@@ -41,6 +41,9 @@ export const Capability = Type.Union(
   [
     Type.Literal("fork"),
     Type.Literal("launcher"),
+    /** A gateway webhook source is configured, so request activity arrives to
+     * be pushed on the `llm_requests` topic. */
+    Type.Literal("llm_events"),
     Type.Literal("llm_stats"),
     Type.Literal("llm_status"),
     Type.Literal("llm_usage"),

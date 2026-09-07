@@ -39,7 +39,7 @@ export const TOPIC_ATTRIBUTES = {
   peers: { roles: ["session", "user"] },
   agents: { roles: ["user"] },
   session_errors: { roles: ["user"] },
-  llm_requests: { roles: ["user"] },
+  llm_requests: { roles: ["user"], capability: "llm_events" },
   llm_status: { roles: ["user"], capability: "llm_status" },
   session_status: { roles: ["user"] },
   transcript: { roles: ["user"] },
