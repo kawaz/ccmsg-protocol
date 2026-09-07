@@ -2,6 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { OP_NAMES } from "../src/attributes.ts";
 import { PARAMETERIZED_TOPICS, PLAIN_TOPICS } from "../src/common/topics.ts";
 import { ERROR_CODES } from "../src/errors.ts";
+import { AgentInfo } from "../src/control/agents.ts";
+import { LlmRequestInfo, LlmStatusReport } from "../src/control/llm.ts";
+import { HelloRequest } from "../src/common/hello.ts";
+import { isValid } from "../src/schemas.ts";
 import { allSchemas, properties } from "./walk.ts";
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
@@ -53,5 +57,36 @@ describe("time and duration fields", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("what the contract does and does not pin down", () => {
+  test("a field this generation has not heard of is carried, not refused", () => {
+    // Within one generation a peer may add optional fields, so an older peer
+    // has to tolerate one it cannot read. Refusing here would make every such
+    // addition a breaking change and leave §8 with nothing to permit.
+    expect(
+      isValid(HelloRequest, {
+        request_id: "1",
+        op: "hello",
+        role: "user",
+        protocol_version: 2,
+        something_added_later: true,
+      }),
+    ).toBe(true);
+  });
+
+  test("a field it does know is held to its type", () => {
+    expect(
+      isValid(HelloRequest, { request_id: "1", op: "hello", role: "user", protocol_version: "2" }),
+    ).toBe(false);
+  });
+});
+
+describe("types whose vocabulary belongs to someone else", () => {
+  test("each says whose, so an unfamiliar value reads as theirs and not as a bug", () => {
+    for (const schema of [AgentInfo, LlmRequestInfo, LlmStatusReport]) {
+      expect(schema.description).toMatch(/^upstream: (claude|llm-gateway) — /);
+    }
   });
 });

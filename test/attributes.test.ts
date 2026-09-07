@@ -8,7 +8,8 @@ import {
   type OpName,
 } from "../src/attributes.ts";
 import { ERROR_CODES } from "../src/errors.ts";
-import { OP_SCHEMAS } from "../src/schemas.ts";
+import { OP_SCHEMAS, TOPIC_SCHEMAS } from "../src/schemas.ts";
+import { TOPIC_ATTRIBUTES } from "../src/common/topics.ts";
 
 describe("op attribute table", () => {
   test("no op is callable by nobody", () => {
@@ -72,12 +73,22 @@ describe("schemas and the table", () => {
     for (const op of Object.keys(OP_SCHEMAS)) expect(OP_NAMES).toContain(op as OpName);
   });
 
-  test("the common and messaging planes are fully specified", () => {
+  test("no op is left without a schema", () => {
     const specified = new Set(Object.keys(OP_SCHEMAS));
-    const missing = [...opsOfPlane("common"), ...opsOfPlane("messaging")].filter(
-      (op) => !specified.has(op),
-    );
-    expect(missing).toEqual([]);
+    expect(OP_NAMES.filter((op) => !specified.has(op))).toEqual([]);
+  });
+
+  test("every topic the attribute table admits carries a frame schema", () => {
+    const framed = new Set(Object.keys(TOPIC_SCHEMAS));
+    const declared = Object.keys(TOPIC_ATTRIBUTES);
+    expect(declared.filter((topic) => !framed.has(topic))).toEqual([]);
+    expect([...framed].filter((topic) => !declared.includes(topic))).toEqual([]);
+  });
+
+  test("a frame schema pins the topic it belongs to", () => {
+    for (const [topic, schema] of Object.entries(TOPIC_SCHEMAS)) {
+      expect((schema as { $id?: string }).$id).toBe(`topic:${topic}`);
+    }
   });
 
   test("a request schema pins the op name it belongs to", () => {
