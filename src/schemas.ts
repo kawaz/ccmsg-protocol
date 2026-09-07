@@ -70,7 +70,6 @@ import {
   SessionSearchRequest,
   SessionSearchResponse,
 } from "./control/session.ts";
-import { TraceWriteRequest, TraceWriteResponse } from "./control/trace.ts";
 import {
   TranscriptFrame,
   TranscriptReadRequest,
@@ -139,7 +138,6 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   translate_run: { request: TranslateRunRequest, response: TranslateRunResponse },
   llm_usage_read: { request: LlmUsageReadRequest, response: LlmUsageReadResponse },
   llm_stats_read: { request: LlmStatsReadRequest, response: LlmStatsReadResponse },
-  trace_write: { request: TraceWriteRequest, response: TraceWriteResponse },
 };
 
 /** The frame schema for every topic.

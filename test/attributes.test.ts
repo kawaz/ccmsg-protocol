@@ -55,9 +55,9 @@ describe("op attribute table", () => {
   test("the planes hold the op counts the contract states", () => {
     expect(opsOfPlane("common")).toHaveLength(5);
     expect(opsOfPlane("messaging")).toHaveLength(4);
-    expect(opsOfPlane("control")).toHaveLength(25);
+    expect(opsOfPlane("control")).toHaveLength(24);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(34);
+    expect(OP_NAMES).toHaveLength(33);
   });
 
   test("role checks read the table", () => {

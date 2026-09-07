@@ -238,7 +238,7 @@ export const OP_ATTRIBUTES = {
     errors: [],
   },
 
-  // --- control: launcher / sandbox / translate / llm / diagnostics (8) ---
+  // --- control: launcher / sandbox / translate / llm (7) ---
   launcher_config_read: {
     plane: "control",
     roles: USER_ONLY,
@@ -292,13 +292,6 @@ export const OP_ATTRIBUTES = {
     roles: USER_ONLY,
     needs_hello: true,
     capability: "llm_stats",
-    locality: "instance-local",
-    errors: [],
-  },
-  trace_write: {
-    plane: "control",
-    roles: USER_ONLY,
-    needs_hello: true,
     locality: "instance-local",
     errors: [],
   },

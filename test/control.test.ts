@@ -47,7 +47,6 @@ import {
   SessionSearchRequest,
   SessionSearchResponse,
 } from "../src/control/session.ts";
-import { TraceWriteRequest } from "../src/control/trace.ts";
 import { TranscriptFrame, TranscriptReadRequest } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
 import { isValid } from "../src/schemas.ts";
@@ -902,43 +901,6 @@ describe("session observation topics", () => {
         data: {
           errors: [{ sid: SID, instance: INSTANCE, text: "x", timestamp: "2026-09-08T00:00:00Z" }],
         },
-      }),
-    ).toBe(false);
-  });
-});
-
-describe("diagnostics", () => {
-  test("a trace names its stages by what happens, not by who does it", () => {
-    expect(
-      isValid(TraceWriteRequest, {
-        request_id: "22",
-        op: "trace_write",
-        sid: SID,
-        start: 0,
-        end: 4_096,
-        size: 4_096,
-        sampled: true,
-        elapsed_ms: 42,
-        points: [
-          { at: NOW, edge: "in", kind: "receive" },
-          { at: NOW + 5, edge: "out", kind: "render" },
-        ],
-      }),
-    ).toBe(true);
-  });
-
-  test("a stage named for one client's own internals is refused", () => {
-    expect(
-      isValid(TraceWriteRequest, {
-        request_id: "22",
-        op: "trace_write",
-        sid: SID,
-        start: 0,
-        end: 1,
-        size: 1,
-        sampled: false,
-        elapsed_ms: 1,
-        points: [{ at: NOW, edge: "in", kind: "dom_commit" }],
       }),
     ).toBe(false);
   });

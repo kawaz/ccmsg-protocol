@@ -12,7 +12,6 @@ export * from "./control/sandbox.ts";
 export * from "./control/session-errors.ts";
 export * from "./control/session-status.ts";
 export * from "./control/session.ts";
-export * from "./control/trace.ts";
 export * from "./control/transcript.ts";
 export * from "./control/translate.ts";
 export * from "./envelope.ts";
