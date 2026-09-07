@@ -1,0 +1,88 @@
+import { type Static, Type } from "@sinclair/typebox";
+import { request, response, topicFrame } from "../envelope.ts";
+import { InstanceId, Mid, Sid, Timestamp } from "../identifiers.ts";
+
+/** Why a message was not handed to its recipient right away.
+ *
+ * These are not errors: the op succeeded and the message is held in the
+ * recipient's inbox. They tell the sender what to do next — wait, resend to
+ * another session, or give up. The op itself fails only when `to` names no
+ * session anywhere in the cluster (`session_not_found`). */
+export const UndeliveredReason = Type.Union(
+  [
+    /** Alive, but not yet listening. The daemon delivers when it starts. */
+    Type.Literal("preparing"),
+    Type.Literal("paused"),
+    /** The session is gone. */
+    Type.Literal("disappeared"),
+    /** The instance holding the session cannot be reached over the mesh. */
+    Type.Literal("instance_unreachable"),
+    /** The recipient's inbox is at its limit; the oldest message was dropped
+     * to make room for this one. */
+    Type.Literal("inbox_full"),
+  ],
+  { $id: "UndeliveredReason" },
+);
+export type UndeliveredReason = Static<typeof UndeliveredReason>;
+
+/** A session the sender could send to instead, offered when the addressee is
+ * paused or gone: a session live now in the same repository. The workspace
+ * name is there because several worktrees of one repository qualify and the
+ * sender has to tell them apart. */
+export const CandidateSession = Type.Object(
+  {
+    sid: Sid,
+    /** Workspace name, when the session runs in a named workspace. */
+    ws: Type.Optional(Type.String()),
+    instance: InstanceId,
+  },
+  { $id: "CandidateSession" },
+);
+export type CandidateSession = Static<typeof CandidateSession>;
+
+export const MessageSendArgs = Type.Object({
+  /** The recipient session. There is no room to address: a message goes to one
+   * session. */
+  to: Sid,
+  text: Type.String({ minLength: 1 }),
+  /** The `mid` of the frame this message answers, when it answers one. */
+  reply_to: Type.Optional(Mid),
+});
+export type MessageSendArgs = Static<typeof MessageSendArgs>;
+
+export const MessageSendResult = Type.Object({
+  /** True when the recipient received it now; false when it went to the inbox
+   * to be delivered once the recipient can take it. */
+  delivered: Type.Boolean(),
+  /** Present when `delivered` is false. */
+  reason: Type.Optional(UndeliveredReason),
+  /** Present when the addressee is paused or gone. */
+  candidates: Type.Optional(Type.Array(CandidateSession)),
+});
+export type MessageSendResult = Static<typeof MessageSendResult>;
+
+export const MessageSendRequest = request("message_send", MessageSendArgs);
+export const MessageSendResponse = response("message_send", MessageSendResult);
+
+/** A message as the recipient receives it, on topic `inbox`.
+ *
+ * To answer it, send to `from`. The route is the sender's id and nothing else,
+ * so no reply instructions travel on the wire: the wording a session sees
+ * belongs to whichever client renders it. */
+export const InboxMessage = Type.Object(
+  {
+    mid: Mid,
+    from: Sid,
+    /** How the sender should be shown, resolved by the issuing instance. */
+    from_label: Type.String(),
+    text: Type.String(),
+    reply_to: Type.Optional(Mid),
+    sent_at: Timestamp,
+  },
+  { $id: "InboxMessage" },
+);
+export type InboxMessage = Static<typeof InboxMessage>;
+
+/** The `inbox` topic. Its snapshot is whatever is still undelivered for this
+ * session; each later frame is one newly arrived message. */
+export const InboxFrame = topicFrame("inbox", Type.Array(InboxMessage));
