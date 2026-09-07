@@ -29,7 +29,7 @@ describe("op attribute table", () => {
   });
 
   test("attributes decide the derived codes", () => {
-    expect(opErrors("hello")).toEqual(["invalid_args", "instance_unreachable"]);
+    expect(opErrors("hello")).toEqual(["invalid_args"]);
     expect(opErrors("session_rename")).toEqual([
       "invalid_args",
       "session_not_found",

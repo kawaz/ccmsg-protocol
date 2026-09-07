@@ -40,18 +40,21 @@ const SESSION_ONLY = ["session"] as const;
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
   // --- common: connect and subscribe (5) ---
+  // `hello` and `instance_ping` address the instance the caller reached, so
+  // there is nothing to forward and no unreachable instance to report — which
+  // is why they are `cluster` despite answering about one instance.
   hello: {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
-    locality: "instance-local",
+    locality: "cluster",
     errors: [],
   },
   instance_ping: {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
-    locality: "instance-local",
+    locality: "cluster",
     errors: [],
   },
   instance_shutdown: {
