@@ -87,6 +87,18 @@ export const InboxMessage = Type.Object(
 );
 export type InboxMessage = Static<typeof InboxMessage>;
 
+/** How long an undelivered message is kept for its recipient. The same window
+ * a lost session stays listed for: a message outliving the session it was
+ * addressed to would be offered to no one, and a session outliving what was
+ * said to it would come back to an empty inbox. */
+export const INBOX_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** How many undelivered messages one session's inbox holds. Beyond it the
+ * oldest is dropped for the newest and the sender is told `inbox_full`. Matched
+ * to what the harness itself will hold for a session, so a message the inbox
+ * accepts is one the recipient can still be handed. */
+export const INBOX_MAX_PER_SID = 256;
+
 /** The `inbox` topic. Its snapshot is whatever is still undelivered for this
  * session; each later frame is one newly arrived message. */
 export const InboxFrame = topicFrame("inbox", Type.Array(InboxMessage));

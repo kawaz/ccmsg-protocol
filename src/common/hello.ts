@@ -1,6 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
 import { Capability, InstanceId, Role, Sid, Timestamp } from "../identifiers.ts";
+import { SessionMetaFields } from "../session-meta.ts";
 
 /** The mesh handshake's opening claim, carried by a `role: "instance"` hello.
  *
@@ -36,6 +37,19 @@ export const HelloArgs = Type.Object({
   mesh: Type.Optional(MeshHello),
   /** The client build, for display in diagnostics. Nothing gates on it. */
   client_version: Type.Optional(Type.String()),
+  /** What a `role: "session"` connection says about itself. All optional: a
+   * session states what it knows, and the instance derives or leaves unknown
+   * what it is not told. The instance repeats these on the `peers` topic, so
+   * they are the same fields under the same names there. */
+  repo: Type.Optional(SessionMetaFields.repo),
+  ws: Type.Optional(SessionMetaFields.ws),
+  cwd: Type.Optional(SessionMetaFields.cwd),
+  transcript_path: Type.Optional(SessionMetaFields.transcript_path),
+  repo_root: Type.Optional(SessionMetaFields.repo_root),
+  branch: Type.Optional(SessionMetaFields.branch),
+  title: Type.Optional(SessionMetaFields.title),
+  model: Type.Optional(SessionMetaFields.model),
+  effort: Type.Optional(SessionMetaFields.effort),
 });
 export type HelloArgs = Static<typeof HelloArgs>;
 

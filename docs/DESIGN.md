@@ -16,6 +16,7 @@ checking to each implementation's hand-written tests, and the two drift.
 | Layer | File | Contents |
 |---|---|---|
 | Identifiers | `src/identifiers.ts` | `sid` / `instance` / `mid`, roles, capabilities, timestamps |
+| Session description | `src/session-meta.ts` | the shared fields naming where a session lives and what it runs as |
 | Errors | `src/errors.ts` | the closed `ErrorCode` union and the error body |
 | Envelope | `src/envelope.ts` | request / response / topic frames / connection events, `PROTOCOL_VERSION` |
 | Op attribute table | `src/attributes.ts` | every op, with its authorization, capability and placement |
@@ -102,6 +103,29 @@ carried as an entry marked `deleted: true`** — an absence in a list of changes
 nothing. Because the namespace becomes part of a topic name it is kept to an identifier, while
 a key may hold what a person typed and is bounded only in length and by rejecting control
 characters.
+
+## Session classification and retention
+
+Where a session lives and what it runs as (`repo`, `ws`, `cwd`, `repo_root`, `branch`,
+`transcript_path`, `title`, `model`, `effort`) is what the session itself states in `hello`
+and what the instance repeats on each `peers` row. The names and types are stated in one
+place (`src/session-meta.ts`), so the side that says them and the side that returns them
+cannot spell them differently. What is not stated is omitted, and what an instance can
+derive it derives.
+
+The classification (`state`) is **derived by the instance and carried on the row**. Handing
+back the raw inputs for a client to assemble would let each instance's reading drift. The
+vocabulary is three for a connected session (`waiting`, `live`, `live_unmanaged`) and two
+for one that was lost (`paused`, `disappeared`), which the presence of `stopped_at` alone
+separates. Being pinned is a mark a person put there rather than a classification, so it
+travels beside it as `pinned`.
+
+The retention windows for undelivered messages and for the last-known list are values the
+contract holds (`INBOX_RETENTION_MS` and `LAST_LIVE_RETENTION_MS` of 7 days,
+`INBOX_MAX_PER_SID` of 256). What a person comes back to is one thing — the session and
+what was said to it — so the two cannot expire at different times. The count is matched to
+what a recipient will hold for one session, keeping what the contract accepts to what the
+recipient can still be handed.
 
 ## Versions and compatibility
 

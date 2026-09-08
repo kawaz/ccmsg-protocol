@@ -1,6 +1,40 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { topicFrame } from "../envelope.ts";
 import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
+import { SessionMetaFields } from "../session-meta.ts";
+
+/** How a session stands, as the instance holding it derives it.
+ *
+ * The instance states the classification rather than the raw inputs it read,
+ * so every client shows the same session the same way. The first three appear
+ * on connected sessions, the last two on sessions the instance has lost; a
+ * client that groups its list groups on this field alone.
+ *
+ * Being pinned is not one of these: a person pins a session, and the mark
+ * travels beside the classification rather than replacing it. */
+export const SessionState = Type.Union(
+  [
+    /** Stopped at something a person has to answer: a dialog it opened, or a
+     * turn that ended in an upstream error. */
+    Type.Literal("waiting"),
+    Type.Literal("live"),
+    /** Alive, but reachable through neither a client connection nor a
+     * terminal, so nothing here can act on it. */
+    Type.Literal("live_unmanaged"),
+    /** Gone, having said it was stopping. */
+    Type.Literal("paused"),
+    /** Gone without saying so. */
+    Type.Literal("disappeared"),
+  ],
+  { $id: "SessionState" },
+);
+export type SessionState = Static<typeof SessionState>;
+
+/** How long a session stays in `last_live` after it was last seen. The same
+ * window the inbox keeps undelivered messages for: what a person comes back to
+ * is one thing — the session and what was said to it — so the two cannot expire
+ * at different times. */
+export const LAST_LIVE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** A client of one session whose greeting was refused.
  *
@@ -31,17 +65,20 @@ export const PeerInfo = Type.Object(
   {
     sid: Sid,
     instance: InstanceId,
-    repo: Type.String(),
-    ws: Type.String(),
-    cwd: Type.String(),
-    /** Present when the session announced a transcript the instance accepted,
-     * which is what decides whether its transcript can be read at all. */
-    transcript_path: Type.Optional(Type.String()),
-    /** Present when the session announced a repository container the instance
-     * accepted. File browsing is rooted here rather than at the working
-     * directory, so sibling workspaces are reachable. */
-    repo_root: Type.Optional(Type.String()),
-    branch: Type.Optional(Type.String()),
+    repo: SessionMetaFields.repo,
+    ws: SessionMetaFields.ws,
+    cwd: SessionMetaFields.cwd,
+    /** Present when the session announced one the instance accepted. */
+    transcript_path: Type.Optional(SessionMetaFields.transcript_path),
+    repo_root: Type.Optional(SessionMetaFields.repo_root),
+    branch: Type.Optional(SessionMetaFields.branch),
+    /** How this session stands. One of `waiting`, `live` or `live_unmanaged`:
+     * a session in this list is connected, so it is by definition not gone.
+     * Absent from an instance that states no classification, and a client then
+     * shows the session without grouping it rather than guessing one. */
+    state: Type.Optional(SessionState),
+    /** Set while a person has pinned this session. Absent means not pinned. */
+    pinned: Type.Optional(Type.Boolean()),
     /** When this session first registered with the instance. Stable across its
      * reconnections, and reset when the instance restarts. */
     connected_at: Type.Optional(Timestamp),
@@ -88,23 +125,31 @@ export const LastLiveSession = Type.Object(
   {
     sid: Sid,
     instance: InstanceId,
-    repo: Type.String(),
-    ws: Type.String(),
-    cwd: Type.String(),
+    repo: SessionMetaFields.repo,
+    ws: SessionMetaFields.ws,
+    cwd: SessionMetaFields.cwd,
     /** Also where the model and effort below were read from. */
-    transcript_path: Type.Optional(Type.String()),
-    repo_root: Type.Optional(Type.String()),
-    branch: Type.Optional(Type.String()),
-    /** The session's own title as of the snapshot, when one was known. Absent
-     * means not known, never untitled. */
-    title: Type.Optional(Type.String()),
+    transcript_path: Type.Optional(SessionMetaFields.transcript_path),
+    repo_root: Type.Optional(SessionMetaFields.repo_root),
+    branch: Type.Optional(SessionMetaFields.branch),
+    title: Type.Optional(SessionMetaFields.title),
+    /** How this session stands: `paused` or `disappeared`, which the
+     * `stopped_at` below is what separates. Absent from an instance that states
+     * no classification. */
+    state: Type.Optional(SessionState),
+    /** Set while a person has pinned this session. Absent means not pinned. */
+    pinned: Type.Optional(Type.Boolean()),
     connected_at: Type.Optional(Timestamp),
     /** The newest instant this session is known to have been alive. */
     last_seen_at: Timestamp,
+    /** When the session said it was stopping. Its presence is what makes this a
+     * pause rather than a disappearance: a session that goes without a word
+     * leaves nothing to stamp here. */
+    stopped_at: Type.Optional(Timestamp),
     /** What its last turn ran as, in the transcript's own spelling. A resume
      * must not quietly switch the session to something else. */
-    model: Type.Optional(Type.String()),
-    effort: Type.Optional(Type.String()),
+    model: Type.Optional(SessionMetaFields.model),
+    effort: Type.Optional(SessionMetaFields.effort),
   },
   { $id: "LastLiveSession" },
 );

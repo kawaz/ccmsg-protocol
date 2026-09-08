@@ -15,6 +15,7 @@ frame が push されるかを schema として書き、daemon と webui の双�
 | 層 | ファイル | 中身 |
 |---|---|---|
 | 識別子 | `src/identifiers.ts` | `sid` / `instance` / `mid` / role / capability / 時刻 |
+| セッションの記述 | `src/session-meta.ts` | セッションの居場所と実行条件を指す共通フィールド |
 | エラー | `src/errors.ts` | `ErrorCode` の閉じた union と error body |
 | 封筒 | `src/envelope.ts` | request / response / topic frame / 接続イベント、`PROTOCOL_VERSION` |
 | op 属性表 | `src/attributes.ts` | 全 op と、その認可・能力・配置 |
@@ -94,6 +95,26 @@ topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapsho
 変化した entry で、**削除は `deleted: true` を付けた entry として届く** (変化の一覧における不在は
 何も言わないため)。ns が topic 名の一部になるので、ns は識別子に限る (key は人が打った文字列を
 許し、長さと制御文字だけを縛る)。
+
+## セッションの分類と保持窓
+
+セッションの居場所と実行条件 (`repo` / `ws` / `cwd` / `repo_root` / `branch` /
+`transcript_path` / `title` / `model` / `effort`) はセッション自身が `hello` で名乗り、
+instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (`src/session-meta.ts`) に
+置き、名乗る側と返す側で綴りが分かれないようにする。名乗られなかったものは省略される
+(instance が導けるものは導く)。
+
+一覧の分類 (`state`) は **instance が導いて行に載せる**。生の入力を返して client 側で
+組み立てると、instance ごとに解釈がずれる。語彙は接続中の 3 つ (`waiting` / `live` /
+`live_unmanaged`) と、失われた側の 2 つ (`paused` / `disappeared`) で、両者を分けるのは
+`stopped_at` の有無ひとつ。Pinned は人が付けた印であって分類ではないので、`pinned` として
+分類の隣に置く。
+
+未配送メッセージと last_live の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` /
+`LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは
+「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。
+件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に
+渡しうるものに保つ。
 
 ## 版と互換
 

@@ -6,8 +6,15 @@ import {
   TopicSubscribeResponse,
   TopicUnsubscribeRequest,
 } from "../src/common/topics.ts";
+import { LAST_LIVE_RETENTION_MS, PeersFrame } from "../src/control/peers.ts";
 import { ErrorResponse } from "../src/envelope.ts";
-import { InboxFrame, MessageSendRequest, MessageSendResponse } from "../src/messaging/message.ts";
+import {
+  INBOX_MAX_PER_SID,
+  INBOX_RETENTION_MS,
+  InboxFrame,
+  MessageSendRequest,
+  MessageSendResponse,
+} from "../src/messaging/message.ts";
 import { NotifyFrame, NotifySendRequest } from "../src/messaging/notify.ts";
 import { SayMarkReadRequest, SayPostRequest } from "../src/messaging/say.ts";
 import { isValid } from "../src/schemas.ts";
@@ -45,6 +52,31 @@ describe("hello", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  test("a session may name where it lives and what it runs as", () => {
+    expect(
+      isValid(HelloRequest, {
+        ...helloRequest,
+        repo: "ccmsg-protocol",
+        ws: "main",
+        cwd: "/repos/kawaz/ccmsg-protocol/main",
+        repo_root: "/repos/kawaz/ccmsg-protocol",
+        branch: "main",
+        transcript_path: "/transcripts/6f1a2b3c.jsonl",
+        title: "pv2-contract",
+        model: "claude-opus-5",
+        effort: "high",
+      }),
+    ).toBe(true);
+  });
+
+  test("a session that names none of it is still a hello", () => {
+    expect(isValid(HelloRequest, helloRequest)).toBe(true);
+  });
+
+  test("a meta field is held to its type", () => {
+    expect(isValid(HelloRequest, { ...helloRequest, cwd: ["/repos"] })).toBe(false);
   });
 
   test("an unknown role is refused", () => {
@@ -295,6 +327,101 @@ describe("say and notify", () => {
         text: "確認して",
       }),
     ).toBe(true);
+  });
+});
+
+describe("the peers topic", () => {
+  const peer = {
+    sid: SID,
+    instance: INSTANCE,
+    repo: "ccmsg-protocol",
+    ws: "main",
+    cwd: "/repos/kawaz/ccmsg-protocol/main",
+    protocol_version: 2,
+  };
+  const lastLive = {
+    sid: OTHER_SID,
+    instance: INSTANCE,
+    repo: "ccmsg",
+    ws: "daemon-v2",
+    cwd: "/repos/kawaz/ccmsg/daemon-v2",
+    last_seen_at: 1_757_300_000_000,
+  };
+
+  test("each entry carries the classification the instance derived", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        snapshot: true,
+        instance: INSTANCE,
+        data: {
+          peers: [
+            { ...peer, state: "waiting", pinned: true },
+            { ...peer, sid: OTHER_SID, state: "live_unmanaged" },
+          ],
+          last_live: [{ ...lastLive, state: "paused", stopped_at: 1_757_299_000_000 }],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a session gone without a word carries no stopped_at", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [], last_live: [{ ...lastLive, state: "disappeared" }] },
+      }),
+    ).toBe(true);
+  });
+
+  test("an entry that states no classification passes", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [peer], last_live: [] },
+      }),
+    ).toBe(true);
+  });
+
+  test("a classification outside the list is refused", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [{ ...peer, state: "busy" }], last_live: [] },
+      }),
+    ).toBe(false);
+  });
+
+  test("an ISO stopped_at is refused", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: {
+          peers: [],
+          last_live: [{ ...lastLive, state: "paused", stopped_at: "2026-09-08T00:00:00Z" }],
+        },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("retention", () => {
+  test("the inbox and the last-known list expire on the same window", () => {
+    expect(INBOX_RETENTION_MS).toBe(LAST_LIVE_RETENTION_MS);
+    expect(LAST_LIVE_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+
+  test("one session's inbox holds 256 undelivered messages", () => {
+    expect(INBOX_MAX_PER_SID).toBe(256);
   });
 });
 

@@ -22,4 +22,5 @@ export * from "./messaging/message.ts";
 export * from "./messaging/notify.ts";
 export * from "./messaging/say.ts";
 export * from "./schemas.ts";
+export * from "./session-meta.ts";
 export * from "./upstream.ts";
