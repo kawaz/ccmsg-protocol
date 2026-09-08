@@ -125,10 +125,6 @@ jobs:
     permissions:
       contents: write # gh release create が tag と release を作る
       id-token: write # npm trusted publishing (OIDC) の token 交換に要る
-    env:
-      # step の `if:` から参照するため job レベルに置く
-      # (secrets context は step の if で読めず、step 自身の env も if には入らない)
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 
@@ -143,6 +139,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false # 依存は bun が入れる (npm の lockfile が無い)
       - name: Update npm (OIDC requires >= 11.5.1)
         run: |
           npm install -g npm@latest
@@ -160,28 +157,14 @@ jobs:
           echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
           ls -lh "$TARBALL"
 
-      # publish 経路は 2 つあり、NPM_TOKEN secret の有無で選ぶ。
-      #
-      # 通常は trusted publishing (OIDC) 経路。token を保管せずに済み、
-      # public repo + public package なら provenance も自動で付く
+      # trusted publishing (OIDC) のみ。token は GitHub に置かない。
+      # public repo + public package なら provenance は自動で付く
       # (docs.npmjs.com/generating-provenance-statements: OIDC 経由では
       # --provenance フラグなしで attestation が生成される)。
-      #
-      # ただし npmjs.com の Trusted Publisher 設定は「対象パッケージの設定画面」
-      # にしか存在せず、パッケージが registry に未登録の間は設定できない。
-      # よって最初の 1 回だけは token が要る。NPM_TOKEN secret を一時的に
-      # 置いた回だけ token 経路に落ち、登録後に secret を消せば OIDC に戻る。
-      # bootstrap 時はリポが private の可能性もあり provenance は付けない
-      # (private repo では attestation 生成自体が失敗する)。
-      - name: Publish (bootstrap, NPM_TOKEN)
-        if: env.NPM_TOKEN != ''
-        env:
-          # setup-node が書いた .npmrc の _authToken がこの変数を参照する
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
-
+      # npmjs.com 側の Trusted Publisher (owner kawaz / repo ccmsg-protocol /
+      # workflow release.yml) は package 登録後にしか設定できないため、
+      # 初版だけは手元の npm ログインで publish する。
       - name: Publish (trusted publishing, OIDC)
-        if: env.NPM_TOKEN == ''
         run: npm publish --access public
 
       # tag は workflow が作る (手で git tag / gh release create を打たない)。

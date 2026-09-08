@@ -4,7 +4,10 @@
   "description": "Wire contract (schema + types + op attribute table) shared by the ccmsg daemon and web UI",
   "license": "MIT",
   "author": "kawaz",
-  "repository": "github:kawaz/ccmsg-protocol",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kawaz/ccmsg-protocol.git"
+  },
   "files": [
     "src"
   ],
