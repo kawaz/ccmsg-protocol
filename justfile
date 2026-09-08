@@ -28,11 +28,7 @@ default:
 # ---------- main entries ----------
 
 # push (バージョン bump 済みを前提、全 gate 通過後に push)
-push: _require-remote check-on-default-branch ensure-clean ci check-translations check-version-bumped
-    bump-semver vcs push --branch main --jj-bookmark-auto-advance
-
-# push (ドキュメント更新等のみで bump 不要な場合)
-push-without-bump: _require-remote check-on-default-branch ensure-clean ci check-translations
+push: check-on-default-branch ensure-clean ci check-translations check-version-bumped
     bump-semver vcs push --branch main --jj-bookmark-auto-advance
 
 # version を bump して Release commit を作成 (push は別途 `just push`)
@@ -67,14 +63,6 @@ test: lint typecheck
 # ---------- check recipes (push の sanity 検証) ----------
 
 # remote 未設定の間は push を止める (雛形段階。GitHub 側リポ作成後にこの recipe を削る)
-[private]
-[script]
-_require-remote:
-    if ! git remote get-url origin >/dev/null 2>&1; then
-        printf >&2 "⚠ origin が未設定です。ローカル雛形の間は push しません\n"
-        exit 1
-    fi
-
 # 現在の bookmark/branch が default (= main) 上にあるか確認
 [private]
 [script]
