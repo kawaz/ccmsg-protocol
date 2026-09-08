@@ -1,4 +1,4 @@
-name: Release
+name: Publish
 
 on:
   push:
@@ -162,8 +162,7 @@ jobs:
       # (docs.npmjs.com/generating-provenance-statements: OIDC 経由では
       # --provenance フラグなしで attestation が生成される)。
       # npmjs.com 側の Trusted Publisher (owner kawaz / repo ccmsg-protocol /
-      # workflow release.yml) は package 登録後にしか設定できないため、
-      # 初版だけは手元の npm ログインで publish する。
+      # workflow publish.yml) が publish を許可する。
       - name: Publish (trusted publishing, OIDC)
         run: npm publish --access public
 
