@@ -35,10 +35,13 @@ export const DIRECT_DELIVERY_FROM_MODE = "prompting";
 /** How the recipient answers: the one line of instruction in the body.
  *
  * A command and not a description of one, because the recipient acts on it
- * directly. `reply` names the thing being done and takes the frame it answers,
- * so nothing has to be looked up to use it. */
-export function directDeliveryReplyLine(mid: Mid): string {
-  return `Reply with: ccmsg reply ${mid} <text>`;
+ * directly. It carries both halves of the address — the sender to send to, and
+ * the frame being answered — so nothing has to be looked up to use it. A `mid`
+ * does not name its sender, and the alternative to spelling the sid out here
+ * would be an op that resolves one, which means a sent-message index the
+ * daemon does not otherwise need. */
+export function directDeliveryReplyLine(mid: Mid, from: Sid): string {
+  return `Reply with: ccmsg reply ${mid} --to ${from} <text>`;
 }
 
 /** An `InboxMessage` as it reaches a session through the messaging socket. */
@@ -94,7 +97,7 @@ export function renderDirectDelivery(message: InboxMessage): string {
   if (message.reply_to !== undefined) {
     attributes.push(`ccmsg-reply-to="${escapeAttribute(message.reply_to)}"`);
   }
-  const body = `${message.text}\n\n${directDeliveryReplyLine(message.mid)}`;
+  const body = `${message.text}\n\n${directDeliveryReplyLine(message.mid, message.from)}`;
   return `<${DIRECT_DELIVERY_TAG} ${attributes.join(" ")}>\n${body}\n</${DIRECT_DELIVERY_TAG}>`;
 }
 
@@ -128,7 +131,7 @@ export function parseDirectDelivery(delivered: string): DirectDelivery | undefin
   if (mid === undefined || from === undefined || from_label === undefined) return undefined;
 
   let text = delivered.slice(opening[0].length, end);
-  const suffix = `\n\n${directDeliveryReplyLine(mid)}`;
+  const suffix = `\n\n${directDeliveryReplyLine(mid, from)}`;
   if (text.endsWith(suffix)) text = text.slice(0, -suffix.length);
 
   const reply_to = attributes.get("ccmsg-reply-to");

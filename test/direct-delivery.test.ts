@@ -36,8 +36,12 @@ describe("what the recipient is told", () => {
     expect(renderDirectDelivery(message)).not.toContain("uds:");
   });
 
-  test("the way back is one runnable line naming the frame", () => {
-    expect(renderDirectDelivery(message)).toContain(`Reply with: ccmsg reply ${MID} <text>`);
+  test("the way back is one runnable line carrying both the frame and the sender", () => {
+    // A `mid` does not name its sender, so the sid is spelled out rather than
+    // left to be resolved.
+    expect(renderDirectDelivery(message)).toContain(
+      `Reply with: ccmsg reply ${MID} --to ${SID} <text>`,
+    );
   });
 
   test("a message that answers one says which", () => {
@@ -82,7 +86,7 @@ describe("reading it back", () => {
   });
 
   test("a body ending in something that looks like the reply line keeps it", () => {
-    const looksLike = { ...message, text: directDeliveryReplyLine(EARLIER_MID) };
+    const looksLike = { ...message, text: directDeliveryReplyLine(EARLIER_MID, SID) };
     expect(parseDirectDelivery(renderDirectDelivery(looksLike))?.text).toBe(looksLike.text);
   });
 

@@ -58,7 +58,9 @@ body, where `from` / `from-name` / `from-mode` are the origin the receiving harn
 `ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. `from` holds
 neither a sid nor a `uds:` path — those are addresses the harness actually dials, and dialing
 one that has gone ends the recipient's turn in failure. The way back is one line at the end of
-the body (`Reply with: ccmsg reply <mid> <text>`), which the recipient runs itself.
+the body (`Reply with: ccmsg reply <mid> --to <sid> <text>`), which the recipient runs itself.
+The sid is spelled out because a `mid` does not name its sender; making it resolvable instead
+would take an op for it, and that op a sent-message index the daemon does not otherwise need.
 
 `text` travels untouched. What the model reads is those characters, so replacing them with
 entities would hand it a corrupted message to answer. A body containing the closing tag is
