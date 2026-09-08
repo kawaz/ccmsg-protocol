@@ -5,7 +5,6 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
 | 2026-09-08 | design | open | [peer-busy-and-main-rule](./2026-09-08-peer-busy-and-main-rule.md) | daemon v2 の gateway 取り込みで判明した契約の穴 2 つ。PeerInfo に忙しさ欄が無い、Llm… |
-| 2026-09-08 | design | open | [topic-granularity-attribute](./2026-09-08-topic-granularity-attribute.md) | topic の差分粒度 (全量置換 / instance ごとの全量置換 / 要素の追加・更新 / 追記 / eve… |
 | 2026-09-08 | design | open | [message-sender-identity](./2026-09-08-message-sender-identity.md) | `InboxMessage.from` が `Sid` 必須だが `message_send` の roles は session と use… |
 
 <!--
