@@ -1,6 +1,6 @@
 ---
 title: message_send の from をどう表すか (Sid 必須 vs user role)
-status: open
+status: resolved
 category: design
 created: 2026-09-08T13:39:56+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-08T22:56:26+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done:v0.4.0 で Sender = Sid | \"user\" と PeerInfo.title を追加 (commit 83afe875)"]
 blocked_by:
 origin: kawaz/ccmsg
 ---
