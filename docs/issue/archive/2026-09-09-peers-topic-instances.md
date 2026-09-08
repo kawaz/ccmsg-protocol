@@ -1,6 +1,6 @@
 ---
 title: PeersFrame に instances[] を追加し mesh 断絶を purely topic 経由で購読可能にする
-status: open
+status: resolved
 category: design
 created: 2026-09-09T01:37:55+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-09T02:01:55+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done: v0.6.0 で PeersFrame.instances (InstanceInfo[]、optional) を追加 (commit ce2cd460)"]
 blocked_by:
 origin: 自リポ TODO
 ---
