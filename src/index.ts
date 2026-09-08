@@ -18,6 +18,7 @@ export * from "./control/translate.ts";
 export * from "./envelope.ts";
 export * from "./errors.ts";
 export * from "./identifiers.ts";
+export * from "./messaging/direct-delivery.ts";
 export * from "./messaging/message.ts";
 export * from "./messaging/notify.ts";
 export * from "./messaging/say.ts";

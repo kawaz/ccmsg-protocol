@@ -72,7 +72,8 @@ export const MessageSendResponse = response("message_send", MessageSendResult);
  *
  * To answer it, send to `from`. The route is the sender's id and nothing else,
  * so no reply instructions travel on the wire: the wording a session sees
- * belongs to whichever client renders it. */
+ * belongs to whoever renders it — see `direct-delivery.ts` for the one route
+ * whose recipient reads text instead of this frame. */
 export const InboxMessage = Type.Object(
   {
     mid: Mid,

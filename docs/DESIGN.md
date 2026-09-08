@@ -45,6 +45,27 @@ inbox and why (the recipient is still starting up, paused, gone, unreachable ove
 out of inbox room, or not taking anything at the moment), so the sender can choose between
 waiting and addressing another session.
 
+## Wording a message handed over directly
+
+One recipient cannot read the delivery frame. It is the route that writes into the harness's
+own messaging socket: there the recipient is the model rather than a client, and what arrives
+is one block of text. With no frame to look at, **a message without `mid` and `from` in its
+body cannot be answered** — the recipient knows something came and not what to answer or how.
+So this one wording belongs to the contract (`renderDirectDelivery` / `parseDirectDelivery`).
+
+The shape is the harness's own sender convention: `<cross-session-message>` embedded in the
+body, where `from` / `from-name` / `from-mode` are the origin the receiving harness reads and
+`ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. `from` holds
+neither a sid nor a `uds:` path — those are addresses the harness actually dials, and dialing
+one that has gone ends the recipient's turn in failure. The way back is one line at the end of
+the body (`Reply with: ccmsg reply <mid> <text>`), which the recipient runs itself.
+
+`text` travels untouched. What the model reads is those characters, so replacing them with
+entities would hand it a corrupted message to answer. A body containing the closing tag is
+delivered rather than refused (one substring must not lose a message), and the closing tag is
+found from the end. Only attribute values are escaped — `&` `<` `>` `"` — so a value cannot
+leave its quotes.
+
 ## The op attribute table
 
 `OP_ATTRIBUTES` declares the following for every op. Authorization, capability gating and
