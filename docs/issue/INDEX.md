@@ -4,6 +4,7 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
+| 2026-09-09 | design | open | [session-status-partial-marker](./2026-09-09-session-status-partial-marker.md) | daemon v2 の fold は末尾 1 MiB seed のため累積フィールドが窓から落ちて消える |
 | 2026-09-08 | design | open | [say-unread-on-wire](./2026-09-08-say-unread-on-wire.md) | `say_post`/`say_mark_read` の未読マークを運ぶ契約フィールドが無い |
 
 <!--
