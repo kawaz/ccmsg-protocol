@@ -27,7 +27,7 @@ frame が push されるかを schema として書き、daemon と webui の双�
 
 | 面 | 誰が使うか | 中身 |
 |---|---|---|
-| common | 全員 | 接続 (`hello` / `instance_ping` / `instance_shutdown`) と購読 (`topic_subscribe` / `topic_unsubscribe`) |
+| common | 全員 | 接続 (`hello` / `instance_ping` / `instance_shutdown`)、終了の宣言 (`session_stopping`)、購読 (`topic_subscribe` / `topic_unsubscribe`) |
 | messaging | エージェント (session role)、人 (webui 経由の user role) | sid 宛の 1 対 1 配送、say、notify |
 | control | webui、CLI の管理コマンド (user role) | セッション観測・操作、ファイル、launcher、sandbox、llm、診断 |
 | mesh | instance 同士 | op を持たない。封筒の `to_instance` / `from_instance` / `hops` だけ |
@@ -159,6 +159,12 @@ instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (
 `stopped_at` の有無ひとつ。Pinned は人が付けた印であって分類ではないので、`pinned` として
 分類の隣に置く。
 
+`stopped_at` が付く入口は `session_stopping` ひとつ。セッションが自分で「これから止まる」と
+宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは
+`disappeared` になる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で
+決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の
+CLI がその代理になる。
+
 **忙しさも分類ではなく行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として
 載せる。接続中のどの分類であっても忙しくはなり得るので、`state` に畳むと片方が失われる。
 真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client
@@ -191,7 +197,7 @@ mesh-peer-auth。
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
+| op | 37 | common 6 / messaging 4 / control 27 / mesh 0 |
 | topic | 10 | messaging 2 (`inbox` / `notify`)、control 8 |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 17 | 閉じた union |

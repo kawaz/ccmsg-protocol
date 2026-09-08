@@ -44,7 +44,11 @@ export const Mid = Type.String({
 export type Mid = Static<typeof Mid>;
 
 /** Who a connection speaks as. Set once by `hello` and fixed for the
- * connection's life; the op attribute table's `roles` is checked against it. */
+ * connection's life; the op attribute table's `roles` is checked against it.
+ *
+ * Once by `hello` means once: a second `hello` on a connection whose identity
+ * is already settled is refused with `bad_request`, whether it repeats the
+ * role or names another. */
 export const Role = Type.Union(
   [Type.Literal("session"), Type.Literal("user"), Type.Literal("instance")],
   { $id: "Role" },

@@ -28,7 +28,7 @@ checking to each implementation's hand-written tests, and the two drift.
 
 | Plane | Who uses it | Contents |
 |---|---|---|
-| common | everyone | connecting (`hello` / `instance_ping` / `instance_shutdown`) and subscribing (`topic_subscribe` / `topic_unsubscribe`) |
+| common | everyone | connecting (`hello` / `instance_ping` / `instance_shutdown`), declaring the end (`session_stopping`), and subscribing (`topic_subscribe` / `topic_unsubscribe`) |
 | messaging | agents (session role) and people (user role, through the web UI) | one-to-one delivery to a sid, say, notify |
 | control | the web UI and the CLI's admin commands (user role) | session observation and operation, files, launcher, sandbox, llm, diagnostics |
 | mesh | instances among themselves | no ops of its own — only the envelope's `to_instance` / `from_instance` / `hops` |
@@ -172,6 +172,13 @@ for one that was lost (`paused`, `disappeared`), which the presence of `stopped_
 separates. Being pinned is a mark a person put there rather than a classification, so it
 travels beside it as `pinned`.
 
+There is one way in to `stopped_at`: `session_stopping`, by which a session states that it
+is about to stop, with the instance holding that declaration until the disconnection
+arrives so that the two are one event in that order. A session that goes without saying so
+is `disappeared` — what separates stopping on purpose from being lost is the declaration,
+not an observation. The session itself calls it (the role is `session` alone), with the
+harness's end-of-session hook or the `ccmsg` CLI standing in for it.
+
 **How busy a session is is an attribute of the row too**, carried as `gateway_active_at`:
 when inference last ran for it. A session can be busy in any of the connected
 classifications, so folding it into `state` would lose one of the two. It is an instant
@@ -208,7 +215,7 @@ procedure of record is mesh-peer-auth in the main ccmsg repository.
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
+| ops | 37 | common 6 / messaging 4 / control 27 / mesh 0 |
 | topics | 10 | messaging 2 (`inbox` / `notify`), control 8 |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 17 | one closed union |

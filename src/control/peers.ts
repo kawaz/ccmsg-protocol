@@ -68,7 +68,10 @@ export const PeerInfo = Type.Object(
     repo: SessionMetaFields.repo,
     ws: SessionMetaFields.ws,
     cwd: SessionMetaFields.cwd,
-    /** Present when the session announced one the instance accepted. */
+    /** Present when the session announced one the instance accepted. What an
+     * instance accepts is its own rule — the reference one takes a path under
+     * the `projects/` tree of its own config home, so that a session cannot
+     * turn a transcript read into a read of any file it names. */
     transcript_path: Type.Optional(SessionMetaFields.transcript_path),
     repo_root: Type.Optional(SessionMetaFields.repo_root),
     branch: Type.Optional(SessionMetaFields.branch),

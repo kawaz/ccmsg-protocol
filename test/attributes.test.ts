@@ -53,11 +53,11 @@ describe("op attribute table", () => {
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(5);
+    expect(opsOfPlane("common")).toHaveLength(6);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(27);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(36);
+    expect(OP_NAMES).toHaveLength(37);
     expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(10);
   });
 
@@ -71,6 +71,8 @@ describe("op attribute table", () => {
     expect(isRoleAllowed("say_post", "user")).toBe(false);
     expect(isRoleAllowed("say_mark_read", "session")).toBe(false);
     expect(isRoleAllowed("session_kill", "user")).toBe(true);
+    expect(isRoleAllowed("session_stopping", "session")).toBe(true);
+    expect(isRoleAllowed("session_stopping", "user")).toBe(false);
   });
 });
 

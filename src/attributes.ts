@@ -2,7 +2,8 @@ import type { ErrorCode } from "./errors.ts";
 import type { Capability, Role } from "./identifiers.ts";
 
 /** Which face of the contract an op belongs to. `common` is the transport
- * level (connect / subscribe), which every face uses. `mesh` holds no ops: an
+ * level (connect, declare the end of a connection, subscribe), which every
+ * face uses. `mesh` holds no ops: an
  * op crosses instances by carrying the envelope's mesh fields, not by being a
  * different op. */
 export type Plane = "common" | "messaging" | "control" | "mesh";
@@ -39,7 +40,7 @@ const SESSION_ONLY = ["session"] as const;
  * facts live: authorization, capability gating and forwarding all read it
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
-  // --- common: connect and subscribe (5) ---
+  // --- common: connect, declare the end, and subscribe (6) ---
   // `hello` and `instance_ping` address the instance the caller reached, so
   // there is nothing to forward and no unreachable instance to report — which
   // is why they are `cluster` despite answering about one instance.
@@ -60,6 +61,13 @@ export const OP_ATTRIBUTES = {
   instance_shutdown: {
     plane: "common",
     roles: USER_ONLY,
+    needs_hello: true,
+    locality: "instance-local",
+    errors: [],
+  },
+  session_stopping: {
+    plane: "common",
+    roles: SESSION_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: [],

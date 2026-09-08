@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { HelloRequest, HelloResponse } from "../src/common/hello.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
+import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import {
   TopicSubscribeRequest,
   TopicSubscribeResponse,
@@ -162,6 +163,44 @@ describe("instance_ping", () => {
     expect(isValid(InstancePingResponse, { ...pong, started_at: "2026-09-08T00:00:00Z" })).toBe(
       false,
     );
+  });
+});
+
+describe("session_stopping", () => {
+  test("a session may say it is going without saying why", () => {
+    expect(isValid(SessionStoppingRequest, { request_id: "2b", op: "session_stopping" })).toBe(
+      true,
+    );
+  });
+
+  test("the reason travels in the harness's own spelling", () => {
+    expect(
+      isValid(SessionStoppingRequest, {
+        request_id: "2b",
+        op: "session_stopping",
+        reason: "prompt_input_exit",
+      }),
+    ).toBe(true);
+  });
+
+  test("an empty reason is refused — omit it instead", () => {
+    expect(
+      isValid(SessionStoppingRequest, { request_id: "2b", op: "session_stopping", reason: "" }),
+    ).toBe(false);
+  });
+
+  test("the reply stamps the instant the pause will carry", () => {
+    expect(
+      isValid(SessionStoppingResponse, {
+        ok: true,
+        request_id: "2b",
+        stopped_at: 1_757_299_000_000,
+      }),
+    ).toBe(true);
+  });
+
+  test("a reply without that instant is refused", () => {
+    expect(isValid(SessionStoppingResponse, { ok: true, request_id: "2b" })).toBe(false);
   });
 });
 

@@ -26,6 +26,21 @@ export const MeshHello = Type.Object(
 );
 export type MeshHello = Static<typeof MeshHello>;
 
+/** The greeting that settles what a connection is.
+ *
+ * Which of the fields below are required is decided by `role`, which no single
+ * object schema can state — so the instance checks it, and a greeting that
+ * breaks one of these is refused with `invalid_args`:
+ *
+ * - `role: "session"` carries `sid`.
+ * - `role: "user"` carries no `sid`: a person speaks for no one session, and a
+ *   greeting that names one is refused rather than quietly ignored.
+ * - `role: "instance"` carries `mesh`.
+ *
+ * A field that belongs to another role is as much a refusal as a missing one:
+ * `mesh` on a session greeting says the caller has confused which handshake it
+ * is in, and accepting it would leave the connection settled as something
+ * neither side meant. */
 export const HelloArgs = Type.Object({
   role: Role,
   /** The generation the caller speaks. A hello announcing another generation

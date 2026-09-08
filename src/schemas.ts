@@ -3,7 +3,12 @@ import { TypeCompiler, type TypeCheck } from "@sinclair/typebox/compiler";
 import type { OpName } from "./attributes.ts";
 import { HelloRequest, HelloResponse } from "./common/hello.ts";
 import { InstancePingRequest, InstancePingResponse } from "./common/ping.ts";
-import { InstanceShutdownRequest, InstanceShutdownResponse } from "./common/shutdown.ts";
+import {
+  InstanceShutdownRequest,
+  InstanceShutdownResponse,
+  SessionStoppingRequest,
+  SessionStoppingResponse,
+} from "./common/shutdown.ts";
 import {
   TopicSubscribeRequest,
   TopicSubscribeResponse,
@@ -108,6 +113,7 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   hello: { request: HelloRequest, response: HelloResponse },
   instance_ping: { request: InstancePingRequest, response: InstancePingResponse },
   instance_shutdown: { request: InstanceShutdownRequest, response: InstanceShutdownResponse },
+  session_stopping: { request: SessionStoppingRequest, response: SessionStoppingResponse },
   topic_subscribe: { request: TopicSubscribeRequest, response: TopicSubscribeResponse },
   topic_unsubscribe: { request: TopicUnsubscribeRequest, response: TopicUnsubscribeResponse },
   message_send: { request: MessageSendRequest, response: MessageSendResponse },
