@@ -304,6 +304,44 @@ describe("message_send", () => {
     ).toBe(true);
   });
 
+  test("a forwarded request may name the connection it came from", () => {
+    expect(
+      isValid(MessageSendRequest, {
+        request_id: "5",
+        op: "message_send",
+        to: OTHER_SID,
+        text: "hi",
+        from_instance: INSTANCE,
+        hops: [INSTANCE],
+        caller: { role: "session", sid: SID },
+      }),
+    ).toBe(true);
+  });
+
+  test("a person's request names a role and no session", () => {
+    expect(
+      isValid(MessageSendRequest, {
+        request_id: "5",
+        op: "message_send",
+        to: OTHER_SID,
+        text: "hi",
+        caller: { role: "user" },
+      }),
+    ).toBe(true);
+  });
+
+  test("a caller without a role is refused — the role is what is dispatched on", () => {
+    expect(
+      isValid(MessageSendRequest, {
+        request_id: "5",
+        op: "message_send",
+        to: OTHER_SID,
+        text: "hi",
+        caller: { sid: SID },
+      }),
+    ).toBe(false);
+  });
+
   test("delivery succeeded", () => {
     expect(isValid(MessageSendResponse, { ok: true, request_id: "5", delivered: true })).toBe(true);
   });
@@ -474,6 +512,36 @@ describe("the peers topic", () => {
         topic: "peers",
         instance: INSTANCE,
         data: { peers: [{ ...peer, gateway_active_at: true }], last_live: [] },
+      }),
+    ).toBe(false);
+  });
+
+  test("a frame may carry the sending instance's view of the mesh", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        snapshot: true,
+        instance: INSTANCE,
+        data: {
+          peers: [peer],
+          last_live: [],
+          instances: [
+            { id: INSTANCE, host: "mba", reachable: true },
+            { id: "wss://nuc.example.ts.net/ccmsg/personal", host: "nuc", reachable: false },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("an instance entry without its reachability is refused", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [], last_live: [], instances: [{ id: INSTANCE, host: "mba" }] },
       }),
     ).toBe(false);
   });

@@ -196,6 +196,18 @@ instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello
 (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。手順の正本は ccmsg 本体リポの
 mesh-peer-auth。
 
+転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら
+`sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の
+主張だけ — 転送元は認証済み peer なので「誰が呼んだか」の申告は信じる、という 1 deployment
+内でだけ成り立つ前提に立つ。`caller` の無い転送 request は接続そのものの role (`instance`)
+で扱われ、instance-local op は属性表どおり `forbidden` になる。同じ instance を 2 度通る
+request は封筒の `hops` で落とし、ループさせない。
+
+mesh の断絶は購読からも見える。`peers` の frame は発生元 instance が見た instance 一覧
+(`instances`、`reachable` 付き) を任意で載せられるので、断絶を知るために `hello` を叩き直す
+必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは
+正常にあり得る。
+
 ## 契約が持つもの
 
 | 単位 | 数 | 内訳 |

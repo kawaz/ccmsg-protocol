@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import { InstanceInfo } from "../common/hello.ts";
 import { topicFrame } from "../envelope.ts";
 import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
 import { SessionMetaFields } from "../session-meta.ts";
@@ -189,5 +190,15 @@ export const PeersFrame = topicFrame(
   Type.Object({
     peers: Type.Array(PeerInfo),
     last_live: Type.Array(LastLiveSession),
+    /** The instances the sending one can see, itself included, as `hello`
+     * answers it. Carried here so that a link going down is something a
+     * subscriber learns from the topic it is already on, rather than by
+     * greeting again to find out. It is the sender's own view like the two
+     * lists above — `reachable` says whether that instance can reach the one it
+     * names, which two instances may legitimately disagree about.
+     *
+     * Absent from an instance that states no view; a client then keeps what it
+     * last knew rather than reading the omission as nothing being reachable. */
+    instances: Type.Optional(Type.Array(InstanceInfo)),
   }),
 );

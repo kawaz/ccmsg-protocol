@@ -1,6 +1,6 @@
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import { ErrorBody } from "./errors.ts";
-import { InstanceId } from "./identifiers.ts";
+import { InstanceId, Role, Sid } from "./identifiers.ts";
 
 /** The generation of this wire contract. Within a generation, only optional
  * fields and whole new ops may be added; a removal or a change of meaning
@@ -8,14 +8,27 @@ import { InstanceId } from "./identifiers.ts";
  * connections and on mesh links alike. */
 export const PROTOCOL_VERSION = 2;
 
+/** The identity a forwarded request is dispatched as: the connection the
+ * forwarding instance received it on, in the two fields that decide anything —
+ * the role the attribute table is read against, and the session it speaks for. */
+export const CallerIdentity = Type.Object(
+  {
+    role: Role,
+    /** Present exactly when the role is `session`, as in `hello`. */
+    sid: Type.Optional(Sid),
+  },
+  { $id: "CallerIdentity" },
+);
+export type CallerIdentity = Static<typeof CallerIdentity>;
+
 /** Fields a request carries in addition to its own arguments.
  *
  * `request_id` pairs a reply with its request so one connection can run its
  * requests concurrently instead of in arrival order. Uniqueness only has to
  * hold among one connection's in-flight requests.
  *
- * The three mesh fields are the whole of the mesh plane: an op forwarded to
- * another instance is the same op in the same shape, wrapped in these. */
+ * The mesh fields are the whole of the mesh plane: an op forwarded to another
+ * instance is the same op in the same shape, wrapped in these. */
 export const RequestEnvelope = Type.Object(
   {
     request_id: Type.String({ minLength: 1 }),
@@ -28,6 +41,19 @@ export const RequestEnvelope = Type.Object(
     /** Instances this request has already passed through, in order. A request
      * that would revisit an instance is dropped rather than looped. */
     hops: Type.Optional(Type.Array(InstanceId)),
+    /** Who the forwarding instance says made this request.
+     *
+     * The destination runs every stage of dispatch again against this identity
+     * — the role check, the capability check, the whole of it — rather than
+     * taking the forwarder's outcome for it. What it does take is the identity
+     * itself: the forwarder is an authenticated peer, so what it says about who
+     * called is believed, which is the assumption that holds inside one
+     * deployment and nowhere else.
+     *
+     * A forwarded request that names none is dispatched as the `instance` role
+     * it arrived on, which the attribute table already answers: an
+     * instance-local op called by an instance is `forbidden`. */
+    caller: Type.Optional(CallerIdentity),
   },
   { $id: "RequestEnvelope" },
 );

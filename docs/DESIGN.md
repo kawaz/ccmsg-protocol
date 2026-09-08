@@ -215,6 +215,20 @@ Authentication between instances happens once, at connection time, and a `role: 
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The
 procedure of record is mesh-peer-auth in the main ccmsg repository.
 
+A forwarded request is authorized again in full at its destination. The envelope's `caller`
+(a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the
+forwarder's own verdict is not carried over. What is taken on trust is the claim itself — the
+forwarder is an authenticated peer, so its word on who called is believed, an assumption that
+holds inside one deployment and nowhere else. A forwarded request naming no caller is
+dispatched as the role of the connection it arrived on (`instance`), which the attribute table
+answers with `forbidden` for every instance-local op. A request that would pass through the
+same instance twice is dropped on the envelope's `hops` rather than looped.
+
+A broken link is visible from a subscription too. A `peers` frame may carry the sending
+instance's view of the instances (`instances`, each with `reachable`), so learning that a link
+went down does not mean greeting again to find out. Reachability is stated from the sender's
+position, so two instances legitimately disagreeing about one is not a fault.
+
 ## What the contract holds
 
 | Unit | Count | Breakdown |
