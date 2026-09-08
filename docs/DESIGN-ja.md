@@ -59,9 +59,12 @@ user の両 role で、人 (webui) は sid を持たない。だから `from` �
 
 形はハーネス自身の送信側規約に乗せる。本文に `<cross-session-message>` を埋め、
 `from` / `from-name` / `from-mode` は受信ハーネスが読む origin、`ccmsg-mid` /
-`ccmsg-from` / `ccmsg-reply-to` は契約側の識別子を置く。`from` には sid も
-`uds:` パスも書かない — それらはハーネスが実際にダイヤルする宛先で、消えた相手に
-ダイヤルすると受信側のターンが失敗で終わる。返る道は本文末尾の 1 行
+`ccmsg-from` / `ccmsg-reply-to` は契約側の識別子を置く。本文の `from` は `ccmsg` 固定で、
+sid も `uds:` パスも書かない — それらはハーネスが実際にダイヤルする宛先で、消えた相手に
+ダイヤルすると受信側のターンが失敗で終わる。書き込む frame 側の `from` はこれとは別で、
+instance が送達ステータスを受ける `uds:` パスを名乗ってよい。その receipt は `refused` /
+`denied` / `dropped` / `expired` / `held` の否定応答だけで、肯定応答は無い (= 期限内の
+沈黙が配送成功)。返る道は本文末尾の 1 行
 (`Reply with: ccmsg reply <mid> --to <sid> <text>`) で、これは受け手自身が実行する。
 宛先 sid を書き下すのは `mid` が送信者を含まないため。引かせる形にすると mid → 送信者の
 op が要り、そのために daemon が送信済み索引を持つことになる。

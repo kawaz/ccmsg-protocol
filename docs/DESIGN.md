@@ -62,9 +62,13 @@ So this one wording belongs to the contract (`renderDirectDelivery` / `parseDire
 
 The shape is the harness's own sender convention: `<cross-session-message>` embedded in the
 body, where `from` / `from-name` / `from-mode` are the origin the receiving harness reads and
-`ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. `from` holds
-neither a sid nor a `uds:` path — those are addresses the harness actually dials, and dialing
-one that has gone ends the recipient's turn in failure. The way back is one line at the end of
+`ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. In the body
+`from` is always `ccmsg` and holds neither a sid nor a `uds:` path — those are addresses the
+harness actually dials, and dialing one that has gone ends the recipient's turn in failure.
+The `from` of the frame it is written in is a separate address, where the instance may name a
+`uds:` socket of its own to receive delivery status on. Those receipts are negative only —
+`refused`, `denied`, `dropped`, `expired`, `held` — so silence within the window is delivery.
+The way back is one line at the end of
 the body (`Reply with: ccmsg reply <mid> --to <sid> <text>`), which the recipient runs itself.
 The sid is spelled out because a `mid` does not name its sender; making it resolvable instead
 would take an op for it, and that op a sent-message index the daemon does not otherwise need.

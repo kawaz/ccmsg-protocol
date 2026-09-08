@@ -23,9 +23,14 @@ export const DIRECT_DELIVERY_TAG = "cross-session-message";
  *
  * Not the sender's session and not a `uds:` path. Those are the addresses the
  * harness itself dials, and dialing one that has gone ends the recipient's turn
- * in failure; the sender here is a daemon that offers no such socket anyway.
- * A name asks for no answer, so there is nothing to dangle — the way back is
- * the reply line, which the recipient runs rather than the harness. */
+ * in failure. A name asks for no answer, so there is nothing to dangle — the
+ * way back is the reply line, which the recipient runs rather than the harness.
+ *
+ * The frame this wrapper is written in is a separate address: there the
+ * instance may name a `uds:` socket of its own, which is where the receiving
+ * harness writes what became of the delivery. Those receipts are negative only
+ * — `refused`, `denied`, `dropped`, `expired`, `held` — so silence within the
+ * window is what says the message was taken. */
 export const DIRECT_DELIVERY_FROM = "ccmsg";
 
 /** What the recipient is told the sender is doing. `prompting` is what a peer
