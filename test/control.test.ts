@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { TopicSubscribeRequest } from "../src/common/topics.ts";
 import { AgentsFrame } from "../src/control/agents.ts";
 import {
   DirListRequest,
@@ -31,6 +32,14 @@ import {
   LlmStatusFrame,
   LlmUsageReadResponse,
 } from "../src/control/llm.ts";
+import {
+  KvDeleteRequest,
+  KvFrame,
+  KvReadRequest,
+  KvReadResponse,
+  KvWriteRequest,
+  KvWriteResponse,
+} from "../src/control/kv.ts";
 import { PeersFrame } from "../src/control/peers.ts";
 import { SandboxGrantRequest, SandboxGrantResponse } from "../src/control/sandbox.ts";
 import { SessionErrorsFrame } from "../src/control/session-errors.ts";
@@ -901,6 +910,156 @@ describe("session observation topics", () => {
         data: {
           errors: [{ sid: SID, instance: INSTANCE, text: "x", timestamp: "2026-09-08T00:00:00Z" }],
         },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("the shared key-value store", () => {
+  test("a value may be any JSON, and nothing here reads it", () => {
+    for (const value of [{ bg: "#101014", fg: "#e8e8ea" }, "dark", 42, true, null, [1, 2, 3]]) {
+      expect(
+        isValid(KvWriteRequest, {
+          request_id: "23",
+          op: "kv_write",
+          ns: "theme",
+          key: "default",
+          value,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  test("a write may carry the time the value was written", () => {
+    expect(
+      isValid(KvWriteRequest, {
+        request_id: "23",
+        op: "kv_write",
+        ns: "theme",
+        key: "device:ipad",
+        value: {},
+        updated_at: NOW,
+      }),
+    ).toBe(true);
+    expect(isValid(KvWriteResponse, { ok: true, request_id: "23", updated_at: NOW })).toBe(true);
+  });
+
+  test("a written time given as an ISO string is refused", () => {
+    expect(
+      isValid(KvWriteRequest, {
+        request_id: "23",
+        op: "kv_write",
+        ns: "theme",
+        key: "default",
+        value: {},
+        updated_at: "2026-09-08T00:00:00Z",
+      }),
+    ).toBe(false);
+  });
+
+  test("a read answers with the value and when it was written", () => {
+    expect(
+      isValid(KvReadRequest, { request_id: "24", op: "kv_read", ns: "theme", key: "default" }),
+    ).toBe(true);
+    expect(
+      isValid(KvReadResponse, {
+        ok: true,
+        request_id: "24",
+        value: { bg: "#101014" },
+        updated_at: NOW,
+      }),
+    ).toBe(true);
+  });
+
+  test("a read that cannot say when is refused", () => {
+    expect(isValid(KvReadResponse, { ok: true, request_id: "24", value: {} })).toBe(false);
+  });
+
+  test("a key holds what a person typed, within bounds", () => {
+    const del = (key: unknown) =>
+      isValid(KvDeleteRequest, { request_id: "25", op: "kv_delete", ns: "theme", key });
+    expect(del("device:kawaz の ipad")).toBe(true);
+    expect(del("x".repeat(256))).toBe(true);
+    expect(del("x".repeat(257))).toBe(false);
+    expect(del("")).toBe(false);
+    expect(del("device:\nipad")).toBe(false);
+  });
+
+  test("a namespace stays an identifier, since it names a topic too", () => {
+    const write = (ns: unknown) =>
+      isValid(KvWriteRequest, { request_id: "25", op: "kv_write", ns, key: "k", value: 1 });
+    expect(write("theme")).toBe(true);
+    expect(write("Theme")).toBe(false);
+    expect(write("theme:extra")).toBe(false);
+    expect(write("")).toBe(false);
+  });
+
+  test("its topic is subscribed to by namespace", () => {
+    expect(
+      isValid(TopicSubscribeRequest, {
+        request_id: "26",
+        op: "topic_subscribe",
+        topic: "kv:theme",
+      }),
+    ).toBe(true);
+    expect(
+      isValid(TopicSubscribeRequest, { request_id: "26", op: "topic_subscribe", topic: "kv" }),
+    ).toBe(false);
+    expect(
+      isValid(TopicSubscribeRequest, {
+        request_id: "26",
+        op: "topic_subscribe",
+        topic: "kv:Theme",
+      }),
+    ).toBe(false);
+  });
+
+  test("the snapshot is every entry, and a change is the entries that changed", () => {
+    expect(
+      isValid(KvFrame, {
+        ev: "topic",
+        topic: "kv:theme",
+        snapshot: true,
+        instance: INSTANCE,
+        data: {
+          entries: [
+            { key: "default", value: { bg: "#101014" }, updated_at: NOW },
+            { key: "device:ipad", value: { bg: "#000" }, updated_at: NOW - 1_000 },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a removal travels as a marked entry, not as an absence", () => {
+    expect(
+      isValid(KvFrame, {
+        ev: "topic",
+        topic: "kv:theme",
+        instance: INSTANCE,
+        data: { entries: [{ key: "device:ipad", updated_at: NOW, deleted: true }] },
+      }),
+    ).toBe(true);
+  });
+
+  test("`deleted: false` is refused — the mark is present or absent", () => {
+    expect(
+      isValid(KvFrame, {
+        ev: "topic",
+        topic: "kv:theme",
+        instance: INSTANCE,
+        data: { entries: [{ key: "k", value: 1, updated_at: NOW, deleted: false }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("an entry that cannot be ordered against another instance's is refused", () => {
+    expect(
+      isValid(KvFrame, {
+        ev: "topic",
+        topic: "kv:theme",
+        instance: INSTANCE,
+        data: { entries: [{ key: "default", value: 1 }] },
       }),
     ).toBe(false);
   });

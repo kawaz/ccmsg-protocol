@@ -5,6 +5,7 @@ export * from "./common/shutdown.ts";
 export * from "./common/topics.ts";
 export * from "./control/agents.ts";
 export * from "./control/files.ts";
+export * from "./control/kv.ts";
 export * from "./control/launcher.ts";
 export * from "./control/llm.ts";
 export * from "./control/peers.ts";

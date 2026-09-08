@@ -55,9 +55,15 @@ describe("op attribute table", () => {
   test("the planes hold the op counts the contract states", () => {
     expect(opsOfPlane("common")).toHaveLength(5);
     expect(opsOfPlane("messaging")).toHaveLength(4);
-    expect(opsOfPlane("control")).toHaveLength(24);
+    expect(opsOfPlane("control")).toHaveLength(27);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(33);
+    expect(OP_NAMES).toHaveLength(36);
+    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(10);
+  });
+
+  test("the store's ops are the only control ops answerable anywhere", () => {
+    const anywhere = opsOfPlane("control").filter((op) => OP_ATTRIBUTES[op].locality === "cluster");
+    expect(anywhere.sort()).toEqual(["kv_delete", "kv_read", "kv_write"]);
   });
 
   test("role checks read the table", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { OP_NAMES } from "../src/attributes.ts";
-import { PARAMETERIZED_TOPICS, PLAIN_TOPICS } from "../src/common/topics.ts";
+import {
+  NAMESPACE_SCOPED_TOPICS,
+  PLAIN_TOPICS,
+  SESSION_SCOPED_TOPICS,
+} from "../src/common/topics.ts";
 import { ERROR_CODES } from "../src/errors.ts";
 import { AgentInfo } from "../src/control/agents.ts";
 import { LlmRequestInfo, LlmStatusReport } from "../src/control/llm.ts";
@@ -30,7 +34,7 @@ describe("naming", () => {
   });
 
   test("every topic and error code is snake_case", () => {
-    for (const topic of [...PLAIN_TOPICS, ...PARAMETERIZED_TOPICS])
+    for (const topic of [...PLAIN_TOPICS, ...SESSION_SCOPED_TOPICS, ...NAMESPACE_SCOPED_TOPICS])
       expect(topic).toMatch(SNAKE_CASE);
     for (const code of ERROR_CODES) expect(code).toMatch(SNAKE_CASE);
   });

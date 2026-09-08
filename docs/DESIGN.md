@@ -84,6 +84,25 @@ replacement replace per instance, so several instances' values never collide.
 
 The first two are checked by `test/conventions.test.ts`, which walks every schema.
 
+## The shared key-value store
+
+The control plane carries a small store under named namespaces (`kv_read` / `kv_write` /
+`kv_delete`). All the contract promises is that **a key is unique within its namespace**: a
+value is any JSON, and what it means belongs to whoever writes and reads it.
+
+The store's ops are the only control ops that are `locality: cluster`. A value is held by the
+cluster rather than by one instance, so whichever instance is asked can answer. Mirroring
+between instances is the daemon's job, and two instances that disagree settle it on the later
+`updated_at`. That is why a write may state its own: a value written while an instance was
+unreachable can join later without pretending to be newer than it is.
+
+The topic `kv:<ns>` shows one client's save to the others as it happens. The snapshot is every
+entry in the namespace and each later frame is the entries that changed, with **a removal
+carried as an entry marked `deleted: true`** — an absence in a list of changes would say
+nothing. Because the namespace becomes part of a topic name it is kept to an identifier, while
+a key may hold what a person typed and is bounded only in length and by rejecting control
+characters.
+
 ## Versions and compatibility
 
 `PROTOCOL_VERSION` is an integer naming a generation. Within a generation only optional
@@ -105,8 +124,8 @@ procedure of record is mesh-peer-auth in the main ccmsg repository.
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 33 | common 5 / messaging 4 / control 24 / mesh 0 |
-| topics | 9 | messaging 2 (`inbox` / `notify`), control 7 |
+| ops | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
+| topics | 10 | messaging 2 (`inbox` / `notify`), control 8 |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 16 | one closed union |
 

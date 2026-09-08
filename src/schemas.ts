@@ -32,6 +32,15 @@ import {
   FileWriteResponse,
 } from "./control/files.ts";
 import {
+  KvDeleteRequest,
+  KvDeleteResponse,
+  KvFrame,
+  KvReadRequest,
+  KvReadResponse,
+  KvWriteRequest,
+  KvWriteResponse,
+} from "./control/kv.ts";
+import {
   LauncherConfigReadRequest,
   LauncherConfigReadResponse,
   LauncherRunRequest,
@@ -138,6 +147,10 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   translate_run: { request: TranslateRunRequest, response: TranslateRunResponse },
   llm_usage_read: { request: LlmUsageReadRequest, response: LlmUsageReadResponse },
   llm_stats_read: { request: LlmStatsReadRequest, response: LlmStatsReadResponse },
+
+  kv_read: { request: KvReadRequest, response: KvReadResponse },
+  kv_write: { request: KvWriteRequest, response: KvWriteResponse },
+  kv_delete: { request: KvDeleteRequest, response: KvDeleteResponse },
 };
 
 /** The frame schema for every topic.
@@ -155,6 +168,7 @@ export const TOPIC_SCHEMAS = {
   session_errors: SessionErrorsFrame,
   llm_requests: LlmRequestsFrame,
   llm_status: LlmStatusFrame,
+  kv: KvFrame,
 } as const;
 
 const compiled = new WeakMap<TSchema, TypeCheck<TSchema>>();

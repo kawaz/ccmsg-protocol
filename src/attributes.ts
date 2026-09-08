@@ -295,6 +295,31 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
+
+  // --- control: the shared key-value store (3) ---
+  // The only control ops that are not instance-local: a value is held by every
+  // instance rather than by one, so whichever is asked can answer.
+  kv_read: {
+    plane: "control",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "cluster",
+    errors: ["not_found"],
+  },
+  kv_write: {
+    plane: "control",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "cluster",
+    errors: [],
+  },
+  kv_delete: {
+    plane: "control",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "cluster",
+    errors: [],
+  },
 } as const satisfies Record<string, OpAttributes>;
 
 export type OpName = keyof typeof OP_ATTRIBUTES;

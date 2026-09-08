@@ -80,6 +80,21 @@ instance ごとの全量置換になり、複数 instance の全量が衝突し�
 
 上 2 つは `test/conventions.test.ts` が全 schema を走査して検査する。
 
+## 共有 kv
+
+control 面に namespace 付きの kv (`kv_read` / `kv_write` / `kv_delete`) がある。契約が約束するのは
+**ns 内で key が一意**なことだけで、`value` は任意の JSON、意味は書き手と読み手のものになる。
+
+kv だけは control 面で唯一 `locality: cluster`。値は特定の instance ではなくクラスタが持つので、
+どの instance に聞いても答えられる。instance 間のミラーは daemon の責務で、食い違った時は
+`updated_at` の新しい方が残る。だから書き込みは `updated_at` を明示でき、届かなかった間に
+書かれた値が後から実際の時刻のまま合流できる。
+
+topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapshot は ns の全 entry、以後の frame は
+変化した entry で、**削除は `deleted: true` を付けた entry として届く** (変化の一覧における不在は
+何も言わないため)。ns が topic 名の一部になるので、ns は識別子に限る (key は人が打った文字列を
+許し、長さと制御文字だけを縛る)。
+
 ## 版と互換
 
 `PROTOCOL_VERSION` は世代を表す整数。同一世代内で許すのは任意フィールドと op の追加だけで、
@@ -100,8 +115,8 @@ mesh-peer-auth。
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 33 | common 5 / messaging 4 / control 24 / mesh 0 |
-| topic | 9 | messaging 2 (`inbox` / `notify`)、control 7 |
+| op | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
+| topic | 10 | messaging 2 (`inbox` / `notify`)、control 8 |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 16 | 閉じた union |
 
