@@ -5,6 +5,7 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
 | 2026-09-08 | design | open | [internal-failure-error-code](./2026-09-08-internal-failure-error-code.md) | ErrorCode に「op の実装が例外で失敗した (呼び出し側の責任ではない)」を表す code が無い。 |
+| 2026-09-08 | design | open | [topic-granularity-attribute](./2026-09-08-topic-granularity-attribute.md) | topic の差分粒度 (全量置換 / instance ごとの全量置換 / 要素の追加・更新 / 追記 / eve… |
 
 <!--
 INDEX の列構成・canonical 順序・行形式の唯一の正本:
