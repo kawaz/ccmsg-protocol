@@ -1,6 +1,6 @@
 ---
 title: peer 忙しさ属性と LlmRequestInfo.main 判定規則の契約の穴
-status: open
+status: resolved
 category: design
 created: 2026-09-08T22:48:05+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-08T22:56:30+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["implemented: v0.4.0 で PeerInfo.gateway_active_at と main の判定規則の注釈を追加 (commit 83afe875)"]
 blocked_by:
 origin: kawaz/ccmsg
 ---

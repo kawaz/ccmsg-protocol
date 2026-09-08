@@ -4,7 +4,6 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
-| 2026-09-08 | design | open | [peer-busy-and-main-rule](./2026-09-08-peer-busy-and-main-rule.md) | daemon v2 の gateway 取り込みで判明した契約の穴 2 つ。PeerInfo に忙しさ欄が無い、Llm… |
 
 <!--
 INDEX の列構成・canonical 順序・行形式の唯一の正本:
