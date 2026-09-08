@@ -40,7 +40,13 @@ export type MeshHello = Static<typeof MeshHello>;
  * A field that belongs to another role is as much a refusal as a missing one:
  * `mesh` on a session greeting says the caller has confused which handshake it
  * is in, and accepting it would leave the connection settled as something
- * neither side meant. */
+ * neither side meant.
+ *
+ * A session's meta (`cwd`, `repo_root`, `transcript_path`, `title`, ...) is
+ * taken field by field: a greeting that leaves a field out does not withdraw
+ * it, and the instance keeps what it already knows for that `sid`. One session
+ * reaches an instance as a run of short-lived processes (a session-start hook,
+ * a `post`, a session-end hook), none of which knows every field. */
 export const HelloArgs = Type.Object({
   role: Role,
   /** The generation the caller speaks. A hello announcing another generation

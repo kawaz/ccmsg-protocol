@@ -167,7 +167,9 @@ Where a session lives and what it runs as (`repo`, `ws`, `cwd`, `repo_root`, `br
 and what the instance repeats on each `peers` row. The names and types are stated in one
 place (`src/session-meta.ts`), so the side that says them and the side that returns them
 cannot spell them differently. What is not stated is omitted, and what an instance can
-derive it derives.
+derive it derives. A greeting is taken field by field: leaving a field out does not withdraw
+it (one session reaches the instance as a run of short-lived processes, none of which
+knows every field).
 
 The classification (`state`) is **derived by the instance and carried on the row**. Handing
 back the raw inputs for a client to assemble would let each instance's reading drift. The
