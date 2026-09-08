@@ -249,6 +249,17 @@ describe("message_send", () => {
     ).toBe(true);
   });
 
+  test("held because the recipient would not take it just now", () => {
+    expect(
+      isValid(MessageSendResponse, {
+        ok: true,
+        request_id: "5",
+        delivered: false,
+        reason: "throttled",
+      }),
+    ).toBe(true);
+  });
+
   test("a reason outside the list is refused", () => {
     expect(
       isValid(MessageSendResponse, {

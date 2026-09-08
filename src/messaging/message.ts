@@ -17,6 +17,10 @@ export const UndeliveredReason = Type.Union(
     Type.Literal("disappeared"),
     /** The instance holding the session cannot be reached over the mesh. */
     Type.Literal("instance_unreachable"),
+    /** The recipient declined it for now — too much arriving at once, a full
+     * queue, or a message it has already been handed. It stays in the inbox and
+     * is offered again, so the sender waits rather than resending. */
+    Type.Literal("throttled"),
     /** The recipient's inbox is at its limit; the oldest message was dropped
      * to make room for this one. */
     Type.Literal("inbox_full"),

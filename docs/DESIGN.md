@@ -38,6 +38,11 @@ Messaging has no rooms. A message is addressed to one sid, and the record of a c
 is the session's own transcript. The route back is not carried as text either: answering
 means sending to the delivery frame's `from`, and that structure is all the contract states.
 
+A message that was not handed over right away has not failed. The reply says it went to the
+inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh,
+out of inbox room, or not taking anything at the moment), so the sender can choose between
+waiting and addressing another session.
+
 ## The op attribute table
 
 `OP_ATTRIBUTES` declares the following for every op. Authorization, capability gating and
