@@ -39,6 +39,12 @@ messaging は会話の器 (room) を持たない。宛先は sid ひとつで、
 セッションの transcript にある。返信経路も契約に文字列としては載らず、配送 frame の
 `from` に返せば返信になるという構造だけを置く。
 
+宛先は sid だが、**送信者は sid とは限らない**。`message_send` を呼べるのは session と
+user の両 role で、人 (webui) は sid を持たない。だから `from` は `Sender` = `Sid | "user"`
+で、リテラルを置くのは「人が送った」と「セッションが送って id が落ちた」を読み分けさせる
+ため (省略にすると区別できない)。既存の sid 値はそのまま通る。`user` 宛には送り返せない
+ので、人への返信をどう届けるかは instance の裁量に置く。
+
 即時配送されなかった送信は失敗ではない。応答は inbox に積んだことと、その理由 (相手が
 準備中 / Paused / 消えている / instance に届かない / inbox が一杯 / 相手が今は受け取らない)
 を返し、送信側が待つか別セッションへ送り直すかを選べるようにする。
@@ -59,6 +65,11 @@ messaging は会話の器 (room) を持たない。宛先は sid ひとつで、
 (`Reply with: ccmsg reply <mid> --to <sid> <text>`) で、これは受け手自身が実行する。
 宛先 sid を書き下すのは `mid` が送信者を含まないため。引かせる形にすると mid → 送信者の
 op が要り、そのために daemon が送信済み索引を持つことになる。
+
+送信者が人 (`from` が `user`) の場合だけ `--to` が落ちて
+`Reply with: ccmsg reply <mid> <text>` になる。`user` は sid ではないので `--to user` は
+届かない宛先になる。その返信が何になるか (webui へ notify として流す等) は instance の
+裁量で、受け手はこの 1 行を実行するだけでよい。
 
 `text` は無加工で運ぶ。モデルが読むのはその文字そのものなので、実体参照に置き換えると
 壊れた本文を返信対象として渡すことになる。本文に閉じタグが含まれていても拒否せず
@@ -92,6 +103,22 @@ one-shot の取得 op は置かない (購読して即解除すれば同じも�
 
 frame は発生元の `instance` を必ず伴う。全量置換の意味を持つ topic は
 instance ごとの全量置換になり、複数 instance の全量が衝突しない。
+
+payload 型が同じであるぶん、「後続の frame が手元の値に対して何をするか」だけは形から
+読めない。それを `TOPIC_ATTRIBUTES` の `granularity` として契約が持ち、daemon と webui が
+同じ表で畳む (各実装がローカル表を持たない)。
+
+| granularity | frame が持つもの | 購読側の畳み方 | snapshot | topic |
+|---|---|---|---|---|
+| `whole` | 値の全体 | 手元を丸ごと置換 | 有 | `session_status:<sid>` |
+| `per_instance_whole` | その `instance` が知る全体 | その instance の分だけ置換し、他 instance の行は残す (手元の値は instance 横断の和) | 有 | `peers` `agents` `session_errors` `llm_requests` `llm_status` |
+| `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `inbox` `kv:<ns>` |
+| `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` |
+| `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
+
+`event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の
+発生から届く。`session_status` が instance ごとでなく全体置換なのは、1 セッションが 1
+instance にしか居らず、他 instance の分を残す必要が無いため。
 
 ## 表記規約 (機械検査あり)
 
@@ -132,6 +159,12 @@ instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (
 `stopped_at` の有無ひとつ。Pinned は人が付けた印であって分類ではないので、`pinned` として
 分類の隣に置く。
 
+**忙しさも分類ではなく行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として
+載せる。接続中のどの分類であっても忙しくはなり得るので、`state` に畳むと片方が失われる。
+真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client
+が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、では
+なく観測手段が無い)。
+
 未配送メッセージと last_live の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` /
 `LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは
 「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。
@@ -161,7 +194,7 @@ mesh-peer-auth。
 | op | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
 | topic | 10 | messaging 2 (`inbox` / `notify`)、control 8 |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| ErrorCode | 16 | 閉じた union |
+| ErrorCode | 17 | 閉じた union |
 
 全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を
 持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を

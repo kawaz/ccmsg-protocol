@@ -8,6 +8,22 @@ export const Sid = Type.String({
 });
 export type Sid = Static<typeof Sid>;
 
+/** Who sent a message: a session, or the person at the web UI.
+ *
+ * A person has no sid — the `user` role greets without one — so the sender of a
+ * message cannot be a `Sid` alone. The literal is spelled out rather than left
+ * as an absent field, because a reader has to tell "a person sent this" from "a
+ * session sent this and the id was lost". Every session id remains a valid
+ * sender, so a reader that only knew sids keeps working.
+ *
+ * There is one person per instance to a session's eye, so the literal carries
+ * no id of its own; which browser it was is not a thing this contract names. */
+export const Sender = Type.Union([Sid, Type.Literal("user")], { $id: "Sender" });
+export type Sender = Static<typeof Sender>;
+
+/** The sender that is the person rather than a session. */
+export const USER_SENDER = "user" as const;
+
 /** An instance id: the endpoint URL other instances dial, compared as a whole
  * string including its path (mesh-peer-auth §4.2 — one origin may host several
  * instances, so origin-level comparison would confuse them). The display name

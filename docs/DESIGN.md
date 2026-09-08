@@ -40,6 +40,13 @@ Messaging has no rooms. A message is addressed to one sid, and the record of a c
 is the session's own transcript. The route back is not carried as text either: answering
 means sending to the delivery frame's `from`, and that structure is all the contract states.
 
+A message is addressed to a sid, but **its sender need not be one**. Both the session and
+the user role may call `message_send`, and a person at the web UI has no sid. So `from` is
+`Sender`, which is `Sid | "user"`; the literal is spelled out rather than left as an absent
+field so that "a person sent this" reads apart from "a session sent this and the id was
+lost". Every sid remains a valid sender. Nothing can be sent back to `user`, so how an
+answer reaches a person is the instance's to arrange.
+
 A message that was not handed over right away has not failed. The reply says it went to the
 inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh,
 out of inbox room, or not taking anything at the moment), so the sender can choose between
@@ -61,6 +68,11 @@ one that has gone ends the recipient's turn in failure. The way back is one line
 the body (`Reply with: ccmsg reply <mid> --to <sid> <text>`), which the recipient runs itself.
 The sid is spelled out because a `mid` does not name its sender; making it resolvable instead
 would take an op for it, and that op a sent-message index the daemon does not otherwise need.
+
+Only when the sender is a person (`from` is `user`) does `--to` drop, leaving
+`Reply with: ccmsg reply <mid> <text>`. `user` is not a sid, so `--to user` would be an
+address nothing reaches. What such an answer becomes — a notification back to the web UI,
+say — is the instance's to decide, and the recipient only has to run the line.
 
 `text` travels untouched. What the model reads is those characters, so replacing them with
 entities would hand it a corrupted message to answer. A body containing the closing tag is
@@ -96,6 +108,23 @@ immediately yields the same value.
 
 Every frame names the `instance` it came from. Topics whose meaning is whole-value
 replacement replace per instance, so several instances' values never collide.
+
+Sharing one payload type leaves exactly one question the shape cannot answer: what a later
+frame does to the value already held. The contract holds that as `granularity` in
+`TOPIC_ATTRIBUTES`, so the daemon and the web UI fold the same way instead of each keeping a
+local table of it.
+
+| granularity | What a frame carries | How a subscriber folds it | snapshot | Topics |
+|---|---|---|---|---|
+| `whole` | the whole value | replaces everything held | yes | `session_status:<sid>` |
+| `per_instance_whole` | the whole of what its `instance` knows | replaces that instance's entries and leaves every other instance's alone (what is held is the union across instances) | yes | `peers`, `agents`, `session_errors`, `llm_requests`, `llm_status` |
+| `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `inbox`, `kv:<ns>` |
+| `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>` |
+| `event` | an occurrence rather than a value | holds nothing | no | `notify` |
+
+Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence
+rather than a current state. `session_status` is whole rather than per instance because one
+session lives on one instance, leaving no other instance's half to preserve.
 
 ## Conventions (machine-checked)
 
@@ -143,6 +172,14 @@ for one that was lost (`paused`, `disappeared`), which the presence of `stopped_
 separates. Being pinned is a mark a person put there rather than a classification, so it
 travels beside it as `pinned`.
 
+**How busy a session is is an attribute of the row too**, carried as `gateway_active_at`:
+when inference last ran for it. A session can be busy in any of the connected
+classifications, so folding it into `state` would lose one of the two. It is an instant
+rather than a flag because nothing observes the moment a request stops being in flight — a
+client reads recency against its own threshold. It is absent on an instance with no gateway
+configured, which means there is nothing observing inference, never that the session is
+quiet.
+
 The retention windows for undelivered messages and for the last-known list are values the
 contract holds (`INBOX_RETENTION_MS` and `LAST_LIVE_RETENTION_MS` of 7 days,
 `INBOX_MAX_PER_SID` of 256). What a person comes back to is one thing — the session and
@@ -174,7 +211,7 @@ procedure of record is mesh-peer-auth in the main ccmsg repository.
 | ops | 36 | common 5 / messaging 4 / control 27 / mesh 0 |
 | topics | 10 | messaging 2 (`inbox` / `notify`), control 8 |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| error codes | 16 | one closed union |
+| error codes | 17 | one closed union |
 
 Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in
 `TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the

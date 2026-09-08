@@ -9,7 +9,7 @@ import {
 } from "../src/attributes.ts";
 import { ERROR_CODES } from "../src/errors.ts";
 import { OP_SCHEMAS, TOPIC_SCHEMAS } from "../src/schemas.ts";
-import { TOPIC_ATTRIBUTES } from "../src/common/topics.ts";
+import { TOPIC_ATTRIBUTES, TOPIC_GRANULARITIES, topicGranularity } from "../src/common/topics.ts";
 
 describe("op attribute table", () => {
   test("no op is callable by nobody", () => {
@@ -71,6 +71,44 @@ describe("op attribute table", () => {
     expect(isRoleAllowed("say_post", "user")).toBe(false);
     expect(isRoleAllowed("say_mark_read", "session")).toBe(false);
     expect(isRoleAllowed("session_kill", "user")).toBe(true);
+  });
+});
+
+describe("topic attribute table", () => {
+  test("every topic states how its frames fold", () => {
+    for (const [topic, attrs] of Object.entries(TOPIC_ATTRIBUTES)) {
+      expect(TOPIC_GRANULARITIES).toContain(attrs.granularity);
+      expect(topicGranularity(topic)).toBe(attrs.granularity);
+    }
+  });
+
+  test("a parameterized name folds like the kind behind it", () => {
+    expect(topicGranularity("session_status:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("whole");
+    expect(topicGranularity("transcript:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("append");
+    expect(topicGranularity("kv:launcher")).toBe("element");
+  });
+
+  test("a name this generation does not define folds no way at all", () => {
+    expect(topicGranularity("rooms")).toBeUndefined();
+  });
+
+  test("`notify` is the only topic with nothing to snapshot", () => {
+    const events = Object.entries(TOPIC_ATTRIBUTES)
+      .filter(([, attrs]) => attrs.granularity === "event")
+      .map(([topic]) => topic);
+    expect(events).toEqual(["notify"]);
+  });
+
+  test("a topic several instances write folds per instance", () => {
+    // A whole-value frame from one instance must not erase another's entries,
+    // so every instance-wide list is `per_instance_whole`; `session_status` is
+    // whole because one session lives on one instance.
+    for (const topic of ["peers", "agents", "session_errors", "llm_requests", "llm_status"]) {
+      expect(TOPIC_ATTRIBUTES[topic as keyof typeof TOPIC_ATTRIBUTES].granularity).toBe(
+        "per_instance_whole",
+      );
+    }
+    expect(TOPIC_ATTRIBUTES.session_status.granularity).toBe("whole");
   });
 });
 

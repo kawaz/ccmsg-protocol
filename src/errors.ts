@@ -11,6 +11,13 @@ export const ERROR_CODES = [
   "unknown_op",
   /** An op with `needs_hello` arrived before `hello` settled the identity. */
   "hello_required",
+  /** The op's implementation failed for a reason that is not the caller's: the
+   * arguments were right and the call was allowed. It belongs beside the other
+   * connection-level codes because no op owns it — any op can fail this way, and
+   * naming it apart from `bad_request` is what keeps a caller from re-reading
+   * arguments that were never the problem. Whether retrying helps is not stated;
+   * `msg` is the only thing that says more. */
+  "internal_error",
   // --- rule-derived (op attribute table §0) ---
   /** The connection's role is outside the op's `roles`. Argument problems stay
    * on `invalid_args` / `bad_request`. */

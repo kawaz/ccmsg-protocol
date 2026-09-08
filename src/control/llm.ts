@@ -249,8 +249,21 @@ export const LlmRequestInfo = Type.Object(
      * sessions, which is the other half of why the pair is the key. */
     prefix: Type.Optional(Type.String()),
     /** True for the series the session's own turns keep warm, as opposed to a
-     * subagent's. The instance decides it so that every client agrees on which
-     * window is the session's. */
+     * subagent's. The instance decides it, by the rule below, so that every
+     * client agrees on which window is the session's rather than each reading
+     * the same events into a different verdict.
+     *
+     * 1. `origin` decides it whenever the gateway states one. It watched the
+     *    request go out and nothing here knows better.
+     * 2. Otherwise a `prefix` seen under two or more sessions is a subagent's:
+     *    a series the session's own turns keep warm is not shared, so sharing
+     *    is the evidence. Among the series left, the one that session used
+     *    first wins — a session's own conversation starts before anything it
+     *    spawns.
+     * 3. If every series of a session is shared, none of them is that session's
+     *    own, so the newest is marked instead. It is the window a countdown
+     *    would be about, and marking nothing would leave the session with no
+     *    window at all. */
     main: Type.Boolean(),
     /** Whose turn issued the request, as the gateway read it. An open set; this
      * is one of the inputs to `main`, and `main` is the verdict clients read. */

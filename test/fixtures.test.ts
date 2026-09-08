@@ -399,6 +399,46 @@ describe("the peers topic", () => {
     ).toBe(false);
   });
 
+  test("a busy session carries when inference last ran, not a flag", () => {
+    // Busy is an attribute of the row: the session is `live` and busy at once,
+    // and a client reads recency against its own threshold.
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: {
+          peers: [
+            { ...peer, state: "live", title: "契約 0.4.0", gateway_active_at: 1_757_300_000_000 },
+          ],
+          last_live: [],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("an instance with no gateway simply omits it", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [{ ...peer, state: "live" }], last_live: [] },
+      }),
+    ).toBe(true);
+  });
+
+  test("a boolean in place of the instant is refused", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [{ ...peer, gateway_active_at: true }], last_live: [] },
+      }),
+    ).toBe(false);
+  });
+
   test("an ISO stopped_at is refused", () => {
     expect(
       isValid(PeersFrame, {
@@ -466,6 +506,44 @@ describe("topic frames", () => {
     ).toBe(true);
   });
 
+  test("a message a person sent names them as the sender", () => {
+    expect(
+      isValid(InboxFrame, {
+        ev: "topic",
+        topic: "inbox",
+        instance: INSTANCE,
+        data: [
+          {
+            mid: `${INSTANCE}/1843`,
+            from: "user",
+            from_label: "kawaz",
+            text: "契約の 4 件をまとめて",
+            sent_at: 1_757_300_002_000,
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  test("a sender that is neither a sid nor the person is refused", () => {
+    expect(
+      isValid(InboxFrame, {
+        ev: "topic",
+        topic: "inbox",
+        instance: INSTANCE,
+        data: [
+          {
+            mid: `${INSTANCE}/1844`,
+            from: "instance",
+            from_label: "nuc",
+            text: "誰",
+            sent_at: 1_757_300_003_000,
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
   test("`snapshot: false` is refused — the mark is present or absent", () => {
     expect(
       isValid(InboxFrame, {
@@ -508,6 +586,18 @@ describe("errors", () => {
   test("a reply that could not name its request passes without the id", () => {
     expect(
       isValid(ErrorResponse, { ok: false, error: { code: "bad_request", msg: "no request_id" } }),
+    ).toBe(true);
+  });
+
+  test("a failure that is not the caller's says so", () => {
+    // Not `bad_request`: the arguments were right, so re-reading them is the
+    // one thing that cannot help.
+    expect(
+      isValid(ErrorResponse, {
+        ok: false,
+        request_id: "9",
+        error: { code: "internal_error", msg: "the transcript reader threw" },
+      }),
     ).toBe(true);
   });
 

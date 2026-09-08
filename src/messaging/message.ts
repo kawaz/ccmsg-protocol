@@ -1,6 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response, topicFrame } from "../envelope.ts";
-import { InstanceId, Mid, Sid, Timestamp } from "../identifiers.ts";
+import { InstanceId, Mid, Sender, Sid, Timestamp } from "../identifiers.ts";
 
 /** Why a message was not handed to its recipient right away.
  *
@@ -70,14 +70,20 @@ export const MessageSendResponse = response("message_send", MessageSendResult);
 
 /** A message as the recipient receives it, on topic `inbox`.
  *
- * To answer it, send to `from`. The route is the sender's id and nothing else,
- * so no reply instructions travel on the wire: the wording a session sees
- * belongs to whoever renders it — see `direct-delivery.ts` for the one route
- * whose recipient reads text instead of this frame. */
+ * To answer it, send to `from`. The route is the sender and nothing else, so no
+ * reply instructions travel on the wire: the wording a session sees belongs to
+ * whoever renders it — see `direct-delivery.ts` for the one route whose
+ * recipient reads text instead of this frame.
+ *
+ * A `from` of `user` is the exception: `message_send` addresses a sid, so there
+ * is no such thing as sending back to the person. An answer to one reaches them
+ * as a notification instead, which is the instance's to arrange — this contract
+ * only states that the sender can be a person, so a client stops treating one
+ * as a malformed message. */
 export const InboxMessage = Type.Object(
   {
     mid: Mid,
-    from: Sid,
+    from: Sender,
     /** How the sender should be shown, resolved by the issuing instance. */
     from_label: Type.String(),
     text: Type.String(),

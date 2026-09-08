@@ -1,5 +1,5 @@
 import type { InboxMessage } from "./message.ts";
-import type { Mid, Sid } from "../identifiers.ts";
+import { type Mid, type Sender, USER_SENDER } from "../identifiers.ts";
 
 /** How an `InboxMessage` is worded when it is handed to a session through the
  * harness's own messaging socket rather than over this protocol.
@@ -39,15 +39,22 @@ export const DIRECT_DELIVERY_FROM_MODE = "prompting";
  * the frame being answered — so nothing has to be looked up to use it. A `mid`
  * does not name its sender, and the alternative to spelling the sid out here
  * would be an op that resolves one, which means a sent-message index the
- * daemon does not otherwise need. */
-export function directDeliveryReplyLine(mid: Mid, from: Sid): string {
-  return `Reply with: ccmsg reply ${mid} --to ${from} <text>`;
+ * daemon does not otherwise need.
+ *
+ * A message from a person carries no addressee: `user` is not a sid and
+ * addressing it would be a send that fails. The line drops `--to` instead, and
+ * what an answer to a person becomes is the instance's to decide — it reaches
+ * them as a notification, which is a route the recipient does not have to know
+ * about to run this line. */
+export function directDeliveryReplyLine(mid: Mid, from: Sender): string {
+  const to = from === USER_SENDER ? "" : ` --to ${from}`;
+  return `Reply with: ccmsg reply ${mid}${to} <text>`;
 }
 
 /** An `InboxMessage` as it reaches a session through the messaging socket. */
 export interface DirectDelivery {
   mid: Mid;
-  from: Sid;
+  from: Sender;
   from_label: string;
   reply_to?: Mid;
   /** The sender's text, exactly as it was sent. */

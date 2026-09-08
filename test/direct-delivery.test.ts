@@ -44,6 +44,26 @@ describe("what the recipient is told", () => {
     );
   });
 
+  test("a message from a person asks for no addressee", () => {
+    // `user` is not a sid: `--to user` would be a send that fails, so the line
+    // drops the addressee and the instance decides what an answer becomes.
+    const fromUser = { ...message, from: "user", from_label: "kawaz" };
+    const rendered = renderDirectDelivery(fromUser);
+    expect(rendered).toContain(`Reply with: ccmsg reply ${MID} <text>`);
+    expect(rendered).not.toContain("--to");
+    expect(rendered).toContain(`ccmsg-from="user"`);
+  });
+
+  test("a message from a person reads back as one", () => {
+    const fromUser = { ...message, from: "user", from_label: "kawaz" };
+    expect(parseDirectDelivery(renderDirectDelivery(fromUser))).toEqual({
+      mid: MID,
+      from: "user",
+      from_label: "kawaz",
+      text: message.text,
+    });
+  });
+
   test("a message that answers one says which", () => {
     const rendered = renderDirectDelivery({ ...message, reply_to: EARLIER_MID });
     expect(rendered).toContain(`ccmsg-reply-to="${EARLIER_MID}"`);

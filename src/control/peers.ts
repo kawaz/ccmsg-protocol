@@ -72,6 +72,11 @@ export const PeerInfo = Type.Object(
     transcript_path: Type.Optional(SessionMetaFields.transcript_path),
     repo_root: Type.Optional(SessionMetaFields.repo_root),
     branch: Type.Optional(SessionMetaFields.branch),
+    /** The session's own title, as it named it. Also what resolves a display
+     * name for this session elsewhere — a message's `from_label`, a
+     * notification's `sid_label` — so the material for those is on the row that
+     * every client already holds. */
+    title: Type.Optional(SessionMetaFields.title),
     /** How this session stands. One of `waiting`, `live` or `live_unmanaged`:
      * a session in this list is connected, so it is by definition not gone.
      * Absent from an instance that states no classification, and a client then
@@ -91,6 +96,19 @@ export const PeerInfo = Type.Object(
      * while none has been found; a client orders such a session after every
      * session that has one rather than treating it as long ago. */
     last_user_input_at: Type.Optional(Timestamp),
+    /** When inference last ran for this session, as the gateway saw it.
+     *
+     * How busy a session is, carried as an attribute of the row rather than
+     * folded into `state`: a session is busy while it stands in any of the
+     * connected classifications, so the two answer different questions and
+     * collapsing them would lose one. It is an instant rather than a flag
+     * because there is no moment a request stops being in flight that anything
+     * observes — a client reads recency and decides its own threshold.
+     *
+     * Absent from an instance with no gateway configured, where nothing
+     * observes inference at all. That is not "idle": a client shows such a
+     * session without the mark rather than as quiet. */
+    gateway_active_at: Type.Optional(Timestamp),
     /** Whether the asking session can reach this one with the harness's own
      * cross-session messaging, which does not cross config homes. Computed
      * against the asker, so it never appears on the asker's own entry nor for a
