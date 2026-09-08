@@ -18,7 +18,8 @@ frame が push されるかを schema として書き、daemon と webui の双�
 | エラー | `src/errors.ts` | `ErrorCode` の閉じた union と error body |
 | 封筒 | `src/envelope.ts` | request / response / topic frame / 接続イベント、`PROTOCOL_VERSION` |
 | op 属性表 | `src/attributes.ts` | 全 op と、その認可・能力・配置 |
-| op 定義 | `src/common/` `src/messaging/` | op ごとの引数・応答・frame |
+| op 定義 | `src/common/` `src/messaging/` `src/control/` | op ごとの引数・応答と、topic の frame |
+| 上流の印 | `src/upstream.ts` | 語彙の持ち主が ccmsg でない型に付ける印 |
 | 検証 | `src/schemas.ts` | op 名 → schema の対応と、compile 済み検証器 |
 
 ## 面 (plane)
@@ -95,8 +96,20 @@ instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello
 (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。手順の正本は ccmsg 本体リポの
 mesh-peer-auth。
 
-## 実装状況
+## 契約が持つもの
 
-common 5 op と messaging 4 op の schema が書かれている。control 25 op は属性表に名前と
-属性だけが登録済みで、schema はこれから足す。`OP_SCHEMAS` に載っていない op が
-属性表にあるのはその段階を表す。
+| 単位 | 数 | 内訳 |
+|---|---|---|
+| op | 33 | common 5 / messaging 4 / control 24 / mesh 0 |
+| topic | 9 | messaging 2 (`inbox` / `notify`)、control 7 |
+| capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
+| ErrorCode | 16 | 閉じた union |
+
+全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を
+持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を
+書かなければ型検査で落ちる。topic 側も属性表と frame の対応を双方向に検査する。
+
+`claude` / `llm-gateway` が語彙を持つ型 (`AgentInfo` / `LlmRequestInfo` / `LlmStatusReport` 等)
+は `upstream()` の印を持つ。印が言うのは「知らない値が来たらそれは上流のもの」であって、
+表記規約の免除ではない。上流の文書は daemon が受け取った時点で snake_case と Unix ms に
+写され、wire にはこの契約の綴りで出る。

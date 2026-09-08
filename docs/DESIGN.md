@@ -19,7 +19,8 @@ checking to each implementation's hand-written tests, and the two drift.
 | Errors | `src/errors.ts` | the closed `ErrorCode` union and the error body |
 | Envelope | `src/envelope.ts` | request / response / topic frames / connection events, `PROTOCOL_VERSION` |
 | Op attribute table | `src/attributes.ts` | every op, with its authorization, capability and placement |
-| Op definitions | `src/common/`, `src/messaging/` | arguments, replies and frames per op |
+| Op definitions | `src/common/`, `src/messaging/`, `src/control/` | arguments and replies per op, and the frame of each topic |
+| Upstream marks | `src/upstream.ts` | the mark carried by types whose vocabulary is not ccmsg's |
 | Validation | `src/schemas.ts` | op name to schema, and compiled validators |
 
 ## Planes
@@ -100,8 +101,22 @@ Authentication between instances happens once, at connection time, and a `role: 
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The
 procedure of record is mesh-peer-auth in the main ccmsg repository.
 
-## State of the implementation
+## What the contract holds
 
-The five common ops and the four messaging ops have schemas. The 25 control ops are
-registered in the attribute table with their names and attributes; their schemas come next.
-An op present in the table but absent from `OP_SCHEMAS` is at that stage.
+| Unit | Count | Breakdown |
+|---|---|---|
+| ops | 33 | common 5 / messaging 4 / control 24 / mesh 0 |
+| topics | 9 | messaging 2 (`inbox` / `notify`), control 7 |
+| capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
+| error codes | 16 | one closed union |
+
+Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in
+`TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the
+attribute table without writing its schema fails to typecheck; the topics are checked against
+the attribute table in both directions.
+
+Types whose vocabulary belongs to `claude` or to `llm-gateway` (`AgentInfo`,
+`LlmRequestInfo`, `LlmStatusReport` and their like) carry the mark `upstream()` makes. The
+mark says that an unfamiliar value is theirs to add — it does not exempt the type from the
+spelling above. Their documents are rewritten into snake_case and Unix milliseconds as the
+daemon takes them in, so what travels here is this contract's spelling.
