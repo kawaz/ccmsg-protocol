@@ -92,6 +92,11 @@ export const RegisterClaims = Type.Object(
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
     jti: Type.String({ minLength: 1 }),
+    /** What the administrator who issued the URL wrote down about who it was
+     * for. Their words, not the holder's — the label the person gives their
+     * own device is `device_label` on the record, and the two are worth telling
+     * apart when a list is read back later. */
+    issued_label: Type.Optional(Type.String({ maxLength: 128 })),
   },
   { $id: "RegisterClaims" },
 );
@@ -118,6 +123,14 @@ export const AuthRegisterArgs = Type.Object({
   /** The registration URL's token, opaque to the caller and to any instance
    * but its issuer. */
   token: Type.String({ minLength: 1 }),
+  /** The six digits the command line showed when the URL was made, typed in by
+   * the person registering. It is not in the URL and never travels with it, so
+   * a leaked URL is not a registration: the two halves reach the browser by
+   * different routes, and only someone who was shown the terminal has both. */
+  code: Type.String({ pattern: "^[0-9]{6}$" }),
+  /** What the person calls the device they are registering, for their own use
+   * when they later read back a list of several. Nothing is decided by it. */
+  device_label: Type.Optional(Type.String({ maxLength: 128 })),
   credential: RegistrationCredential,
 });
 export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
@@ -283,7 +296,27 @@ export const CredentialRecord = Type.Object(
      * zero forever, so only a pair of non-zero readings says anything, and a
      * reading below the last one is a refusal. */
     sign_count: Type.Optional(Type.Integer({ minimum: 0 })),
+    /** The label the administrator put on the registration URL, carried over
+     * from the claims it was spent against. */
+    issued_label: Type.Optional(Type.String({ maxLength: 128 })),
+    /** The label the person put on this device as they registered it. */
+    device_label: Type.Optional(Type.String({ maxLength: 128 })),
     registered_at: Timestamp,
+    /** Where the registration came from and what browser sent it.
+     *
+     * None of this authenticates anything, and nothing is ever admitted or
+     * refused by it — an address is trivially chosen by whoever is making the
+     * request. They are here to be recognised by the one person reading their
+     * own list: an address that is their home provider's and a browser that is
+     * the one they use is how they place a line as theirs, or fail to, which is
+     * the whole reason to keep it. The same holds of the pair below. */
+    registered_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+    registered_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
+    /** When this credential last answered a challenge, and from where. A
+     * credential the person no longer recognises is one they remove. */
+    last_used_at: Type.Optional(Timestamp),
+    last_used_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+    last_used_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
   },
   { $id: "CredentialRecord" },
 );

@@ -211,7 +211,10 @@ id は instance が自分に 1 度だけ発行する不透明な乱数で、引�
 他 instance が dial する URL で、同一 origin に複数 instance が相乗りするため比較は origin
 ではなく URL 全体で行う。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
 endpoint が変わっても無効にならない。`hello` の応答は自 instance の id と endpoint、および
-mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。
+mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は
+handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない
+段階から分かっており、link が落ちている相手こそ一覧から消してはならない。自 instance の
+`endpoint` も任意で、mesh に参加しない instance は peer に渡す URL を持たない。
 
 instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello` がその起点になる
 (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint —
@@ -244,6 +247,19 @@ challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここ�
 置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」
 ではない。この 4 つは `needs_hello: false` で、`hello` と同じく identity 未確定の接続から
 呼べる (`request_id` は HTTP 側の carrier が合成する)。
+
+`auth_register` は登録 URL の token とは別に、URL を発行した CLI が表示した 6 桁のコードを
+受け取る。コードは URL に含めない — 2 つが別の経路でブラウザに届くことが「URL を持っている
+だけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを
+形にする。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、
+どちらの半分が失敗したかは名乗らない。
+
+登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いた
+もので、`auth_register` の `device_label` は利用者が「どの端末か」を書いたもの。credential
+record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく
+**記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ
+人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、
+という判断のためだけに置く。
 
 残り 3 op:
 

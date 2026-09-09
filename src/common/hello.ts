@@ -86,7 +86,10 @@ export type HelloArgs = Static<typeof HelloArgs>;
 /** One instance as seen from the instance answering `hello`. */
 export const InstanceInfo = Type.Object(
   {
-    id: InstanceId,
+    /** Absent until the handshake with it has settled: an endpoint an operator
+     * configured is known before anything answers there, and leaving such a
+     * peer out of the list would hide the very entry whose link is down. */
+    id: Type.Optional(InstanceId),
     /** Where it is dialed. An attribute of the instance like the host below:
      * it is what a peer connects to and authenticates against, and it may
      * change under a fixed `id` when the instance moves. */
@@ -107,8 +110,10 @@ export const HelloResult = Type.Object({
   instance: InstanceId,
   /** Where the answering instance is dialed. Stated beside the id because the
    * caller reached it by some URL of its own — a proxy's, an alias — and what a
-   * peer is to dial is neither that nor derivable from the id. */
-  endpoint: Endpoint,
+   * peer is to dial is neither that nor derivable from the id. Absent on an
+   * instance that joins no mesh: it is reached by the people and sessions on
+   * its own machine, and it has no URL to give a peer. */
+  endpoint: Type.Optional(Endpoint),
   /** The instances this one knows of, itself included. */
   instances: Type.Array(InstanceInfo),
   /** What this instance can do. An op whose `capability` is absent here

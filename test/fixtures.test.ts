@@ -170,7 +170,7 @@ describe("hello", () => {
     ).toBe(false);
   });
 
-  test("a reply that says who is answering but not where it is dialed is refused", () => {
+  test("an instance in no mesh answers without an endpoint to be dialed at", () => {
     expect(
       isValid(HelloResponse, {
         ok: true,
@@ -182,7 +182,25 @@ describe("hello", () => {
         version: "0.1.0",
         started_at: 1_757_300_000_000,
       }),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  test("a peer that has not finished greeting is listed by endpoint alone", () => {
+    expect(
+      isValid(HelloResponse, {
+        ok: true,
+        request_id: "1",
+        protocol_version: 3,
+        instance: INSTANCE,
+        endpoint: INSTANCE_ENDPOINT,
+        instances: [
+          { endpoint: "wss://nuc.example.ts.net/ccmsg/personal", host: "nuc", reachable: false },
+        ],
+        capabilities: [],
+        version: "0.1.0",
+        started_at: 1_757_300_000_000,
+      }),
+    ).toBe(true);
   });
 });
 
@@ -647,7 +665,25 @@ describe("authenticating a person", () => {
     ).toBe(false);
   });
 
-  test("registration carries the URL's token and what the authenticator made", () => {
+  test("registration carries the URL's token, the typed code and what the authenticator made", () => {
+    expect(
+      isValid(AuthRegisterRequest, {
+        request_id: "a2",
+        op: "auth_register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        code: "048213",
+        device_label: "work laptop",
+        credential: {
+          id: "Y3JlZC1pZA",
+          raw_id: "Y3JlZC1pZA",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
+          attestation_object: "o2NmbXRkbm9uZQ",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a registration with only the URL, and no code beside it, is refused", () => {
     expect(
       isValid(AuthRegisterRequest, {
         request_id: "a2",
@@ -660,7 +696,24 @@ describe("authenticating a person", () => {
           attestation_object: "o2NmbXRkbm9uZQ",
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  test("a code that is not six digits is refused", () => {
+    expect(
+      isValid(AuthRegisterRequest, {
+        request_id: "a2",
+        op: "auth_register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        code: "4821",
+        credential: {
+          id: "Y3JlZC1pZA",
+          raw_id: "Y3JlZC1pZA",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
+          attestation_object: "o2NmbXRkbm9uZQ",
+        },
+      }),
+    ).toBe(false);
   });
 
   test("a credential field that is not base64url is refused", () => {
@@ -669,6 +722,7 @@ describe("authenticating a person", () => {
         request_id: "a2",
         op: "auth_register",
         token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        code: "048213",
         credential: {
           id: "Y3JlZC1pZA",
           raw_id: "cred id!",
@@ -769,6 +823,7 @@ describe("authenticating a person", () => {
           rp_id: "mba.example.ts.net",
           expires_at: 1_757_300_600_000,
           jti: "01J9Z3W2Q",
+          issued_label: "for kawaz",
         },
       }),
     ).toBe(true);
@@ -823,6 +878,39 @@ describe("authenticating a person", () => {
                 user_handle: "dXNlci1oYW5kbGU",
                 sign_count: 0,
                 registered_at: 1_757_300_000_000,
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a record carries what a person reads it back by, none of it authenticating", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        instance: INSTANCE,
+        data: {
+          records: [
+            {
+              key: "credential/personal-1/Y3JlZC1pZA",
+              updated_at: 1_757_400_000_000,
+              body: {
+                kind: "credential",
+                sub: "personal-1",
+                credential_id: "Y3JlZC1pZA",
+                public_key: "pQECAyYgASFYIA",
+                user_handle: "dXNlci1oYW5kbGU",
+                issued_label: "for kawaz",
+                device_label: "work laptop",
+                registered_at: 1_757_300_000_000,
+                registered_ip: "203.0.113.7",
+                registered_user_agent: "Mozilla/5.0",
+                last_used_at: 1_757_400_000_000,
+                last_used_ip: "203.0.113.7",
+                last_used_user_agent: "Mozilla/5.0",
               },
             },
           ],

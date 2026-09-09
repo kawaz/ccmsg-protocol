@@ -232,7 +232,10 @@ instances dial; several instances may share one origin, so the comparison is the
 rather than the origin. Everything keyed by the id — `mid`, the store's keys, the issuer of a
 record or a token — survives the endpoint changing. `hello` answers with the answering
 instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
-reachability).
+reachability). An entry's `id` is optional, because it is unknown until the handshake with
+that peer has settled — a configured endpoint is known before anything answers there, and a
+peer whose link is down is the last one to drop from the list. The answering instance's own
+`endpoint` is optional too: an instance that joins no mesh has no URL to give a peer.
 
 Authentication between instances happens once, at connection time, and a `role: "instance"`
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The
@@ -270,6 +273,21 @@ are in the attribute table all the same, because **authorization is not decided 
 table** — what a carrier decides is what an op can do, never who may call it. All four are
 `needs_hello: false` and reachable from a connection with no identity yet, as `hello` is; the
 `request_id` is composed by the HTTP carrier.
+
+Besides the registration URL's token, `auth_register` takes the six digits the command line
+showed when that URL was made. They are not in the URL: the two halves reaching the browser by
+different routes is exactly what makes holding the URL insufficient, and the contract states
+that by taking the code as a required argument. A wrong code and a spent URL are both answered
+with the existing `auth_invalid` / `auth_expired`, which do not say which half failed.
+
+Two names travel with a registration. `RegisterClaims.issued_label` is what the administrator
+wrote about who the URL was for; `auth_register`'s `device_label` is what the person wrote
+about which device they are on. The credential record keeps both, along with the address and
+user agent at registration and at last use. None of it authenticates anything and nothing is
+decided by it — an address is chosen freely by whoever makes the request. It is there as
+**something to recognise**: the one person reading their own list places a line as theirs
+because the address is their home provider's and the browser is the one they use, or fails to,
+and removes it.
 
 The other three:
 
