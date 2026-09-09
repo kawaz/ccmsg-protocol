@@ -92,6 +92,13 @@ export const RegisterClaims = Type.Object(
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
     jti: Type.String({ minLength: 1 }),
+    /** The WebAuthn user handle for this subject: sixteen random bytes the
+     * issuing instance settles on once per `sub`. The page creates the
+     * credential against it, the record keeps it, and an assertion that names a
+     * handle is held to it. It is here rather than left to the page because the
+     * authenticator stores it beyond this instance's reach — a second value for
+     * one person would be a second account on their device. */
+    user_id: Base64Url,
     /** What the administrator who issued the URL wrote down about who it was
      * for. Their words, not the holder's — the label the person gives their
      * own device is `device_label` on the record, and the two are worth telling
@@ -242,7 +249,16 @@ export const AuthRefreshResponse = response("auth_refresh", AuthRefreshResult);
  * verification, the record lookup — the receiving instance does itself. */
 export const AuthResolveArgs = Type.Union(
   [
-    Type.Object({ kind: Type.Literal("register"), token: Type.String({ minLength: 1 }) }),
+    Type.Object({
+      kind: Type.Literal("register"),
+      token: Type.String({ minLength: 1 }),
+      /** The digits the person typed, forwarded unchecked. The issuer holds
+       * both the code and the count of attempts against it, so it is the only
+       * one that can refuse a wrong one and retire the URL after enough of
+       * them; a receiver that judged the code itself would let an attacker
+       * spread guesses across instances without any of them counting. */
+      code: Type.String({ pattern: "^[0-9]{6}$" }),
+    }),
     Type.Object({ kind: Type.Literal("challenge"), challenge: Base64Url }),
   ],
   { $id: "AuthResolveArgs" },
@@ -300,7 +316,9 @@ export const CredentialRecord = Type.Object(
     credential_id: Base64Url,
     /** The public key, COSE-encoded. */
     public_key: Base64Url,
-    /** The `user.id` this credential was created against. */
+    /** The `user_id` of the registration's claims, which is what the credential
+     * was created against and what an assertion naming a handle is checked
+     * against. */
     user_handle: Base64Url,
     /** The relying party this credential was created under, as the claims of
      * the registration that made it stated. Written by the registration and not

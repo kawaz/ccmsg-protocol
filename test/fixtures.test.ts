@@ -808,6 +808,7 @@ describe("authenticating a person", () => {
         op: "auth_resolve",
         kind: "register",
         token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        code: "048213",
         to_instance: INSTANCE,
       }),
     ).toBe(true);
@@ -824,10 +825,23 @@ describe("authenticating a person", () => {
           rp_id: "mba.example.ts.net",
           expires_at: 1_757_300_600_000,
           jti: "01J9Z3W2Q",
+          user_id: "dXNlci1oYW5kbGU",
           issued_label: "for kawaz",
         },
       }),
     ).toBe(true);
+  });
+
+  test("a forwarded registration without the typed code is refused", () => {
+    expect(
+      isValid(AuthResolveRequest, {
+        request_id: "a5",
+        op: "auth_resolve",
+        kind: "register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        to_instance: INSTANCE,
+      }),
+    ).toBe(false);
   });
 
   test("spending a challenge answers nothing beyond having spent it", () => {

@@ -260,6 +260,16 @@ challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここ�
 省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を
 持っている場合しか通せない (推測して通すことはしない)。
 
+コードの検証も発行者だけが行う。受けた instance は `auth_resolve` の `register` に token と
+一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、
+受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。
+
+登録 URL の claims は `user_id` (発行 instance が `sub` ごとに 1 度決める 16 byte 乱数) を
+持つ。ページは `navigator.credentials.create()` の `user.id` にこれを使い、instance は
+`CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せに
+しないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの
+値が付けば端末上では 2 つのアカウントになる。
+
 credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、
 assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
 

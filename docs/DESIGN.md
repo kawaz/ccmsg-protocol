@@ -288,6 +288,17 @@ receiving this may all be different. The field being optional means a receiver m
 with a value and no issuer, in which case it can only honour a challenge it holds itself and
 refuses the rest rather than guessing.
 
+The code is judged by the issuer alone. A receiving instance forwards it beside the token on
+`auth_resolve`'s `register` and decides nothing: the issuer is what counts the attempts, and a
+receiver ruling on the code itself would let an attacker spread guesses across instances with
+none of them counted anywhere.
+
+A registration URL's claims carry a `user_id`, sixteen random bytes the issuing instance
+settles on once per subject. The page creates the credential against it as `user.id`, the
+instance keeps it as `CredentialRecord.user_handle`, and an assertion naming a handle is held
+to it. It is not left to the page because the authenticator keeps it beyond the instance's
+reach — two values for one person would be two accounts on their device.
+
 A credential record keeps the `rp_id` it was registered under. A passkey answers only for the
 domain it was created against, so an assertion's `rpIdHash` is checked against that and not
 against the host of whatever endpoint was reached.
