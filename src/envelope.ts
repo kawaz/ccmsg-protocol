@@ -8,6 +8,16 @@ import { InstanceId, Role, Sid } from "./identifiers.ts";
  * connections and on mesh links alike. */
 export const PROTOCOL_VERSION = 2;
 
+/** The largest a single frame — one newline-delimited line, request, reply or
+ * topic frame alike — may be, in bytes.
+ *
+ * A value both sides hold because only the sender can keep to it: a frame over
+ * it is answered `bad_request` and the connection stays up, so a client that
+ * does not know the ceiling reads a refusal it cannot attribute to size. What
+ * a caller does with a payload above it — split it, write it as a file — is its
+ * own decision, which is why the contract states the limit and not a remedy. */
+export const MAX_FRAME_BYTES = 1_048_576;
+
 /** The identity a forwarded request is dispatched as: the connection the
  * forwarding instance received it on, in the two fields that decide anything —
  * the role the attribute table is read against, and the session it speaks for. */

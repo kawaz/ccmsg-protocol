@@ -200,6 +200,20 @@ what was said to it — so the two cannot expire at different times. The count i
 what a recipient will hold for one session, keeping what the contract accepts to what the
 recipient can still be handed.
 
+## Limits the sender keeps to
+
+A limit only the sender can keep to is a value the contract holds. A limit only the receiver
+knows is one the sender cannot read its own refusal against.
+
+`MAX_FRAME_BYTES` of 1 MiB is the ceiling on a single frame — one newline-delimited line, be
+it a request, a reply or a topic frame. A frame over it is answered `bad_request` and the
+connection stays up. What to do with a body above it — split it, write it as a file and send
+the reference — is the caller's decision, so the contract states the limit and not a remedy.
+
+`TITLE_MAX_CHARS` of 200 is the ceiling on `session_rename`'s `title`, and the schema's
+`maxLength` is the same value. A title is typed into a terminal and becomes a session's first
+line, so it stops at a readable length rather than at whatever the terminal would accept.
+
 ## Versions and compatibility
 
 `PROTOCOL_VERSION` is an integer naming a generation. Within a generation only optional

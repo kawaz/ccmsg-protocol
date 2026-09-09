@@ -8,7 +8,7 @@ import {
   TopicUnsubscribeRequest,
 } from "../src/common/topics.ts";
 import { LAST_LIVE_RETENTION_MS, PeersFrame } from "../src/control/peers.ts";
-import { ErrorResponse } from "../src/envelope.ts";
+import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
 import {
   INBOX_MAX_PER_SID,
   INBOX_RETENTION_MS,
@@ -558,6 +558,12 @@ describe("the peers topic", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe("frame size", () => {
+  test("one frame is capped at 1 MiB", () => {
+    expect(MAX_FRAME_BYTES).toBe(1024 * 1024);
   });
 });
 

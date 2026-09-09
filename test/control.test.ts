@@ -55,6 +55,7 @@ import {
   SessionRenameResponse,
   SessionSearchRequest,
   SessionSearchResponse,
+  TITLE_MAX_CHARS,
 } from "../src/control/session.ts";
 import { TranscriptFrame, TranscriptReadRequest } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
@@ -103,6 +104,14 @@ describe("session ops", () => {
         title: "pv2 control ops",
       }),
     ).toBe(true);
+  });
+
+  test("a title stops at the length the contract states", () => {
+    const rename = (title: string) =>
+      isValid(SessionRenameRequest, { request_id: "2", op: "session_rename", sid: SID, title });
+    expect(TITLE_MAX_CHARS).toBe(200);
+    expect(rename("t".repeat(TITLE_MAX_CHARS))).toBe(true);
+    expect(rename("t".repeat(TITLE_MAX_CHARS + 1))).toBe(false);
   });
 
   test("a rename reply without its instance is refused", () => {
