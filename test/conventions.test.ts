@@ -74,7 +74,7 @@ describe("what the contract does and does not pin down", () => {
         request_id: "1",
         op: "hello",
         role: "user",
-        protocol_version: 2,
+        protocol_version: 3,
         something_added_later: true,
       }),
     ).toBe(true);

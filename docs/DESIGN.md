@@ -15,7 +15,7 @@ checking to each implementation's hand-written tests, and the two drift.
 
 | Layer | File | Contents |
 |---|---|---|
-| Identifiers | `src/identifiers.ts` | `sid` / `instance` / `mid`, roles, capabilities, timestamps |
+| Identifiers | `src/identifiers.ts` | `sid` / `instance` / `endpoint` / `mid`, roles, capabilities, timestamps |
 | Session description | `src/session-meta.ts` | the shared fields naming where a session lives and what it runs as |
 | Errors | `src/errors.ts` | the closed `ErrorCode` union and the error body |
 | Envelope | `src/envelope.ts` | request / response / topic frames / connection events, `PROTOCOL_VERSION` |
@@ -93,10 +93,11 @@ forwarding all read this table instead of each keeping their own copy of the sam
 |---|---|
 | `plane` | which face the op belongs to |
 | `roles` | who may call it; anyone else gets `forbidden` |
-| `needs_hello` | whether an identity settled by `hello` is required (everything but `hello` and `instance_ping`) |
+| `needs_hello` | whether an identity settled by `hello` is required (everything but `hello`, `instance_ping` and the four ops that settle an identity) |
 | `capability` | the capability it needs; absent from `hello`'s set means `capability_unavailable` |
 | `locality` | `instance-local` ops are forwarded to the owning instance, or answer `instance_unreachable` |
 | `scope` | present when the role changes what the reply may contain rather than whether the call is allowed |
+| `carrier` | present on an op carried over HTTP rather than as a frame on the WebSocket; who may call it is not the carrier's to decide (below) |
 | `errors` | the codes specific to this op |
 
 The codes that follow from those attributes (`invalid_args`, `hello_required`, `forbidden`,
@@ -122,7 +123,7 @@ local table of it.
 |---|---|---|---|---|
 | `whole` | the whole value | replaces everything held | yes | `session_status:<sid>` |
 | `per_instance_whole` | the whole of what its `instance` knows | replaces that instance's entries and leaves every other instance's alone (what is held is the union across instances) | yes | `peers`, `agents`, `session_errors`, `llm_requests`, `llm_status` |
-| `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `inbox`, `kv:<ns>` |
+| `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `inbox`, `kv:<ns>`, `auth_records` |
 | `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>` |
 | `event` | an occurrence rather than a value | holds nothing | no | `notify` |
 
@@ -136,8 +137,9 @@ session lives on one instance, leaving no other instance's half to preserve.
   (`*_ms` / `*_secs`)
 - Fields are snake_case; ops are `<noun>_<verb>` (`hello` is the one single word)
 - "Unknown" is omitted; "none" is an empty array
-- Identifiers: `sid` is a globally unique uuid, `instance` is an endpoint URL compared whole
-  including its path, `mid` is `<instance>/<counter>`
+- Identifiers: `sid` is a globally unique uuid, `instance` is the opaque random value an
+  instance issues for itself (16 bytes as hex), `endpoint` is the URL it is dialed at,
+  compared whole including its path, `mid` is `<instance>/<counter>`
 
 The first two are checked by `test/conventions.test.ts`, which walks every schema.
 
@@ -223,13 +225,23 @@ There is no compatibility path.
 
 ## Instances and mesh
 
-An instance is identified by the endpoint URL other instances dial. Several instances may
-share one origin, so the comparison is the whole URL rather than the origin. `hello` answers
-with the instance itself and the instances it can see.
+**Identity is the `instance` id; what is dialed and what TLS is checked against is the
+`endpoint` URL**, and the two are separate types. The id is an opaque random value an
+instance issues for itself once and keeps through a move. The endpoint is the URL other
+instances dial; several instances may share one origin, so the comparison is the whole URL
+rather than the origin. Everything keyed by the id — `mid`, the store's keys, the issuer of a
+record or a token — survives the endpoint changing. `hello` answers with the answering
+instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
+reachability).
 
 Authentication between instances happens once, at connection time, and a `role: "instance"`
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The
-procedure of record is mesh-peer-auth in the main ccmsg repository.
+`iss` / `aud` compared there are endpoints — trust is rooted in the URL and nowhere else. The
+id the peer names travels in the same hello, and the proof landing is what makes everything
+that hello said trusted, so the receiver keeps an authenticated endpoint-to-id mapping. That
+mapping is what a later `to_instance` id is dialed through. One id binds to one link: a hello
+naming an id already bound to another endpoint closes one of the two by the rule glare
+settles on. The procedure of record is mesh-peer-auth in the main ccmsg repository.
 
 A forwarded request is authorized again in full at its destination. The envelope's `caller`
 (a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the
@@ -245,14 +257,42 @@ instance's view of the instances (`instances`, each with `reachable`), so learni
 went down does not mean greeting again to find out. Reachability is stated from the sender's
 position, so two instances legitimately disagreeing about one is not a fault.
 
+## Authenticating a person
+
+What the contract holds is **the shape on the wire, and nothing else**. The procedure —
+registering and verifying a passkey, the cookie, replicating the records, where a challenge
+is forwarded — is DR-0001 in the main ccmsg repository, and is not copied here.
+
+The four ops that settle a person's identity (`auth_challenge`, `auth_register`,
+`auth_assert`, `auth_refresh_token`) are **carried over HTTP**: reading and setting a cookie,
+and answering before a connection exists, are things a frame on the WebSocket cannot do. They
+are in the attribute table all the same, because **authorization is not decided outside that
+table** — what a carrier decides is what an op can do, never who may call it. All four are
+`needs_hello: false` and reachable from a connection with no identity yet, as `hello` is; the
+`request_id` is composed by the HTTP carrier.
+
+The other three:
+
+- `auth_refresh` is a WebSocket op. It moves a live connection's deadline (`hello`'s
+  `auth_expires_at`) rather than closing it
+- `auth_resolve` and `auth_rotate` are between instances (`roles: ["instance"]`, `locality:
+  instance-local`). What only an issuer can answer — checking a registration URL, spending a
+  challenge, rotating a token family — is forwarded to it as `to_instance = iss`
+
+Credential records and token families are replicated on the `auth_records` topic
+(`roles: ["instance"]`, element granularity). Not on the store, because the store is the
+person's to read and write: a token read out of it would be their session, and a credential
+written into it would be a new way in. A removal travels as a tombstone element, since an
+absence in a list of changes says nothing.
+
 ## What the contract holds
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 37 | common 6 / messaging 4 / control 27 / mesh 0 |
-| topics | 10 | messaging 2 (`inbox` / `notify`), control 8 |
+| ops | 44 | common 13 / messaging 4 / control 27 / mesh 0 |
+| topics | 11 | messaging 2 (`inbox` / `notify`), control 8, common 1 (`auth_records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| error codes | 17 | one closed union |
+| error codes | 20 | one closed union |
 
 Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in
 `TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the

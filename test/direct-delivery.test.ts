@@ -8,8 +8,8 @@ import {
 import type { InboxMessage } from "../src/messaging/message.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
-const MID = "wss://mba.example.ts.net/ccmsg/personal/41";
-const EARLIER_MID = "wss://mba.example.ts.net/ccmsg/personal/17";
+const MID = "3f9c1a7b5e2d48069c1a7b5e2d480691/41";
+const EARLIER_MID = "3f9c1a7b5e2d48069c1a7b5e2d480691/17";
 
 const message: InboxMessage = {
   mid: MID,

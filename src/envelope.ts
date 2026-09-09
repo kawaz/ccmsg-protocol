@@ -6,7 +6,7 @@ import { InstanceId, Role, Sid } from "./identifiers.ts";
  * fields and whole new ops may be added; a removal or a change of meaning
  * raises it. Peers announcing another generation are refused, on client
  * connections and on mesh links alike. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** The largest a single frame — one newline-delimited line, request, reply or
  * topic frame alike — may be, in bytes.

@@ -24,22 +24,47 @@ export type Sender = Static<typeof Sender>;
 /** The sender that is the person rather than a session. */
 export const USER_SENDER = "user" as const;
 
-/** An instance id: the endpoint URL other instances dial, compared as a whole
- * string including its path (mesh-peer-auth §4.2 — one origin may host several
- * instances, so origin-level comparison would confuse them). The display name
- * lives in config, never on the wire. */
+/** An instance id: an opaque random value an instance issues for itself once
+ * and keeps for its life, held in its state directory.
+ *
+ * It names the instance and nothing else — where to reach it is the `Endpoint`
+ * below, which may change without this changing. Everything that has to survive
+ * an instance moving is keyed by this: `mid`, the store's keys, the issuer of a
+ * credential record, a token family and a challenge.
+ *
+ * Hexadecimal of a fixed width, because the value appears inside composed
+ * strings (`mid`) and in the store's keys, where a character that means
+ * something to a reader of those — a separator, a case fold — would make two
+ * ids that differ compare equal. The display name lives in config, never on
+ * the wire. */
 export const InstanceId = Type.String({
   $id: "InstanceId",
-  pattern: "^wss?://[^\\s?#]+$",
+  pattern: "^[0-9a-f]{32}$",
 });
 export type InstanceId = Static<typeof InstanceId>;
 
-/** A delivery-frame id: `<instance>/<counter>`, numbered by the instance that
- * issued the frame. It exists so `reply_to` can point at one frame; it is not
- * a cursor and carries no ordering across instances. */
+/** Where an instance is reached: the URL other instances dial, compared as a
+ * whole string including its path (mesh-peer-auth §4.2 — one origin may host
+ * several instances, so origin-level comparison would confuse them).
+ *
+ * Apart from `InstanceId` because the two answer different questions and change
+ * on different occasions. This is what a peer dials, what the TLS certificate
+ * is checked against and what the mesh handshake's `iss` / `aud` are compared
+ * as — trust is rooted in the URL and nowhere else. Which instance answers
+ * there is the id, which the handshake states and which an alias or a move does
+ * not alter. */
+export const Endpoint = Type.String({
+  $id: "Endpoint",
+  pattern: "^wss?://[^\\s?#]+$",
+});
+export type Endpoint = Static<typeof Endpoint>;
+
+/** A delivery-frame id: `<instance id>/<counter>`, numbered by the instance
+ * that issued the frame. It exists so `reply_to` can point at one frame; it is
+ * not a cursor and carries no ordering across instances. */
 export const Mid = Type.String({
   $id: "Mid",
-  pattern: "^wss?://[^\\s?#]+/\\d+$",
+  pattern: "^[0-9a-f]{32}/\\d+$",
 });
 export type Mid = Static<typeof Mid>;
 

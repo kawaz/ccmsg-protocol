@@ -11,6 +11,7 @@ export const PLAIN_TOPICS = [
   "session_errors",
   "llm_requests",
   "llm_status",
+  "auth_records",
 ] as const;
 
 /** Topics naming one session, written `<topic>:<sid>`. */
@@ -102,6 +103,11 @@ export const TOPIC_ATTRIBUTES = {
   session_status: { roles: ["user"], granularity: "whole" },
   transcript: { roles: ["user"], granularity: "append" },
   kv: { roles: ["user"], granularity: "element" },
+  // The only topic no person may subscribe to: its elements are the secrets
+  // that authenticate them. A relay carries it as the instance it is, not on a
+  // caller's behalf, so there is no path by which a person's subscription
+  // reaches it.
+  auth_records: { roles: ["instance"], granularity: "element" },
 } as const satisfies Record<
   PlainTopic | SessionScopedTopic | NamespaceScopedTopic,
   TopicAttributes

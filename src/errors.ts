@@ -46,6 +46,20 @@ export const ERROR_CODES = [
   /** The on-disk content sniffed as binary, so a text edit would not be
    * faithful to what the caller saw. */
   "not_a_text_file",
+  // --- authenticating a person ---
+  /** A challenge, registration or token was good once and its window has
+   * passed. Apart from `auth_invalid` because it is the one authentication
+   * failure a client answers by itself: it repeats the step that issues a fresh
+   * one, where anything invalid means asking the person again. */
+  "auth_expired",
+  /** The credential, signature, challenge or token did not check out. What
+   * failed is not stated: a caller learns only that this attempt is not one,
+   * and `msg` says no more than the instance's own log would want. */
+  "auth_invalid",
+  /** The instance that issued the challenge or registration, and alone can
+   * spend it, is not one this cluster knows or could reach just now. The client
+   * asks for a fresh one, which the instance it is talking to can issue. */
+  "auth_unknown_issuer",
   // --- translate ---
   /** The helper process is present but failed on this call. (Its absence is
    * `capability_unavailable` instead.) */

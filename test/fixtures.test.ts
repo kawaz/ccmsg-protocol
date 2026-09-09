@@ -1,4 +1,20 @@
 import { describe, expect, test } from "bun:test";
+import {
+  AUTH_CHALLENGE_TTL_MS,
+  AuthAssertRequest,
+  AuthAssertResponse,
+  AuthChallengeResponse,
+  AuthRecordsFrame,
+  AuthRefreshRequest,
+  AuthRefreshResponse,
+  AuthRefreshTokenResponse,
+  AuthRegisterRequest,
+  AuthResolveRequest,
+  AuthResolveResponse,
+  AuthRotateResponse,
+  FAMILY_TOMBSTONE_RETENTION_MS,
+  REGISTER_TTL_MS,
+} from "../src/common/auth.ts";
 import { HelloRequest, HelloResponse } from "../src/common/hello.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
@@ -21,15 +37,17 @@ import { SayMarkReadRequest, SayPostRequest } from "../src/messaging/say.ts";
 import { isValid } from "../src/schemas.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
+const OTHER_INSTANCE = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
 const OTHER_SID = "0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b";
-const INSTANCE = "wss://mba.example.ts.net/ccmsg/personal";
+const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
+const INSTANCE_ENDPOINT = "wss://mba.example.ts.net/ccmsg/personal";
 
 describe("hello", () => {
   const helloRequest = {
     request_id: "1",
     op: "hello",
     role: "session",
-    protocol_version: 2,
+    protocol_version: 3,
     sid: SID,
     client_version: "0.1.0",
   };
@@ -44,11 +62,12 @@ describe("hello", () => {
         request_id: "1",
         op: "hello",
         role: "instance",
-        protocol_version: 2,
+        protocol_version: 3,
         mesh: {
           ver: 1,
           iss: "wss://nuc.example.ts.net/ccmsg/personal",
-          aud: INSTANCE,
+          aud: INSTANCE_ENDPOINT,
+          id: OTHER_INSTANCE,
           kid: "9f2c7a5e1b4d8036af51c9e27d604b18",
         },
       }),
@@ -98,11 +117,18 @@ describe("hello", () => {
       isValid(HelloResponse, {
         ok: true,
         request_id: "1",
-        protocol_version: 2,
+        protocol_version: 3,
         instance: INSTANCE,
+        endpoint: INSTANCE_ENDPOINT,
+        auth_expires_at: 1_757_310_000_000,
         instances: [
-          { id: INSTANCE, host: "mba", reachable: true },
-          { id: "wss://nuc.example.ts.net/ccmsg/personal", host: "nuc", reachable: false },
+          { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
+          {
+            id: OTHER_INSTANCE,
+            endpoint: "wss://nuc.example.ts.net/ccmsg/personal",
+            host: "nuc",
+            reachable: false,
+          },
         ],
         capabilities: ["fork", "launcher", "terminal"],
         version: "0.1.0",
@@ -116,8 +142,9 @@ describe("hello", () => {
       isValid(HelloResponse, {
         ok: true,
         request_id: "1",
-        protocol_version: 2,
+        protocol_version: 3,
         instance: INSTANCE,
+        endpoint: INSTANCE_ENDPOINT,
         instances: [],
         capabilities: ["telepathy"],
         version: "0.1.0",
@@ -126,13 +153,30 @@ describe("hello", () => {
     ).toBe(false);
   });
 
-  test("an instance id must be a whole endpoint URL", () => {
+  test("an instance id names the instance and not where it is reached", () => {
+    // The URL is the endpoint, which moves; the id does not.
     expect(
       isValid(HelloResponse, {
         ok: true,
         request_id: "1",
-        protocol_version: 2,
-        instance: "personal@mba",
+        protocol_version: 3,
+        instance: INSTANCE_ENDPOINT,
+        endpoint: INSTANCE_ENDPOINT,
+        instances: [],
+        capabilities: [],
+        version: "0.1.0",
+        started_at: 1_757_300_000_000,
+      }),
+    ).toBe(false);
+  });
+
+  test("a reply that says who is answering but not where it is dialed is refused", () => {
+    expect(
+      isValid(HelloResponse, {
+        ok: true,
+        request_id: "1",
+        protocol_version: 3,
+        instance: INSTANCE,
         instances: [],
         capabilities: [],
         version: "0.1.0",
@@ -297,7 +341,7 @@ describe("message_send", () => {
         op: "message_send",
         to: OTHER_SID,
         text: "hi",
-        to_instance: "wss://nuc.example.ts.net/ccmsg/personal",
+        to_instance: OTHER_INSTANCE,
         from_instance: INSTANCE,
         hops: [INSTANCE],
       }),
@@ -414,7 +458,7 @@ describe("the peers topic", () => {
     repo: "ccmsg-protocol",
     ws: "main",
     cwd: "/repos/kawaz/ccmsg-protocol/main",
-    protocol_version: 2,
+    protocol_version: 3,
   };
   const lastLive = {
     sid: OTHER_SID,
@@ -527,8 +571,13 @@ describe("the peers topic", () => {
           peers: [peer],
           last_live: [],
           instances: [
-            { id: INSTANCE, host: "mba", reachable: true },
-            { id: "wss://nuc.example.ts.net/ccmsg/personal", host: "nuc", reachable: false },
+            { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
+            {
+              id: OTHER_INSTANCE,
+              endpoint: "wss://nuc.example.ts.net/ccmsg/personal",
+              host: "nuc",
+              reachable: false,
+            },
           ],
         },
       }),
@@ -541,7 +590,11 @@ describe("the peers topic", () => {
         ev: "topic",
         topic: "peers",
         instance: INSTANCE,
-        data: { peers: [], last_live: [], instances: [{ id: INSTANCE, host: "mba" }] },
+        data: {
+          peers: [],
+          last_live: [],
+          instances: [{ id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba" }],
+        },
       }),
     ).toBe(false);
   });
@@ -558,6 +611,297 @@ describe("the peers topic", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe("authenticating a person", () => {
+  const challenge = {
+    challenge: "Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA",
+    issuer: INSTANCE,
+    expires_at: 1_757_300_300_000,
+  };
+  const session = {
+    ok: true,
+    request_id: "a1",
+    sub: "personal-1",
+    access: { value: "YWNjZXNzLXRva2Vu", expires_at: 1_757_310_000_000 },
+  };
+
+  test("a challenge says who can spend it", () => {
+    expect(isValid(AuthChallengeResponse, { ok: true, request_id: "a1", ...challenge })).toBe(true);
+  });
+
+  test("a challenge without its issuer is refused — nobody could consume it", () => {
+    const { issuer: _dropped, ...rest } = challenge;
+    expect(isValid(AuthChallengeResponse, { ok: true, request_id: "a1", ...rest })).toBe(false);
+  });
+
+  test("an issuer spelled as a URL is refused", () => {
+    expect(
+      isValid(AuthChallengeResponse, {
+        ok: true,
+        request_id: "a1",
+        ...challenge,
+        issuer: INSTANCE_ENDPOINT,
+      }),
+    ).toBe(false);
+  });
+
+  test("registration carries the URL's token and what the authenticator made", () => {
+    expect(
+      isValid(AuthRegisterRequest, {
+        request_id: "a2",
+        op: "auth_register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        credential: {
+          id: "Y3JlZC1pZA",
+          raw_id: "Y3JlZC1pZA",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
+          attestation_object: "o2NmbXRkbm9uZQ",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a credential field that is not base64url is refused", () => {
+    expect(
+      isValid(AuthRegisterRequest, {
+        request_id: "a2",
+        op: "auth_register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        credential: {
+          id: "Y3JlZC1pZA",
+          raw_id: "cred id!",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
+          attestation_object: "o2NmbXRkbm9uZQ",
+        },
+      }),
+    ).toBe(false);
+  });
+
+  test("an assertion names the challenge it answers", () => {
+    expect(
+      isValid(AuthAssertRequest, {
+        request_id: "a3",
+        op: "auth_assert",
+        challenge,
+        credential: {
+          raw_id: "Y3JlZC1pZA",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+          authenticator_data: "YXV0aC1kYXRh",
+          signature: "c2lnbmF0dXJl",
+          user_handle: "dXNlci1oYW5kbGU",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("an assertion from a resident credential names no account", () => {
+    expect(
+      isValid(AuthAssertRequest, {
+        request_id: "a3",
+        op: "auth_assert",
+        challenge,
+        credential: {
+          raw_id: "Y3JlZC1pZA",
+          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+          authenticator_data: "YXV0aC1kYXRh",
+          signature: "c2lnbmF0dXJl",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("what a person gets back is the access token alone", () => {
+    expect(isValid(AuthAssertResponse, session)).toBe(true);
+  });
+
+  test("the refresh token is not in the reply — it is the cookie's", () => {
+    expect(
+      isValid(AuthRefreshTokenResponse, {
+        ...session,
+        refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
+      }),
+    ).toBe(true);
+    // Carried, not refused, like any field this generation does not name — but
+    // nothing reads it, and an instance that answered one would be handing the
+    // browser's script the value the cookie exists to keep from it.
+    expect(isValid(AuthRefreshTokenResponse, session)).toBe(true);
+  });
+
+  test("renewing a live connection moves its deadline", () => {
+    expect(
+      isValid(AuthRefreshRequest, {
+        request_id: "a4",
+        op: "auth_refresh",
+        access_token: "YWNjZXNzLXRva2Vu",
+      }),
+    ).toBe(true);
+    expect(
+      isValid(AuthRefreshResponse, {
+        ok: true,
+        request_id: "a4",
+        auth_expires_at: 1_757_320_000_000,
+      }),
+    ).toBe(true);
+  });
+
+  test("the issuer is asked to spend a registration, and answers what it authorized", () => {
+    expect(
+      isValid(AuthResolveRequest, {
+        request_id: "a5",
+        op: "auth_resolve",
+        kind: "register",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+        to_instance: INSTANCE,
+      }),
+    ).toBe(true);
+    expect(
+      isValid(AuthResolveResponse, {
+        ok: true,
+        request_id: "a5",
+        kind: "register",
+        claims: {
+          iss: INSTANCE,
+          sub: "personal-1",
+          unit: "personal",
+          endpoint: INSTANCE_ENDPOINT,
+          rp_id: "mba.example.ts.net",
+          expires_at: 1_757_300_600_000,
+          jti: "01J9Z3W2Q",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("spending a challenge answers nothing beyond having spent it", () => {
+    expect(isValid(AuthResolveResponse, { ok: true, request_id: "a5", kind: "challenge" })).toBe(
+      true,
+    );
+  });
+
+  test("a resolve that mixes the two subjects is refused", () => {
+    expect(
+      isValid(AuthResolveRequest, {
+        request_id: "a5",
+        op: "auth_resolve",
+        kind: "challenge",
+        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
+      }),
+    ).toBe(false);
+  });
+
+  test("a rotation answers both halves — the caller has a cookie to set", () => {
+    expect(
+      isValid(AuthRotateResponse, {
+        ok: true,
+        request_id: "a6",
+        sub: "personal-1",
+        access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
+        refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
+      }),
+    ).toBe(true);
+  });
+
+  test("a credential record is complete without the instance that wrote it", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        snapshot: true,
+        instance: INSTANCE,
+        data: {
+          records: [
+            {
+              key: "credential/personal-1/Y3JlZC1pZA",
+              updated_at: 1_757_300_000_000,
+              body: {
+                kind: "credential",
+                sub: "personal-1",
+                credential_id: "Y3JlZC1pZA",
+                public_key: "pQECAyYgASFYIA",
+                user_handle: "dXNlci1oYW5kbGU",
+                sign_count: 0,
+                registered_at: 1_757_300_000_000,
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a family names the one instance allowed to write it", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        instance: INSTANCE,
+        data: {
+          records: [
+            {
+              key: "family/01J9Z3W2Q",
+              updated_at: 1_757_300_100_000,
+              body: {
+                kind: "token_family",
+                sub: "personal-1",
+                iss: INSTANCE,
+                access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
+                refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
+                previous_refresh: { value: "b2xkLXJlZnJlc2g", expires_at: 1_757_400_000_000 },
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a removal travels as a record, and a credential's never expires", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        instance: INSTANCE,
+        data: {
+          records: [
+            {
+              key: "credential/personal-1/Y3JlZC1pZA",
+              updated_at: 1_757_400_000_000,
+              body: { kind: "tombstone", sub: "personal-1", deleted_at: 1_757_400_000_000 },
+            },
+            {
+              key: "family/01J9Z3W2Q",
+              updated_at: 1_757_400_000_000,
+              body: {
+                kind: "tombstone",
+                sub: "personal-1",
+                deleted_at: 1_757_400_000_000,
+                expires_at: 1_758_004_800_000,
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("a record of no known kind is refused", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        instance: INSTANCE,
+        data: {
+          records: [{ key: "k", updated_at: 1, body: { kind: "password", sub: "personal-1" } }],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  test("a family expires within the window its tombstone is kept for", () => {
+    expect(FAMILY_TOMBSTONE_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(AUTH_CHALLENGE_TTL_MS).toBeLessThan(REGISTER_TTL_MS);
   });
 });
 

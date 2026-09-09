@@ -22,6 +22,16 @@ export interface OpAttributes {
   /** The capability the op needs, when it needs one. */
   readonly capability?: Capability;
   readonly locality: Locality;
+  /** Set on an op a client reaches over HTTP rather than as a frame on its
+   * WebSocket. Such an op is in this table like any other because the table is
+   * the one place authorization is decided — an op reachable without appearing
+   * here would be a second, unwritten rule about who may call what.
+   *
+   * What the carrier decides is not authorization but what the op can do: these
+   * are the ops that set or read a cookie, which a frame on an open connection
+   * cannot, and they answer before any identity is settled. The route each is
+   * published at belongs to the instance, not here. */
+  readonly carrier?: "http";
   /** Present when the role changes what the reply may contain rather than
    * whether the call is allowed. */
   readonly scope?: "role";
@@ -34,13 +44,14 @@ const ALL_ROLES = ["session", "user", "instance"] as const;
 const AGENT_AND_USER = ["session", "user"] as const;
 const USER_ONLY = ["user"] as const;
 const SESSION_ONLY = ["session"] as const;
+const INSTANCE_ONLY = ["instance"] as const;
 
 /** The whole op vocabulary, with the attributes that decide who may call each
  * op, what it needs, and where it runs. This table is the single place those
  * facts live: authorization, capability gating and forwarding all read it
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
-  // --- common: connect, declare the end, and subscribe (6) ---
+  // --- common: connect, declare the end, and subscribe (13) ---
   // `hello` and `instance_ping` address the instance the caller reached, so
   // there is nothing to forward and no unreachable instance to report — which
   // is why they are `cluster` despite answering about one instance.
@@ -72,19 +83,87 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
+  // Open to every role, with which role may have which topic left to the topic
+  // table: an instance subscribes as itself to what only instances may hold,
+  // and a person is refused there by that table rather than here.
   topic_subscribe: {
     plane: "common",
-    roles: AGENT_AND_USER,
+    roles: ALL_ROLES,
     needs_hello: true,
     locality: "cluster",
     errors: ["topic_unknown"],
   },
   topic_unsubscribe: {
     plane: "common",
-    roles: AGENT_AND_USER,
+    roles: ALL_ROLES,
     needs_hello: true,
     locality: "cluster",
     errors: ["topic_unknown"],
+  },
+
+  // The four ops that authenticate a person are open to every role for the
+  // same reason `hello` is: they run before there is an identity to check, and
+  // what they answer is what settles one. They are `cluster` because whichever
+  // instance is reached answers — behind a load balancer that is not a choice
+  // the caller makes — and each asks the issuing instance itself for the parts
+  // only it holds.
+  auth_challenge: {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    carrier: "http",
+    errors: [],
+  },
+  auth_register: {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    carrier: "http",
+    errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
+  },
+  auth_assert: {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    carrier: "http",
+    errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
+  },
+  auth_refresh_token: {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    carrier: "http",
+    errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
+  },
+  // Addresses the connection it arrives on, which is on the instance that
+  // received it: nothing to forward, as with `hello`.
+  auth_refresh: {
+    plane: "common",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "cluster",
+    errors: ["auth_invalid", "auth_expired"],
+  },
+  // Between instances: what an issuer alone can answer. Instance-local by the
+  // usual rule — the subject belongs to one instance, and it is reached by
+  // `to_instance` being that instance's id.
+  auth_resolve: {
+    plane: "common",
+    roles: INSTANCE_ONLY,
+    needs_hello: true,
+    locality: "instance-local",
+    errors: ["auth_invalid", "auth_expired"],
+  },
+  auth_rotate: {
+    plane: "common",
+    roles: INSTANCE_ONLY,
+    needs_hello: true,
+    locality: "instance-local",
+    errors: ["auth_invalid", "auth_expired"],
   },
 
   // --- messaging: one-to-one delivery (4) ---

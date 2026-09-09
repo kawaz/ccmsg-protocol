@@ -1,6 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
-import { Capability, InstanceId, Role, Sid, Timestamp } from "../identifiers.ts";
+import { Capability, Endpoint, InstanceId, Role, Sid, Timestamp } from "../identifiers.ts";
 import { SessionMetaFields } from "../session-meta.ts";
 
 /** The mesh handshake's opening claim, carried by a `role: "instance"` hello.
@@ -13,12 +13,21 @@ export const MeshHello = Type.Object(
     /** Generation of the mesh handshake format, apart from the protocol
      * generation so the handshake can change without the wire changing. */
     ver: Type.Integer({ minimum: 1 }),
-    /** The endpoint URL the connecting instance claims to be. */
-    iss: InstanceId,
+    /** The endpoint URL the connecting instance claims to be reached at. */
+    iss: Endpoint,
     /** The endpoint URL it believes it is connecting to. Compared whole
      * against the receiver's own URL, which is what stops a signature made for
      * one instance from being replayed at another on the same host. */
-    aud: InstanceId,
+    aud: Endpoint,
+    /** Which instance is answering at `iss`. The claim is worth nothing until
+     * the proof lands, after which everything this hello said is trusted, so
+     * the receiver keeps the pair as its authenticated endpoint-to-id mapping —
+     * the table every later `to_instance` is dialed through.
+     *
+     * One id binds to one authenticated link: a hello naming an id already
+     * bound to another endpoint closes one of the two by the same rule glare
+     * settles on, and the loser is the greater endpoint string. */
+    id: InstanceId,
     /** Names the ephemeral key the receiver is to fetch for this connection. */
     kid: Type.String({ minLength: 16 }),
   },
@@ -78,6 +87,10 @@ export type HelloArgs = Static<typeof HelloArgs>;
 export const InstanceInfo = Type.Object(
   {
     id: InstanceId,
+    /** Where it is dialed. An attribute of the instance like the host below:
+     * it is what a peer connects to and authenticates against, and it may
+     * change under a fixed `id` when the instance moves. */
+    endpoint: Endpoint,
     /** The host it runs on. An attribute of the instance, not its identity —
      * one host may run several instances. */
     host: Type.String({ minLength: 1 }),
@@ -92,6 +105,10 @@ export const HelloResult = Type.Object({
   protocol_version: Type.Integer({ minimum: 1 }),
   /** The instance answering. Every other id in the reply is relative to it. */
   instance: InstanceId,
+  /** Where the answering instance is dialed. Stated beside the id because the
+   * caller reached it by some URL of its own — a proxy's, an alias — and what a
+   * peer is to dial is neither that nor derivable from the id. */
+  endpoint: Endpoint,
   /** The instances this one knows of, itself included. */
   instances: Type.Array(InstanceInfo),
   /** What this instance can do. An op whose `capability` is absent here
@@ -101,6 +118,12 @@ export const HelloResult = Type.Object({
   /** The daemon build, for display. */
   version: Type.String(),
   started_at: Timestamp,
+  /** When this connection's authorization runs out, after which the instance
+   * closes it. Present on a connection an access token opened; absent where
+   * reaching the instance is itself the permission (the Unix socket) or where
+   * the connection is a mesh link. The person's client renews before this
+   * instant with `auth_refresh` rather than reconnecting. */
+  auth_expires_at: Type.Optional(Timestamp),
 });
 export type HelloResult = Static<typeof HelloResult>;
 

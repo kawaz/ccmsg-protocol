@@ -1,6 +1,23 @@
 import type { TSchema } from "@sinclair/typebox";
 import { TypeCompiler, type TypeCheck } from "@sinclair/typebox/compiler";
 import type { OpName } from "./attributes.ts";
+import {
+  AuthAssertRequest,
+  AuthAssertResponse,
+  AuthChallengeRequest,
+  AuthChallengeResponse,
+  AuthRecordsFrame,
+  AuthRefreshRequest,
+  AuthRefreshResponse,
+  AuthRefreshTokenRequest,
+  AuthRefreshTokenResponse,
+  AuthRegisterRequest,
+  AuthRegisterResponse,
+  AuthResolveRequest,
+  AuthResolveResponse,
+  AuthRotateRequest,
+  AuthRotateResponse,
+} from "./common/auth.ts";
 import { HelloRequest, HelloResponse } from "./common/hello.ts";
 import { InstancePingRequest, InstancePingResponse } from "./common/ping.ts";
 import {
@@ -116,6 +133,13 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   session_stopping: { request: SessionStoppingRequest, response: SessionStoppingResponse },
   topic_subscribe: { request: TopicSubscribeRequest, response: TopicSubscribeResponse },
   topic_unsubscribe: { request: TopicUnsubscribeRequest, response: TopicUnsubscribeResponse },
+  auth_challenge: { request: AuthChallengeRequest, response: AuthChallengeResponse },
+  auth_register: { request: AuthRegisterRequest, response: AuthRegisterResponse },
+  auth_assert: { request: AuthAssertRequest, response: AuthAssertResponse },
+  auth_refresh_token: { request: AuthRefreshTokenRequest, response: AuthRefreshTokenResponse },
+  auth_refresh: { request: AuthRefreshRequest, response: AuthRefreshResponse },
+  auth_resolve: { request: AuthResolveRequest, response: AuthResolveResponse },
+  auth_rotate: { request: AuthRotateRequest, response: AuthRotateResponse },
   message_send: { request: MessageSendRequest, response: MessageSendResponse },
   say_post: { request: SayPostRequest, response: SayPostResponse },
   say_mark_read: { request: SayMarkReadRequest, response: SayMarkReadResponse },
@@ -175,6 +199,7 @@ export const TOPIC_SCHEMAS = {
   llm_requests: LlmRequestsFrame,
   llm_status: LlmStatusFrame,
   kv: KvFrame,
+  auth_records: AuthRecordsFrame,
 } as const;
 
 const compiled = new WeakMap<TSchema, TypeCheck<TSchema>>();

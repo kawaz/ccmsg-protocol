@@ -63,7 +63,7 @@ import { isValid } from "../src/schemas.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
 const OTHER_SID = "0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b";
-const INSTANCE = "wss://mba.example.ts.net/ccmsg/personal";
+const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
 const NOW = 1_757_300_000_000;
 
 describe("session ops", () => {
@@ -754,7 +754,7 @@ describe("session observation topics", () => {
     branch: "main",
     connected_at: NOW,
     last_activity_at: NOW,
-    protocol_version: 2,
+    protocol_version: 3,
   };
 
   test("both lists travel together, because a session moves between them", () => {

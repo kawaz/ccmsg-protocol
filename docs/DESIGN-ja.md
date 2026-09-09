@@ -14,7 +14,7 @@ frame が push されるかを schema として書き、daemon と webui の双�
 
 | 層 | ファイル | 中身 |
 |---|---|---|
-| 識別子 | `src/identifiers.ts` | `sid` / `instance` / `mid` / role / capability / 時刻 |
+| 識別子 | `src/identifiers.ts` | `sid` / `instance` / `endpoint` / `mid` / role / capability / 時刻 |
 | セッションの記述 | `src/session-meta.ts` | セッションの居場所と実行条件を指す共通フィールド |
 | エラー | `src/errors.ts` | `ErrorCode` の閉じた union と error body |
 | 封筒 | `src/envelope.ts` | request / response / topic frame / 接続イベント、`PROTOCOL_VERSION` |
@@ -88,10 +88,11 @@ op が要り、そのために daemon が送信済み索引を持つことにな
 |---|---|
 | `plane` | 面の所属 |
 | `roles` | 呼べる role。外の role は `forbidden` |
-| `needs_hello` | `hello` で identity が確定していることを要求するか (`hello` / `instance_ping` 以外は要) |
+| `needs_hello` | `hello` で identity が確定していることを要求するか (`hello` / `instance_ping` / identity を確定させる 4 op 以外は要) |
 | `capability` | 必要な能力。`hello` が返す集合に無ければ `capability_unavailable` |
 | `locality` | `instance-local` な op は担当 instance へ転送。届かなければ `instance_unreachable` |
 | `scope` | role で「可否」でなく「応答の可視範囲」が変わる op に付く |
+| `carrier` | WS の frame でなく HTTP で運ぶ op に付く。誰が呼べるかは carrier では決まらない (下記) |
 | `errors` | その op に固有のコード |
 
 属性から決まるコード (`invalid_args` / `hello_required` / `forbidden` /
@@ -115,7 +116,7 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 |---|---|---|---|---|
 | `whole` | 値の全体 | 手元を丸ごと置換 | 有 | `session_status:<sid>` |
 | `per_instance_whole` | その `instance` が知る全体 | その instance の分だけ置換し、他 instance の行は残す (手元の値は instance 横断の和) | 有 | `peers` `agents` `session_errors` `llm_requests` `llm_status` |
-| `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `inbox` `kv:<ns>` |
+| `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `inbox` `kv:<ns>` `auth_records` |
 | `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` |
 | `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
 
@@ -128,7 +129,8 @@ instance にしか居らず、他 instance の分を残す必要が無いため�
 - 時刻は Unix ms の整数で、名前は `*_at`。長さは単位を名前に持つ (`*_ms` / `*_secs`)
 - フィールドは snake_case、op は `<名詞>_<動詞>` (`hello` のみ単語 1 つ)
 - 「不明」は省略、「無い」は空配列
-- 識別子: `sid` は uuid でグローバル、`instance` は endpoint URL でパスまで含めた完全一致、
+- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な
+  乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、
   `mid` は `<instance>/<連番>`
 
 上 2 つは `test/conventions.test.ts` が全 schema を走査して検査する。
@@ -204,13 +206,20 @@ CLI がその代理になる。
 
 ## instance と mesh
 
-`instance` の識別子は他 instance が dial する endpoint URL そのもの。同一 origin に複数
-instance が相乗りするため、比較は origin ではなく URL 全体で行う。`hello` の応答が自
-instance と、mesh で見えている instance の一覧を返す。
+**identity は `instance` (id)、dial 先と TLS の照合先は `endpoint` (URL)** で、2 つは別の型。
+id は instance が自分に 1 度だけ発行する不透明な乱数で、引っ越しても変わらない。endpoint は
+他 instance が dial する URL で、同一 origin に複数 instance が相乗りするため比較は origin
+ではなく URL 全体で行う。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
+endpoint が変わっても無効にならない。`hello` の応答は自 instance の id と endpoint、および
+mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。
 
 instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello` がその起点になる
-(`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。手順の正本は ccmsg 本体リポの
-mesh-peer-auth。
+(`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint —
+信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の
+内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance`
+の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に
+束縛済みの id を名乗る hello は glare と同じ決定的な規則で片方を閉じる。手順の正本は ccmsg
+本体リポの mesh-peer-auth。
 
 転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら
 `sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の
@@ -224,14 +233,39 @@ mesh の断絶は購読からも見える。`peers` の frame は発生元 insta
 必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは
 正常にあり得る。
 
+## 人の認証
+
+契約が持つのは **wire の形だけ**。手順 (passkey の登録・検証、cookie、record の複製、
+challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここに複製しない。
+
+人の identity を確定させる 4 op (`auth_challenge` / `auth_register` / `auth_assert` /
+`auth_refresh_token`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答える
+ことが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に
+置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」
+ではない。この 4 つは `needs_hello: false` で、`hello` と同じく identity 未確定の接続から
+呼べる (`request_id` は HTTP 側の carrier が合成する)。
+
+残り 3 op:
+
+- `auth_refresh` は WS。生きている接続の期限 (`hello` 応答の `auth_expires_at`) を、
+  切らずに延ばす
+- `auth_resolve` / `auth_rotate` は instance 間 (`roles: ["instance"]`、`locality:
+  instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、
+  token family の rotate — を `to_instance = iss` で発行者へ転送する
+
+credential record と token family は topic `auth_records` (`roles: ["instance"]`、element 粒度)
+で複製する。kv に載せないのは、kv は user role が読み書きできるため — token が読めれば
+その人のセッションになり、credential が書ければ新しい入口になる。削除は tombstone という
+要素として届く (変化の一覧における不在は何も言わないので)。
+
 ## 契約が持つもの
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 37 | common 6 / messaging 4 / control 27 / mesh 0 |
-| topic | 10 | messaging 2 (`inbox` / `notify`)、control 8 |
+| op | 44 | common 13 / messaging 4 / control 27 / mesh 0 |
+| topic | 11 | messaging 2 (`inbox` / `notify`)、control 8、common 1 (`auth_records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| ErrorCode | 17 | 閉じた union |
+| ErrorCode | 20 | 閉じた union |
 
 全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を
 持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を

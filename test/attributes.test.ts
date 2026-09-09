@@ -3,6 +3,7 @@ import {
   isRoleAllowed,
   OP_ATTRIBUTES,
   OP_NAMES,
+  opAttributes,
   opErrors,
   opsOfPlane,
   type OpName,
@@ -47,18 +48,38 @@ describe("op attribute table", () => {
     ]);
   });
 
-  test("only hello and ping are callable before hello", () => {
+  test("what is callable before hello is the greeting and what settles an identity", () => {
     const open = OP_NAMES.filter((op) => !OP_ATTRIBUTES[op].needs_hello);
-    expect(open.sort()).toEqual(["hello", "instance_ping"]);
+    expect(open.sort()).toEqual([
+      "auth_assert",
+      "auth_challenge",
+      "auth_refresh_token",
+      "auth_register",
+      "hello",
+      "instance_ping",
+    ]);
+  });
+
+  test("an op carried over HTTP is one of those, and is in the table like any other", () => {
+    // The carrier decides what an op can do — set a cookie, answer before a
+    // connection exists — never who may call it: that stays this table's.
+    const overHttp = OP_NAMES.filter((op) => opAttributes(op).carrier === "http");
+    expect(overHttp.sort()).toEqual([
+      "auth_assert",
+      "auth_challenge",
+      "auth_refresh_token",
+      "auth_register",
+    ]);
+    for (const op of overHttp) expect(OP_ATTRIBUTES[op].needs_hello).toBe(false);
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(6);
+    expect(opsOfPlane("common")).toHaveLength(13);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(27);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(37);
-    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(10);
+    expect(OP_NAMES).toHaveLength(44);
+    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(11);
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
@@ -111,6 +132,23 @@ describe("topic attribute table", () => {
       );
     }
     expect(TOPIC_ATTRIBUTES.session_status.granularity).toBe("whole");
+  });
+
+  test("the records that authenticate a person are the one topic no person may read", () => {
+    const forInstances = Object.entries(TOPIC_ATTRIBUTES)
+      .filter(([, attrs]) => !(attrs.roles as readonly string[]).includes("user"))
+      .map(([topic]) => topic);
+    expect(forInstances).toEqual(["auth_records"]);
+    expect(TOPIC_ATTRIBUTES.auth_records.roles).toEqual(["instance"]);
+  });
+
+  test("subscribing is open to every role, and the topic table is what narrows it", () => {
+    // An instance subscribes as itself to `auth_records`, so the op cannot
+    // refuse the role; what a person may not have is refused by the topic.
+    for (const role of ["session", "user", "instance"] as const) {
+      expect(isRoleAllowed("topic_subscribe", role)).toBe(true);
+      expect(isRoleAllowed("topic_unsubscribe", role)).toBe(true);
+    }
   });
 });
 

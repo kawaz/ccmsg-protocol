@@ -1,4 +1,5 @@
 export * from "./attributes.ts";
+export * from "./common/auth.ts";
 export * from "./common/hello.ts";
 export * from "./common/ping.ts";
 export * from "./common/shutdown.ts";
