@@ -240,8 +240,8 @@ Authentication between instances happens once, at connection time, and a `role: 
 id the peer names travels in the same hello, and the proof landing is what makes everything
 that hello said trusted, so the receiver keeps an authenticated endpoint-to-id mapping. That
 mapping is what a later `to_instance` id is dialed through. One id binds to one link: a hello
-naming an id already bound to another endpoint closes one of the two by the rule glare
-settles on. The procedure of record is mesh-peer-auth in the main ccmsg repository.
+naming an id already bound to another endpoint is the one closed, and the standing binding
+stays. The procedure of record is mesh-peer-auth in the main ccmsg repository.
 
 A forwarded request is authorized again in full at its destination. The envelope's `caller`
 (a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the

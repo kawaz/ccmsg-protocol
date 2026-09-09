@@ -218,7 +218,7 @@ instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello
 信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の
 内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance`
 の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に
-束縛済みの id を名乗る hello は glare と同じ決定的な規則で片方を閉じる。手順の正本は ccmsg
+束縛済みの id を名乗る hello は新しく来た側を閉じる (既存の束縛を優先する)。手順の正本は ccmsg
 本体リポの mesh-peer-auth。
 
 転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら

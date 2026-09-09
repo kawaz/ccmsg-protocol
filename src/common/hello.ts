@@ -25,8 +25,8 @@ export const MeshHello = Type.Object(
      * the table every later `to_instance` is dialed through.
      *
      * One id binds to one authenticated link: a hello naming an id already
-     * bound to another endpoint closes one of the two by the same rule glare
-     * settles on, and the loser is the greater endpoint string. */
+     * bound to another endpoint is the one closed, the standing binding being
+     * the one an operator's endpoint list has already vouched for. */
     id: InstanceId,
     /** Names the ephemeral key the receiver is to fetch for this connection. */
     kid: Type.String({ minLength: 16 }),
