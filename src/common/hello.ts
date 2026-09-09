@@ -92,8 +92,10 @@ export const InstanceInfo = Type.Object(
     id: Type.Optional(InstanceId),
     /** Where it is dialed. An attribute of the instance like the host below:
      * it is what a peer connects to and authenticates against, and it may
-     * change under a fixed `id` when the instance moves. */
-    endpoint: Endpoint,
+     * change under a fixed `id` when the instance moves. Absent for the same
+     * reason it is absent from the reply's own `endpoint`: an instance in no
+     * mesh has no URL to be dialed at, including on its own line. */
+    endpoint: Type.Optional(Endpoint),
     /** The host it runs on. An attribute of the instance, not its identity —
      * one host may run several instances. */
     host: Type.String({ minLength: 1 }),

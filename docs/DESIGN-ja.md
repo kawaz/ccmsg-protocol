@@ -213,8 +213,8 @@ id は instance が自分に 1 度だけ発行する不透明な乱数で、引�
 endpoint が変わっても無効にならない。`hello` の応答は自 instance の id と endpoint、および
 mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は
 handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない
-段階から分かっており、link が落ちている相手こそ一覧から消してはならない。自 instance の
-`endpoint` も任意で、mesh に参加しない instance は peer に渡す URL を持たない。
+段階から分かっており、link が落ちている相手こそ一覧から消してはならない。`endpoint` は一覧の
+各行でも自 instance の行でも任意で、mesh に参加しない instance は peer に渡す URL を持たない。
 
 instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello` がその起点になる
 (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint —
@@ -253,6 +253,15 @@ challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここ�
 だけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを
 形にする。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、
 どちらの半分が失敗したかは名乗らない。
+
+登録も assertion と同じく challenge を issuer 付きで運ぶ。値は `client_data_json` の中にも
+あるが「誰が使い切れるか」は入っておらず、LB の下では challenge の発行 instance・登録 URL を
+作った instance・この request を受けた instance が全部違い得るため。任意フィールドなので
+省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を
+持っている場合しか通せない (推測して通すことはしない)。
+
+credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、
+assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
 
 登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いた
 もので、`auth_register` の `device_label` は利用者が「どの端末か」を書いたもの。credential

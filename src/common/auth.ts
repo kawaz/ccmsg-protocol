@@ -131,6 +131,16 @@ export const AuthRegisterArgs = Type.Object({
   /** What the person calls the device they are registering, for their own use
    * when they later read back a list of several. Nothing is decided by it. */
   device_label: Type.Optional(Type.String({ maxLength: 128 })),
+  /** The challenge this registration answers, with the instance that can spend
+   * it — the same pairing an assertion carries, and for the same reason: the
+   * value also sits inside `client_data_json`, but who may consume it does not,
+   * and behind a load balancer the instance that issued it, the one that made
+   * the registration URL and the one receiving this may all be different.
+   *
+   * Omitting it leaves the receiver with a value and no issuer, so it can only
+   * be honoured where the receiver itself holds the challenge; anywhere else
+   * the registration is refused rather than guessed at. */
+  challenge: Type.Optional(AuthChallenge),
   credential: RegistrationCredential,
 });
 export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
@@ -292,6 +302,13 @@ export const CredentialRecord = Type.Object(
     public_key: Base64Url,
     /** The `user.id` this credential was created against. */
     user_handle: Base64Url,
+    /** The relying party this credential was created under, as the claims of
+     * the registration that made it stated. Written by the registration and not
+     * derived later: a passkey only answers for the domain it was made under,
+     * so an assertion's `rpIdHash` is checked against this and not against
+     * whatever the endpoint being reached happens to be. Absent only on a
+     * record written before the field existed. */
+    rp_id: Type.Optional(Type.String({ minLength: 1 })),
     /** The authenticator's counter, when it keeps one. Synced passkeys report
      * zero forever, so only a pair of non-zero readings says anything, and a
      * reading below the last one is a refusal. */

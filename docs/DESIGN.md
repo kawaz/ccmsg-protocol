@@ -234,8 +234,9 @@ record or a token — survives the endpoint changing. `hello` answers with the a
 instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
 reachability). An entry's `id` is optional, because it is unknown until the handshake with
 that peer has settled — a configured endpoint is known before anything answers there, and a
-peer whose link is down is the last one to drop from the list. The answering instance's own
-`endpoint` is optional too: an instance that joins no mesh has no URL to give a peer.
+peer whose link is down is the last one to drop from the list. `endpoint` is optional on every
+line and on the answering instance's own: an instance that joins no mesh has no URL to give a
+peer.
 
 Authentication between instances happens once, at connection time, and a `role: "instance"`
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The
@@ -279,6 +280,17 @@ showed when that URL was made. They are not in the URL: the two halves reaching 
 different routes is exactly what makes holding the URL insufficient, and the contract states
 that by taking the code as a required argument. A wrong code and a spent URL are both answered
 with the existing `auth_invalid` / `auth_expired`, which do not say which half failed.
+
+A registration carries its challenge with an issuer beside it, as an assertion does. The value
+is inside `client_data_json` as well, but who may spend it is not, and behind a load balancer
+the instance that issued the challenge, the one that made the registration URL and the one
+receiving this may all be different. The field being optional means a receiver may be left
+with a value and no issuer, in which case it can only honour a challenge it holds itself and
+refuses the rest rather than guessing.
+
+A credential record keeps the `rp_id` it was registered under. A passkey answers only for the
+domain it was created against, so an assertion's `rpIdHash` is checked against that and not
+against the host of whatever endpoint was reached.
 
 Two names travel with a registration. `RegisterClaims.issued_label` is what the administrator
 wrote about who the URL was for; `auth_register`'s `device_label` is what the person wrote
