@@ -27,6 +27,13 @@ export type SessionKillResult = Static<typeof SessionKillResult>;
 export const SessionKillRequest = request("session_kill", SessionKillArgs);
 export const SessionKillResponse = response("session_kill", SessionKillResult);
 
+/** How long a title may be. A title is typed into a terminal and shown as a
+ * session's first line, where anything longer is unreadable whatever the
+ * terminal would accept — so the ceiling is the caller's to keep to, and a
+ * client that composes a title has to know it before it sends one. Counted the
+ * way a JSON Schema `maxLength` is, over the value as sent. */
+export const TITLE_MAX_CHARS = 200;
+
 /** Retitles a running session by typing its own rename command into the
  * terminal it lives in.
  *
@@ -35,13 +42,6 @@ export const SessionKillResponse = response("session_kill", SessionKillResult);
  * terminal, not that the session took them — the instance cannot see the TUI's
  * reaction, and the title it settles on arrives later on the `agents` topic. A
  * session whose terminal is unknown is refused rather than guessed at. */
-/** How long a title may be. A title is typed into a terminal and shown as a
- * session's first line, where anything longer is unreadable whatever the
- * terminal would accept — so the ceiling is the caller's to keep to, and a
- * client that composes a title has to know it before it sends one. Counted the
- * way a JSON Schema `maxLength` is, over the value as sent. */
-export const TITLE_MAX_CHARS = 200;
-
 export const SessionRenameArgs = Type.Object({
   sid: Sid,
   /** The new title. Surrounding whitespace is trimmed and control characters
