@@ -953,12 +953,44 @@ describe("authenticating a person", () => {
                 access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
                 refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
                 previous_refresh: { value: "b2xkLXJlZnJlc2g", expires_at: 1_757_400_000_000 },
+                retired: [
+                  {
+                    hash: "9f".repeat(32),
+                    expires_at: 1_757_380_000_000,
+                  },
+                ],
               },
             },
           ],
         },
       }),
     ).toBe(true);
+  });
+
+  test("a retired generation is remembered as a digest and not as the token", () => {
+    expect(
+      isValid(AuthRecordsFrame, {
+        ev: "topic",
+        topic: "auth_records",
+        instance: INSTANCE,
+        data: {
+          records: [
+            {
+              key: "family/01J9Z3W2Q",
+              updated_at: 1_757_300_100_000,
+              body: {
+                kind: "token_family",
+                sub: "personal-1",
+                iss: INSTANCE,
+                access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
+                refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
+                retired: [{ hash: "b2xkLXJlZnJlc2g", expires_at: 1_757_380_000_000 }],
+              },
+            },
+          ],
+        },
+      }),
+    ).toBe(false);
   });
 
   test("a removal travels as a record, and a credential's never expires", () => {

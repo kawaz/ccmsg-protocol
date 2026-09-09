@@ -320,6 +320,11 @@ The other three:
   instance-local`). What only an issuer can answer — checking a registration URL, spending a
   challenge, rotating a token family — is forwarded to it as `to_instance = iss`
 
+A family remembers the refresh values it retired as digests in `retired`, kept until each
+value's own expiry — replicating the values themselves would be handing live secrets around,
+where recognising a replay only asks whether something presented now was once issued here and
+no longer stands.
+
 Credential records and token families are replicated on the `auth_records` topic
 (`roles: ["instance"]`, element granularity). Not on the store, because the store is the
 person's to read and write: a token read out of it would be their session, and a credential

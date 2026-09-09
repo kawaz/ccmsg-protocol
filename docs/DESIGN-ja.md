@@ -288,6 +288,10 @@ record は両方と、登録時・最終使用時の IP と User-Agent を持つ
   instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、
   token family の rotate — を `to_instance = iss` で発行者へ転送する
 
+family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す
+(値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつて
+ここで発行され、もう有効でない」かどうかだけ)。
+
 credential record と token family は topic `auth_records` (`roles: ["instance"]`、element 粒度)
 で複製する。kv に載せないのは、kv は user role が読み書きできるため — token が読めれば
 その人のセッションになり、credential が書ければ新しい入口になる。削除は tombstone という

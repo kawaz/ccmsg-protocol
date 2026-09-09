@@ -373,6 +373,30 @@ export const TokenFamily = Type.Object(
     refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     /** The generation before the current one, while the grace for it lasts. */
     previous_refresh: Type.Optional(Type.Object({ value: Base64Url, expires_at: Timestamp })),
+    /** What every generation retired before that was, kept only as a digest and
+     * only until the value itself would have expired.
+     *
+     * Recognising a replay takes remembering the value, but holding it is what
+     * the family is trying to protect — these travel to every instance, and a
+     * retired token still inside its lifetime would be a live secret copied
+     * around for no purpose it could serve. A digest answers the one question
+     * asked of it, that a value presented now was once issued here and is no
+     * longer, which fails the whole family.
+     *
+     * Written by the `iss` alone, like the rest of the family, and replicated,
+     * so the memory survives that instance restarting and holds wherever the
+     * reused value is presented. */
+    retired: Type.Optional(
+      Type.Array(
+        Type.Object({
+          /** sha256 of the retired value, lowercase hex. */
+          hash: Type.String({ pattern: "^[0-9a-f]{64}$" }),
+          /** When the value would have expired, after which remembering it
+           * refuses nothing that its own expiry would not. */
+          expires_at: Timestamp,
+        }),
+      ),
+    ),
   },
   { $id: "TokenFamily" },
 );
