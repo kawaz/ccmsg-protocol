@@ -18,6 +18,15 @@ export const ERROR_CODES = [
    * arguments that were never the problem. Whether retrying helps is not stated;
    * `msg` is the only thing that says more. */
   "internal_error",
+  // --- backpressure ---
+  /** The call was well-formed and allowed, and the instance is not taking it
+   * just now: what it would be queued behind has reached the limit the sender
+   * keeps to. Apart from `internal_error` because nothing failed and the
+   * arguments are not what to re-read — the same call sent again once the
+   * reader has caught up is the one that goes through. Which ops answer it is
+   * in their `errors`, since only an op that queues for a reader has a queue to
+   * fill. */
+  "rate_limited",
   // --- rule-derived (op attribute table §0) ---
   /** The connection's role is outside the op's `roles`. Argument problems stay
    * on `invalid_args` / `bad_request`. */

@@ -179,7 +179,7 @@ export const OP_ATTRIBUTES = {
     roles: SESSION_ONLY,
     needs_hello: true,
     locality: "cluster",
-    errors: [],
+    errors: ["rate_limited"],
   },
   say_mark_read: {
     plane: "messaging",
@@ -193,7 +193,7 @@ export const OP_ATTRIBUTES = {
     roles: AGENT_AND_USER,
     needs_hello: true,
     locality: "cluster",
-    errors: [],
+    errors: ["rate_limited"],
   },
 
   // --- control: session observation and operation (10) ---

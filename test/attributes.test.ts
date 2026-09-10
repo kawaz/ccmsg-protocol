@@ -30,6 +30,13 @@ describe("op attribute table", () => {
     }
   });
 
+  test("backpressure is answered only by the ops that queue for a reader", () => {
+    const queueing = OP_NAMES.filter((op) =>
+      (OP_ATTRIBUTES[op].errors as readonly string[]).includes("rate_limited"),
+    );
+    expect(queueing.sort()).toEqual(["notify_send", "say_post"]);
+  });
+
   test("attributes decide the derived codes", () => {
     expect(opErrors("hello")).toEqual(["invalid_args"]);
     expect(opErrors("session_rename")).toEqual([

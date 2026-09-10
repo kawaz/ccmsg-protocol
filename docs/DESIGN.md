@@ -235,6 +235,12 @@ it a request, a reply or a topic frame. A frame over it is answered `bad_request
 connection stays up. What to do with a body above it — split it, write it as a file and send
 the reference — is the caller's decision, so the contract states the limit and not a remedy.
 
+A limit the receiver keeps has one thing the sender can read: `rate_limited`, the answer an op gives when
+what it would queue for a reader has filled up. It is apart from `internal_error` because nothing failed and
+the arguments are not what to look at again — the same call sent once the reader has caught up is the one
+that goes through. Only an op that queues for a reader (`notify_send`, `say_post`) declares it; a message
+held for a session that is not reading needs no refusal, since the inbox is where it waits.
+
 `TITLE_MAX_CHARS` of 200 is the ceiling on `session_rename`'s `title`, and the schema's
 `maxLength` is the same value. A title is typed into a terminal and becomes a session's first
 line, so it stops at a readable length rather than at whatever the terminal would accept.
@@ -392,7 +398,7 @@ absence in a list of changes says nothing.
 | ops | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
 | topics | 12 | messaging 2 (`inbox` / `notify`), control 9, common 1 (`auth_records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| error codes | 20 | one closed union |
+| error codes | 21 | one closed union |
 
 Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in
 `TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the

@@ -217,6 +217,8 @@ dump の返答は path を返すだけで item を運ばないので、**item �
 本文をどう扱うか (分割する / ファイルに書いて参照を送る) は呼ぶ側の判断なので、契約は
 上限だけを置いて回避策は置かない。
 
+受け取る側が守る上限のうち、送る側が読み取れるものが 1 つある。`rate_limited` は「読み手に届けるために積む先が埋まっている」時の返答で、`internal_error` とは別に置く — 失敗したものは何も無く、引数を読み直す話でもないから。読み手が追いついてから同じ呼び出しを送れば通る。宣言するのは読み手向けに積む op (`notify_send` / `say_post`) だけで、読んでいないセッション宛の message は inbox で待てるので拒否自体が要らない。
+
 `TITLE_MAX_CHARS` = 200 は `session_rename` の `title` の上限で、schema の `maxLength` と
 同じ値。title は端末に打ち込まれてセッションの 1 行目になるので、端末が受け付けるかどうか
 とは別に読める長さで頭打ちにする。
@@ -355,7 +357,7 @@ credential record と token family は topic `auth_records` (`roles: ["instance"
 | op | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
 | topic | 12 | messaging 2 (`inbox` / `notify`)、control 9、common 1 (`auth_records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| ErrorCode | 20 | 閉じた union |
+| ErrorCode | 21 | 閉じた union |
 
 全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を
 持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を
