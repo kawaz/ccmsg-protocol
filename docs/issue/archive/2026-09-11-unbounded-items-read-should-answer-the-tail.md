@@ -1,6 +1,6 @@
 ---
 title: 境界の無い transcript_items_read は末尾を返す既定にするか
-status: open
+status: resolved
 category: design
 created: 2026-09-11T00:20:48+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-11T00:32:06+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done:契約 1.15.0 で境界の無い transcript_items_read の既定を「末尾から limit 件 + prev」に決定 (transcript_read の before 無指定と同じ)。始まりから読みたい側は since_at: 0 を置く","done:DESIGN 日英と TranscriptItemsReadArgs の doc を更新","done:daemon の backwards() と webui 初回読み(until_at = MAX_SAFE_INTEGER の除去)は各リポの追随タスク"]
 blocked_by:
 origin: webui (Timeline v0.3.0)
 ---
