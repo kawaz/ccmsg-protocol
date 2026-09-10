@@ -1,7 +1,7 @@
 ---
-title: エコシステム外部レビュー(2026-09)の指摘への対応検討
+title: エコシステム外部レビュー (2026-09) の指摘への対応検討
 status: open
-category: design
+category: task
 created: 2026-09-10T14:46:18+09:00
 last_read:
 open_entered: 2026-09-10T14:46:18+09:00
@@ -14,25 +14,24 @@ discard_reason:
 pending_reason:
 close_reason:
 blocked_by:
-origin: kawaz依頼(2026-09-10、claude-rules-personalセッション経由)
+origin: kawaz 依頼 (2026-09-10、claude-rules-personal セッション経由)
 ---
 
-# エコシステム外部レビュー(2026-09)の指摘への対応検討
+# エコシステム外部レビュー (2026-09) の指摘への対応検討
 
 ## 概要
 
-外部レビューで本リポ向けの指摘が出た。以下2ファイルを読んで対応を検討してほしい: 個別ファイル `/Users/kawaz/.local/share/repos/github.com/kawaz/claude-rules-personal/main/docs/research/2026-09-10-ecosystem-review/ccmsg.md` (ccmsgと共通)、共通ファイル `/Users/kawaz/.local/share/repos/github.com/kawaz/claude-rules-personal/main/docs/research/2026-09-10-ecosystem-review/common.md`。
+外部レビューで本リポ (ccmsg-protocol) 向けの指摘が出た。以下 2 ファイルを読んで対応を検討する。
+
+- 個別ファイル: `/Users/kawaz/.local/share/repos/github.com/kawaz/claude-rules-personal/main/docs/research/2026-09-10-ecosystem-review/ccmsg.md` (ccmsg と共通)
+- 共通ファイル: `/Users/kawaz/.local/share/repos/github.com/kawaz/claude-rules-personal/main/docs/research/2026-09-10-ecosystem-review/common.md`
 
 ## 背景
 
-温度感: レビューは初版の指摘から個別プロジェクトの精読を進めるたびに認識が改まり、指摘が覆されたケースが多い。全面的に鵜呑みにせず実物と照合してから採否を決めること。「裁定待ち」項目は kawaz の判断が要る。対応タイミングは担当セッションまたは kawaz に任せる。
+kawaz からの依頼 (2026-09-10、claude-rules-personal セッション経由)。レビューは初版の指摘から個別プロジェクトの精読を進めるたびに認識が改まり、指摘が覆されたケースが多い。**全面的に鵜呑みにせず実物と照合してから採否を決めること**。「裁定待ち」項目は kawaz の判断が要る。対応タイミングは担当セッションまたは kawaz に任せる。
 
 ## 受け入れ条件
 
-- [ ] ccmsg.md / common.md の指摘を実物 (コード・DESIGN・issue) と照合し、各項目の採否を判断する
-- [ ] 「裁定待ち」項目は kawaz に判断を仰ぐ
-- [ ] 採否の結果 (採用/却下と理由) を本issueに追記してclose する
-
-## TODO
-
-<!-- wip 時のみ -->
+- [ ] 個別ファイル・共通ファイルの指摘を実物 (本リポのコード・DR・issue) と照合する
+- [ ] 各指摘について採用 / 却下と理由を判定する (裁定が要るものは「裁定待ち」として明示)
+- [ ] 採否の結果を本 issue に追記して close する
