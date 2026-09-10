@@ -1,6 +1,6 @@
 ---
 title: TranscriptItem の Static 型消失と item 同一性 (uuid 重複) 不備
-status: open
+status: resolved
 category: bug
 created: 2026-09-10T23:01:08+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-10T23:17:28+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done:契約 1.13.0 で対応。item() を generic 化して TObject を返すようにし TranscriptItem の Static が潰れなくなった (TOOL_ITEMS の TSchema[] 注釈も外した)","done:item に id (= <uuid>:<index>) を追加し result_item/parent_item を id で張る形にした。uuid は元 record の参照として残す","done:source (offset/bytes) を必須化し USE_FIELDS のコメントを「リンク先が範囲外なのは正常」に直した","daemon 側の自前 Item 型の置き換えは daemon の作業として残る"]
 blocked_by:
 origin: ccmsg (daemon v0.4.0 dump のアイテム型化実装)
 ---
