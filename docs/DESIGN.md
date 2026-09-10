@@ -216,6 +216,9 @@ An element of `types` is a type name, a prefix, either negated with `-`, or `@<p
 
 `session_dump_write` answers with `entries` as **a count per type** rather than one total, and with an `ids` ledger beside it. A single total leaves the caller unable to tell a dump that kept what it asked for from one whose selection matched almost nothing. The ledger gathers the ids the items carried, so naming an agent from it as the next dump's subject needs no reading of the file. An id says how to point at something rather than what a line is, which is why it is not one of the types.
 
+A dump's reply names a path and carries no items, so **the file is where the items actually travel**. Its shape is therefore the contract's too (`SessionDumpFile`: `sid`, `agent_id?`, `written_at`, the selection as applied, `items`, `ids`, as JSON) — otherwise a successor session handed the path, or a client fetching it, would be reading a format nothing states. The file repeats what was asked for because it outlives the request: it has to say on its own what it is a dump of and what was left out.
+
+
 ## Limits the sender keeps to
 
 A limit only the sender can keep to is a value the contract holds. A limit only the receiver

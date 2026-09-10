@@ -20,6 +20,7 @@ import {
 } from "../src/control/files.ts";
 import {
   DumpPresetsReadResponse,
+  SessionDumpFile,
   TranscriptItem,
   TranscriptItemSelector,
 } from "../src/control/dump.ts";
@@ -64,7 +65,7 @@ import {
 } from "../src/control/session.ts";
 import { TranscriptFrame, TranscriptReadRequest } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
-import { TRANSCRIPT_ITEMS } from "../src/fixtures/control.ts";
+import { SESSION_DUMP_FILE, TRANSCRIPT_ITEMS } from "../src/fixtures/control.ts";
 import { isValid } from "../src/schemas.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
@@ -312,6 +313,16 @@ describe("transcript items", () => {
   test("an item without the record it is addressed by is refused", () => {
     const { uuid: _dropped, ...rest } = TRANSCRIPT_ITEMS[0] as Record<string, unknown>;
     expect(isValid(TranscriptItem, rest)).toBe(false);
+  });
+
+  test("the file says what it is a dump of, so the path alone is enough to read it", () => {
+    const file = { ...SESSION_DUMP_FILE, items: TRANSCRIPT_ITEMS };
+    expect(isValid(SessionDumpFile, file)).toBe(true);
+    // A dump that matched nothing is a file with no items, not a file without
+    // the field.
+    const { items: _dropped, ...rest } = file;
+    expect(isValid(SessionDumpFile, rest)).toBe(false);
+    expect(isValid(SessionDumpFile, { ...file, items: [] })).toBe(true);
   });
 
   test("a selection names types, prefixes, exclusions and presets", () => {

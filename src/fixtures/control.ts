@@ -48,6 +48,7 @@ import type {
 import type {
   DumpPresetsReadRequest,
   DumpPresetsReadResponse,
+  SessionDumpFile,
   TranscriptItem,
 } from "../control/dump.ts";
 import type {
@@ -163,7 +164,7 @@ export const SESSION_DUMP_WRITE_REQUEST: Static<typeof SessionDumpWriteRequest> 
 export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse> = {
   ok: true,
   request_id,
-  path: "/transcripts/6f1a2b3c.dump.md",
+  path: "/transcripts/6f1a2b3c.dump.json",
   instance,
   entries: { thinking: 41, "tool:Bash": 62, "tool:Read": 25 },
   ids: [
@@ -178,6 +179,16 @@ export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse
     { kind: "sid", id: other_sid, label: "ccmsg-webui/main" },
   ],
   bytes: 65_536,
+};
+
+/** The file the reply above names, holding the items themselves. */
+export const SESSION_DUMP_FILE: Static<typeof SessionDumpFile> = {
+  sid,
+  agent_id: "a471372f2",
+  written_at: FIXTURE_NOW,
+  types: ["tool:Read", "tool:Write", "tool:Edit", "tool:Glob", "thinking"],
+  items: [],
+  ids: [{ kind: "agent", id: "a471372f2", label: "dump-kinds-design", status: "ok" }],
 };
 
 export const DUMP_PRESETS_READ_REQUEST: Static<typeof DumpPresetsReadRequest> = {

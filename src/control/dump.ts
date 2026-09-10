@@ -1,6 +1,6 @@
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
-import { Timestamp } from "../identifiers.ts";
+import { Sid, Timestamp } from "../identifiers.ts";
 
 /** The vocabulary a transcript is read in: item types, the shape one item
  * takes, the ledger of ids they carry, and the named selections a person dumps
@@ -395,6 +395,32 @@ export type DumpIdEntry = Static<typeof DumpIdEntry>;
  * it started and not itself. */
 export const DumpIds = Type.Array(DumpIdEntry, { $id: "DumpIds" });
 export type DumpIds = Static<typeof DumpIds>;
+
+/** The file a dump is written to.
+ *
+ * The reply to a dump names a path rather than carrying the items, so the file
+ * is where they actually travel — which makes its shape as much a part of the
+ * contract as the reply is: a successor session handed the path, or a client
+ * that fetches it, would otherwise be reading a format nothing states. It
+ * repeats what it was asked for, because a file outlives the request that made
+ * it and has to say on its own what it is a dump of and what was left out. */
+export const SessionDumpFile = Type.Object(
+  {
+    sid: Sid,
+    /** The agent the dump is of, absent when it is of the session itself. */
+    agent_id: Type.Optional(Type.String()),
+    written_at: Timestamp,
+    /** The selection as applied: presets expanded and exclusions kept in
+     * place, so the file states what it holds without the instance's config
+     * having to be read beside it. */
+    types: Type.Array(TranscriptItemSelector),
+    /** Oldest first, as the transcript had them. */
+    items: Type.Array(TranscriptItem),
+    ids: DumpIds,
+  },
+  { $id: "SessionDumpFile" },
+);
+export type SessionDumpFile = Static<typeof SessionDumpFile>;
 
 /** A selection an operator named and can ask for by name.
  *
