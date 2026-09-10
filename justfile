@@ -62,7 +62,6 @@ test: lint typecheck
 
 # ---------- check recipes (push の sanity 検証) ----------
 
-# remote 未設定の間は push を止める (雛形段階。GitHub 側リポ作成後にこの recipe を削る)
 # 現在の bookmark/branch が default (= main) 上にあるか確認
 [private]
 [script]
