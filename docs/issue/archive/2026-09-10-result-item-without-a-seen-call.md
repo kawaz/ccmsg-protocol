@@ -1,6 +1,6 @@
 ---
 title: result item without a seen call — parent_item が必須なのに解決できない
-status: open
+status: resolved
 category: design
 created: 2026-09-10T23:48:41+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-11T00:31:14+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done:候補(a)採用、契約1.15.0にRESULT_FIELDS.parent_itemをoptional化しharnessキーparent_tool_use_id(必須)を追加、use側はUSE_FIELDS.tool_use_id(必須)で読み手が結び直す設計とし個別tool_use_idを廃止","daemon側はsystem:unknown退避をやめてparent_tool_use_id経由で型名を復元する追随が必要(未実装)"]
 blocked_by:
 origin: daemon (ccmsg)
 ---

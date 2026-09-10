@@ -5,12 +5,10 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
 | 2026-09-11 | design | open | [unbounded-items-read-should-answer-the-tail](./2026-09-11-unbounded-items-read-should-answer-the-tail.md) | 境界の無い transcript_items_read は末尾を返す既定にするか |
-| 2026-09-10 | design | open | [rate-limited-error-code](./2026-09-10-rate-limited-error-code.md) | daemon 送出側 backpressure 用の rate_limited error code が契約に無い |
 | 2026-09-10 | task | open | [ecosystem-review-2026-09](./2026-09-10-ecosystem-review-2026-09.md) | エコシステム外部レビュー (2026-09) の指摘への対応検討 |
 | 2026-09-10 | bug | open | [token-family-bound-to-endpoint](./2026-09-10-token-family-bound-to-endpoint.md) | TokenFamily が endpoint を持たず、access token が別 endpoint 登録を跨いで通る |
 | 2026-09-10 | design | open | [transcript-snapshot-implies-nothing-about-liveness](./2026-09-10-transcript-snapshot-implies-nothing-about-liveness.md) | transcript:<sid> の snapshot が返ることの意味を契約 DESIGN に明記するか |
 | 2026-09-10 | design | open | [schema-library-choice-record](./2026-09-10-schema-library-choice-record.md) | TypeBox (JSON Schema) 採用根拠が記録されていない |
-| 2026-09-10 | design | open | [result-item-without-a-seen-call](./2026-09-10-result-item-without-a-seen-call.md) | parent_item 必須だが daemon の部分読みでは did を解決できない場面がある |
 | 2026-09-09 | design | open | [passkey-list-for-people](./2026-09-09-passkey-list-for-people.md) | 人 (webui) が自分の passkey 一覧を見て保守する op が契約に無い |
 | 2026-09-09 | design | open | [inbox-invisible-to-user-and-lacks-tombstone](./2026-09-09-inbox-invisible-to-user-and-lacks-tombstone.md) | inbox topic が user role へ配送されず、要素の削除印も表現できない |
 | 2026-09-09 | design | open | [file-read-paging-and-external-listing](./2026-09-09-file-read-paging-and-external-listing.md) | webui Files タブが file_read paging と外部ファイル列挙を契約で表現できない |
