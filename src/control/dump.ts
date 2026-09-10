@@ -129,12 +129,21 @@ const USE_FIELDS = {
   role: Type.Literal("use"),
   /** The result's id, once there is one. */
   result_item: Type.Optional(TranscriptItemId),
+  /** The harness's own key for this call, which the result names back. */
+  tool_use_id: Type.String(),
 };
 
 const RESULT_FIELDS = {
   role: Type.Literal("result"),
-  /** The call this answers. Always known: a result exists because a call did. */
-  parent_item: TranscriptItemId,
+  /** The call this answers, when the reader saw it. A read that begins in the
+   * middle of a file — a topic's seed, a transcript resumed from another file —
+   * meets results whose call is behind where it started, and an id it never
+   * read is one it cannot name. */
+  parent_item: Type.Optional(TranscriptItemId),
+  /** The harness's key for the call this answers, which the record carries
+   * whether or not the call was read. A reader that has no `parent_item` joins
+   * on this against the `tool_use_id` of the calls it holds. */
+  parent_tool_use_id: Type.String(),
 };
 
 function item<T extends TSchema, F extends Record<string, TSchema>>(type: T, fields: F) {
@@ -259,7 +268,6 @@ const ToolType = Type.String({ pattern: "^tool:[A-Za-z0-9_.-]+$" });
 function toolUse<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
   return item(Type.Literal(`tool:${name}` as const), {
     ...USE_FIELDS,
-    tool_use_id: Type.String(),
     ...fields,
   });
 }
@@ -267,7 +275,6 @@ function toolUse<N extends string, F extends Record<string, TSchema>>(name: N, f
 function toolResult<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
   return item(Type.Literal(`tool:${name}` as const), {
     ...RESULT_FIELDS,
-    tool_use_id: Type.String(),
     ...fields,
   });
 }
@@ -280,12 +287,10 @@ const OptCount = Type.Optional(Type.Integer({ minimum: 0 }));
  * to decide whether it is kept. */
 const ToolUseGeneric = item(ToolType, {
   ...USE_FIELDS,
-  tool_use_id: Type.String(),
   input: Type.Record(Type.String(), Type.Unknown()),
 });
 const ToolResultGeneric = item(ToolType, {
   ...RESULT_FIELDS,
-  tool_use_id: Type.String(),
   result: Type.Record(Type.String(), Type.Unknown()),
 });
 

@@ -350,6 +350,30 @@ describe("transcript items", () => {
     expect(isValid(TranscriptItem, { ...result, parent_item: "f10b6d43" })).toBe(false);
   });
 
+  test("a result read without its call keeps the key the call is found by", () => {
+    // A read that begins in the middle of a file meets results whose call is
+    // behind where it started; the harness's key is on the record either way.
+    const result = TRANSCRIPT_ITEMS.find((item) => item.id === "18d6f2c9:0") as Record<
+      string,
+      unknown
+    >;
+    const { parent_item: _unread, ...unseen } = result;
+    expect(isValid(TranscriptItem, unseen)).toBe(true);
+    expect(unseen["parent_tool_use_id"]).toBe("toolu_01Ne9BDS");
+    const { parent_tool_use_id: _dropped, ...keyless } = result;
+    expect(isValid(TranscriptItem, keyless)).toBe(false);
+  });
+
+  test("a call carries the key its result names back", () => {
+    const call = TRANSCRIPT_ITEMS.find((item) => item.id === "f10b6d43:1") as Record<
+      string,
+      unknown
+    >;
+    expect(call["tool_use_id"]).toBe("toolu_01Ne9BDS");
+    const { tool_use_id: _dropped, ...keyless } = call;
+    expect(isValid(TranscriptItem, keyless)).toBe(false);
+  });
+
   test("an item names where its record begins and how far it runs, so it can be fetched raw", () => {
     const [first] = TRANSCRIPT_ITEMS as Record<string, unknown>[];
     expect(isValid(TranscriptItem, { ...first, source: { offset: 0 } })).toBe(false);

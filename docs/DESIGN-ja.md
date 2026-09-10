@@ -194,7 +194,7 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 アイテムの identity は `id` (= `<uuid>:<index>`、record 内の位置) で、`uuid` は**そのアイテムが出てきた record** として横に残る。assistant の 1 record が thinking と text と各ツール呼び出しに割れるので、record id だけではその全部を同時に名指すことになり、リンクが一意に解けない。
 
-呼び出しと結果は **2 アイテム**で、`result_item` / `parent_item` の id で互いを指す。agent や monitor の結果は何 turn も後に来るので、1 つに畳むと「どちらの時刻に置くか」を分類が決めることになる。畳むのは描く側の判断。リンクは slice ではなく transcript 全体から張られるので、**指す先が今回の範囲に入っていないのは正常** — 読み手はその id で改めて取りに行ける。`result_item` の無い `use` は「まだ返っていない呼び出し」。位置ではなく id で指すのは、選択と範囲によってどのアイテムが存在するかが変わるため。
+呼び出しと結果は **2 アイテム**で、`result_item` / `parent_item` の id で互いを指す。agent や monitor の結果は何 turn も後に来るので、1 つに畳むと「どちらの時刻に置くか」を分類が決めることになる。畳むのは描く側の判断。リンクは slice ではなく transcript 全体から張られるので、**指す先が今回の範囲に入っていないのは正常** — 読み手はその id で改めて取りに行ける。`result_item` の無い `use` は「まだ返っていない呼び出し」。位置ではなく id で指すのは、選択と範囲によってどのアイテムが存在するかが変わるため。`parent_item` は「読み手が呼び出しを見たか」に従うので optional — file の途中から読み始める場面 (topic の seed、別 file から resume した transcript) では、呼び出しが読み始めより手前にあり、読んでいない id は名乗れない。常にあるのは **`parent_tool_use_id`** の方で、これは harness が record に持つ呼び出しのキー。呼び出し側が必ず持つ `tool_use_id` と突き合わせれば、`parent_item` が無くても結び直せる。どちらも無い result は「何が返ったか」しか言えない行になる。
 
 各アイテムは `source` (`offset` / `bytes`) で**元 record のファイル内の位置**も持つ。分類は誤りうるもので、それが答えられない唯一の問いが「その行は実際に何と書いてあったか」になる。`transcript_read` を `offset + bytes` で終わるよう指定すればその record 自体が返るので、client は普段は型付きアイテムを描き、怪しいものだけ生の record を取り寄せられる。1 record から複数アイテムが出た場合は同じ番地を共有し、取り寄せは record 単位になる。
 
