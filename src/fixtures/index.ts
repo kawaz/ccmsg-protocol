@@ -92,6 +92,10 @@ export const OP_FIXTURES = {
     request: control.SESSION_DUMP_WRITE_REQUEST,
     response: control.SESSION_DUMP_WRITE_RESPONSE,
   },
+  dump_presets_read: {
+    request: control.DUMP_PRESETS_READ_REQUEST,
+    response: control.DUMP_PRESETS_READ_RESPONSE,
+  },
   transcript_read: {
     request: control.TRANSCRIPT_READ_REQUEST,
     response: control.TRANSCRIPT_READ_RESPONSE,

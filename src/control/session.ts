@@ -1,6 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
 import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
+import { DumpIds, TranscriptItemSelector, TranscriptItemType } from "./dump.ts";
 
 /** Ends the OS process behind a session.
  *
@@ -173,6 +174,13 @@ export const SessionSearchResponse = response("session_search", SessionSearchRes
  * destination is the instance's own data directory. */
 export const SessionDumpWriteArgs = Type.Object({
   sid: Sid,
+  /** Dump one agent below the session instead of the session itself, naming it
+   * as the transcript's own file does. The subject decides what every item
+   * type points at, so the same selection reads an agent's work the way it
+   * reads the session's. Kept beside `sid` rather than spelled into it: `sid`
+   * is validated as a sid, and a single joined string would be neither
+   * validated nor parsed anywhere but in the instance. */
+  agent_id: Type.Optional(Type.String()),
   /** Inclusive lower bound in time. */
   since_at: Type.Optional(Timestamp),
   /** Inclusive lower bound as a transcript record id, which cuts at that
@@ -181,9 +189,19 @@ export const SessionDumpWriteArgs = Type.Object({
   since_uuid: Type.Optional(Type.String()),
   until_at: Type.Optional(Timestamp),
   until_uuid: Type.Optional(Type.String()),
-  /** Leave out the assistant's thinking blocks. */
+  /** Which item types to keep, applied left to right over the whole range.
+   * Absent keeps everything but the attachments. */
+  types: Type.Optional(Type.Array(TranscriptItemSelector)),
+  /** A preset configured on the instance, used as the ground `types` is then
+   * applied over. A name the instance does not have is refused rather than
+   * ignored, since a dump silently wider than asked for is the failure a
+   * selection exists to prevent. */
+  preset: Type.Optional(Type.String({ minLength: 1 })),
+  /** Leave out the assistant's thinking blocks. `["-thinking"]` says the same
+   * thing in the vocabulary the rest of the selection is written in. */
   no_thinking: Type.Optional(Type.Boolean()),
-  /** Leave out the machinery of in-process agents. */
+  /** Leave out the machinery of in-process agents, which
+   * `["-message:sub", "-tool:Agent"]` also says. */
   no_agent: Type.Optional(Type.Boolean()),
 });
 export type SessionDumpWriteArgs = Static<typeof SessionDumpWriteArgs>;
@@ -192,7 +210,13 @@ export const SessionDumpWriteResult = Type.Object({
   /** Absolute path on the writing instance's host. */
   path: Type.String(),
   instance: InstanceId,
-  entries: Type.Integer({ minimum: 0 }),
+  /** How many items of each type were written, keyed by type name. A single
+   * total leaves the caller unable to tell a dump that kept what it asked for
+   * from one whose selection matched almost nothing. */
+  entries: Type.Record(TranscriptItemType, Type.Integer({ minimum: 0 })),
+  /** The ids those items carried, so the next dump — of an agent named here —
+   * can be asked for without opening the file. */
+  ids: DumpIds,
   bytes: Type.Integer({ minimum: 0 }),
 });
 export type SessionDumpWriteResult = Static<typeof SessionDumpWriteResult>;

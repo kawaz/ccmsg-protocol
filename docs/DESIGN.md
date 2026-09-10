@@ -202,6 +202,20 @@ what was said to it — so the two cannot expire at different times. The count i
 what a recipient will hold for one session, keeping what the contract accepts to what the
 recipient can still be handed.
 
+## Transcript item types
+
+A transcript is a file the harness writes for its own reasons, and its shape changes without ccmsg agreeing to it. What the contract holds is **the vocabulary a line was read into — the item types — and nothing that reads a line**. With the classifying left to whoever opens the file (the daemon), the contract stays still when the harness changes its format, and when a second harness (codex's rollout) is read at all. Where the classifying code lives is not settled; the daemon is the favoured home.
+
+A type name is `:`-separated, and a prefix names everything below it: `tool` is every tool, `message:user` both directions of what a person and a session said. Three families stay open at their last segment — `tool:<Name>`, `system:attachment:<kind>`, `hook:<Event>` — because the harness coins that segment, and a closed list would turn every newcomer into `unknown` with nothing left to say what arrived. `TRANSCRIPT_ITEM_TYPES` spells out the closed part alone; a name outside it is a newcomer rather than an error. Segments after the first are not snake_case because they are the harness's spelling (`tool:Bash`, `hook:PreToolUse`).
+
+`in` and `out` are read **from wherever the subject stands**. The subject is the session by default and one agent below it when `agent_id` names one; the type definitions do not change, only what they point at. A dump of an agent reads `message:user:in` as the brief its parent handed it, which is what lets one preset be carried down a chain of agents.
+
+A call and its result are **two items**, pointing at each other by uuid through `result_item` and `parent_item`. An agent's or a monitor's result arrives many turns later, so folding the pair into one item would make the classifying decide which of the two instants it happens at; folding belongs to whoever draws them. A `use` with no `result_item` is a call that has not come back, including one whose result fell outside the range asked for. The links point by uuid and not by position, since the selection and the range decide which items exist at all.
+
+An element of `types` is a type name, a prefix, either negated with `-`, or `@<preset>`, applied left to right. Presets are not fixed here: an instance's config holds them and `dump_presets_read` reads them. What a preset names is an **interest** — how the work was done, what to hand over — and an interest is not a property of the wire. Type names stay one to one with what a record is, and the groupings people reach for are named by whoever configures them. Expanding a reference, and refusing a cycle or an unconfigured name, belong where the config is validated.
+
+`session_dump_write` answers with `entries` as **a count per type** rather than one total, and with an `ids` ledger beside it. A single total leaves the caller unable to tell a dump that kept what it asked for from one whose selection matched almost nothing. The ledger gathers the ids the items carried, so naming an agent from it as the next dump's subject needs no reading of the file. An id says how to point at something rather than what a line is, which is why it is not one of the types.
+
 ## Limits the sender keeps to
 
 A limit only the sender can keep to is a value the contract holds. A limit only the receiver
@@ -366,7 +380,7 @@ absence in a list of changes says nothing.
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 44 | common 13 / messaging 4 / control 27 / mesh 0 |
+| ops | 45 | common 13 / messaging 4 / control 28 / mesh 0 |
 | topics | 11 | messaging 2 (`inbox` / `notify`), control 8, common 1 (`auth_records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 20 | one closed union |

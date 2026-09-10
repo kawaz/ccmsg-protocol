@@ -33,6 +33,7 @@ import {
   TopicUnsubscribeResponse,
 } from "./common/topics.ts";
 import { AgentsFrame } from "./control/agents.ts";
+import { DumpPresetsReadRequest, DumpPresetsReadResponse } from "./control/dump.ts";
 import {
   DirListRequest,
   DirListResponse,
@@ -150,6 +151,7 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   session_env_read: { request: SessionEnvReadRequest, response: SessionEnvReadResponse },
   session_search: { request: SessionSearchRequest, response: SessionSearchResponse },
   session_dump_write: { request: SessionDumpWriteRequest, response: SessionDumpWriteResponse },
+  dump_presets_read: { request: DumpPresetsReadRequest, response: DumpPresetsReadResponse },
   transcript_read: { request: TranscriptReadRequest, response: TranscriptReadResponse },
   session_fork_origin: { request: SessionForkOriginRequest, response: SessionForkOriginResponse },
   session_last_live_remove: {

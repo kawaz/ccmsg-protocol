@@ -19,6 +19,11 @@ import {
   FileWriteRequest,
 } from "../src/control/files.ts";
 import {
+  DumpPresetsReadResponse,
+  TranscriptItem,
+  TranscriptItemSelector,
+} from "../src/control/dump.ts";
+import {
   LauncherConfigReadResponse,
   LauncherRunRequest,
   LauncherRunResponse,
@@ -59,6 +64,7 @@ import {
 } from "../src/control/session.ts";
 import { TranscriptFrame, TranscriptReadRequest } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
+import { TRANSCRIPT_ITEMS } from "../src/fixtures/control.ts";
 import { isValid } from "../src/schemas.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
@@ -257,6 +263,67 @@ describe("session ops", () => {
     expect(
       isValid(SessionLastLiveRemoveResponse, { ok: true, request_id: "7", removed: false }),
     ).toBe(true);
+  });
+});
+
+describe("transcript items", () => {
+  test("every item a reader emits passes", () => {
+    for (const item of TRANSCRIPT_ITEMS) expect(isValid(TranscriptItem, item)).toBe(true);
+  });
+
+  test("a tool nobody wrote fields for still arrives, with what it was called with", () => {
+    expect(
+      isValid(TranscriptItem, {
+        uuid: "aa11bb22",
+        type: "tool:Workflow",
+        at: 1_757_300_000_000,
+        role: "use",
+        tool_use_id: "toolu_02",
+        input: { script: "resume.ts" },
+      }),
+    ).toBe(true);
+  });
+
+  test("an attachment of a kind nobody has seen keeps its own name", () => {
+    expect(
+      isValid(TranscriptItem, {
+        uuid: "bb22cc33",
+        type: "system:attachment:telemetry",
+        at: 1_757_300_000_000,
+        attachment: { type: "telemetry" },
+      }),
+    ).toBe(true);
+  });
+
+  test("a hook is typed by its event, and carries the matcher as a field", () => {
+    // `hook:PreToolUse:Bash` would read as a third level of the hierarchy and
+    // leave `hook:PreToolUse` selecting nothing.
+    const hook = {
+      uuid: "cc33dd44",
+      type: "hook:PreToolUse",
+      at: 1_757_300_000_000,
+      hook_name: "PreToolUse:Bash",
+      outcome: "additionalContext",
+    };
+    expect(isValid(TranscriptItem, hook)).toBe(true);
+    expect(isValid(TranscriptItem, { ...hook, outcome: "allowed" })).toBe(false);
+  });
+
+  test("an item without the record it is addressed by is refused", () => {
+    const { uuid: _dropped, ...rest } = TRANSCRIPT_ITEMS[0] as Record<string, unknown>;
+    expect(isValid(TranscriptItem, rest)).toBe(false);
+  });
+
+  test("a selection names types, prefixes, exclusions and presets", () => {
+    for (const selector of ["tool", "tool:Bash", "-message:sub", "@howto", "system:api-error"])
+      expect(isValid(TranscriptItemSelector, selector)).toBe(true);
+    for (const selector of ["", "tool:", "@", "-@ho to", "Tool"])
+      expect(isValid(TranscriptItemSelector, selector)).toBe(false);
+  });
+
+  test("presets are the instance's, so an unconfigured list is empty and not absent", () => {
+    expect(isValid(DumpPresetsReadResponse, { ok: true, request_id: "9", presets: [] })).toBe(true);
+    expect(isValid(DumpPresetsReadResponse, { ok: true, request_id: "9" })).toBe(false);
   });
 });
 

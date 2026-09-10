@@ -5,6 +5,7 @@ export * from "./common/ping.ts";
 export * from "./common/shutdown.ts";
 export * from "./common/topics.ts";
 export * from "./control/agents.ts";
+export * from "./control/dump.ts";
 export * from "./control/files.ts";
 export * from "./control/kv.ts";
 export * from "./control/launcher.ts";

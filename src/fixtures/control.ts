@@ -46,6 +46,11 @@ import type {
   SandboxRevokeResponse,
 } from "../control/sandbox.ts";
 import type {
+  DumpPresetsReadRequest,
+  DumpPresetsReadResponse,
+  TranscriptItem,
+} from "../control/dump.ts";
+import type {
   SessionDumpWriteRequest,
   SessionDumpWriteResponse,
   SessionEnvReadRequest,
@@ -149,8 +154,10 @@ export const SESSION_DUMP_WRITE_REQUEST: Static<typeof SessionDumpWriteRequest> 
   request_id,
   op: "session_dump_write",
   sid,
+  agent_id: "a471372f2",
   since_at: FIXTURE_NOW - 3_600_000,
-  no_thinking: true,
+  preset: "howto",
+  types: ["@file", "-tool:Grep", "thinking"],
 };
 
 export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse> = {
@@ -158,9 +165,103 @@ export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse
   request_id,
   path: "/transcripts/6f1a2b3c.dump.md",
   instance,
-  entries: 128,
+  entries: { thinking: 41, "tool:Bash": 62, "tool:Read": 25 },
+  ids: [
+    {
+      kind: "agent",
+      id: "a471372f2",
+      label: "dump-kinds-design",
+      status: "ok",
+      duration_ms: 252_000,
+    },
+    { kind: "task", id: "b6mmcr0ax", label: "just watch", status: "running" },
+    { kind: "sid", id: other_sid, label: "ccmsg-webui/main" },
+  ],
   bytes: 65_536,
 };
+
+export const DUMP_PRESETS_READ_REQUEST: Static<typeof DumpPresetsReadRequest> = {
+  request_id,
+  op: "dump_presets_read",
+};
+
+export const DUMP_PRESETS_READ_RESPONSE: Static<typeof DumpPresetsReadResponse> = {
+  ok: true,
+  request_id,
+  presets: [
+    {
+      name: "file",
+      description: "reading, writing and searching, as one interest",
+      opts: { types: ["tool:Read", "tool:Write", "tool:Edit", "tool:Glob", "tool:Grep"] },
+    },
+    {
+      name: "howto",
+      description: "how the work was done: what was thought, run, read and written",
+      opts: { types: ["thinking", "message:user", "message:sub", "tool:Bash", "@file"] },
+    },
+  ],
+};
+
+/** One item of several types, as a reader emits them.
+ *
+ * A call and its result appear as the two items they are, linked both ways, so
+ * an implementation can check that it draws the pair without assuming they are
+ * adjacent. */
+export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
+  {
+    uuid: "3f9a21c4",
+    type: "message:user:in",
+    at: FIXTURE_NOW - 3_600_000,
+    turn: 1,
+    text: "dump のアイテム型を整理して",
+  },
+  { uuid: "f10b6d43", type: "thinking", at: FIXTURE_NOW - 3_500_000, text: "台帳として分ける" },
+  {
+    uuid: "07c5e1b8",
+    type: "tool:Bash",
+    at: FIXTURE_NOW - 3_400_000,
+    role: "use",
+    tool_use_id: "toolu_01Ne9BDS",
+    result_item: "18d6f2c9",
+    command: "jq -r '.type' session.jsonl | sort | uniq -c",
+    description: "count the record types",
+  },
+  {
+    uuid: "18d6f2c9",
+    type: "tool:Bash",
+    at: FIXTURE_NOW - 3_399_000,
+    role: "result",
+    tool_use_id: "toolu_01Ne9BDS",
+    parent_item: "07c5e1b8",
+    stdout: "1174 assistant\n753 user\n",
+    interrupted: false,
+  },
+  {
+    uuid: "b7e41d09",
+    type: "message:sub:out",
+    at: FIXTURE_NOW - 3_300_000,
+    role: "use",
+    result_item: "c2d80f16",
+    prompt: "docs/design/dump-kinds.md を書き直す",
+    agent_id: "a471372f2",
+    subagent_type: "opus5-worker-high",
+  },
+  {
+    uuid: "92e6d4f5",
+    type: "hook:PreToolUse",
+    at: FIXTURE_NOW - 3_200_000,
+    hook_name: "PreToolUse:Bash",
+    outcome: "additionalContext",
+    content: "read コマンドを使うこと",
+    tool_use_id: "toolu_01Ne9BDS",
+  },
+  {
+    uuid: "81d5c3e4",
+    type: "system:attachment:queued_command",
+    at: FIXTURE_NOW - 3_100_000,
+    attachment: { type: "queued_command", command: "/pre-clear" },
+  },
+];
 
 export const TRANSCRIPT_READ_REQUEST: Static<typeof TranscriptReadRequest> = {
   request_id,

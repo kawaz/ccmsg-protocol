@@ -184,6 +184,20 @@ CLI がその代理になる。
 件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に
 渡しうるものに保つ。
 
+## transcript のアイテム型
+
+transcript は harness が自分の都合で書くファイルで、ccmsg の合意なく形が変わる。契約が持つのは**その行を何と読んだか (アイテム型) の語彙だけ**で、行を型に落とす分類そのものは持たない。ファイルを読む側 (daemon) が分類を持てば、harness が形式を変えても、別 harness (codex の rollout) を読むようになっても、契約は動かない。分類コードの置き場は未裁定で、daemon 側に置く案が推し。
+
+型名は `:` 区切りの階層で、prefix がその配下すべてを指す (`tool` は全ツール、`message:user` は in と out の両方)。`tool:<Name>` / `system:attachment:<kind>` / `hook:<Event>` の 3 家系だけ末尾が開いている — 末尾を名付けるのは harness であって契約ではなく、閉じた列挙にすると知らない名前が来た瞬間に `unknown` へ落ちて何が来たか分からなくなる。`TRANSCRIPT_ITEM_TYPES` に並ぶのは閉じている分だけで、そこに無い名前は誤りではなく新顔。2 段目以降が snake_case でないのは、そこが harness の綴りだから (`tool:Bash` / `hook:PreToolUse`)。
+
+`in` / `out` は**主語から見た向き**。主語は既定でセッション、`agent_id` を渡せばその配下の agent 1 体になり、型の定義は変えずに指す先だけが移る。agent を主語にした dump の `message:user:in` は親から渡された指示書になる。同じ preset が親でも子でも孫でも通るのはこのため。
+
+呼び出しと結果は **2 アイテム**で、`result_item` / `parent_item` の uuid で互いを指す。agent や monitor の結果は何 turn も後に来るので、1 つに畳むと「どちらの時刻に置くか」を分類が決めることになる。畳むのは描く側の判断。`result_item` の無い `use` は「まだ返っていない呼び出し」で、範囲の切り方で結果が dump の外に落ちた場合を含む。位置ではなく uuid で指すのは、選択と範囲によってどのアイテムが存在するかが変わるため。
+
+選択 (`types`) の要素は型名・prefix・`-` 付きの除外・`@<preset 名>` で、左から順に適用する。preset は契約に焼かず instance の config が持つ (`dump_presets_read` で引く)。preset が名付けるのは「調査のノウハウ」「引き継ぎ」といった**関心の切り方**であって wire の性質ではない。型名は行の実体と 1 対 1 に保ち、束ね方は operator が名付ける側に置く。展開の再帰と、循環・未定義名の拒否は config を検証する場所の責務。
+
+`session_dump_write` の結果の `entries` は総数から**型ごとの件数**になり、`ids` 台帳が加わった。総数だけでは、頼んだものが入った dump と選択がほとんど何にも当たらなかった dump を呼び手が区別できない。台帳はアイテムが持つ id を集めたもので、ここに出た agent を次の dump の主語にすれば、ファイルを開かずに掘り下げられる。id は「その行が何か」ではなく「その行をどう指すか」なので、型の並びには入れない。
+
 ## 送る側が守る上限
 
 守れるのが送る側だけの上限は、契約が値として持つ。相手だけが知っている上限は、超えた時に
@@ -329,7 +343,7 @@ credential record と token family は topic `auth_records` (`roles: ["instance"
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 44 | common 13 / messaging 4 / control 27 / mesh 0 |
+| op | 45 | common 13 / messaging 4 / control 28 / mesh 0 |
 | topic | 11 | messaging 2 (`inbox` / `notify`)、control 8、common 1 (`auth_records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 20 | 閉じた union |
