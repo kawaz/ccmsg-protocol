@@ -307,7 +307,10 @@ client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent 
   切らずに延ばす
 - `auth_resolve` / `auth_rotate` は instance 間 (`roles: ["instance"]`、`locality:
   instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、
-  token family の rotate — を `to_instance = iss` で発行者へ転送する
+  token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は
+  受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた
+  instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず
+  `last_refresh` に書く (自分で観測した値と同じ扱い)
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す
 (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつて

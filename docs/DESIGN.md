@@ -342,7 +342,10 @@ The other three:
   `auth_expires_at`) rather than closing it
 - `auth_resolve` and `auth_rotate` are between instances (`roles: ["instance"]`, `locality:
   instance-local`). What only an issuer can answer — checking a registration URL, spending a
-  challenge, rotating a token family — is forwarded to it as `to_instance = iss`
+  challenge, rotating a token family — is forwarded to it as `to_instance = iss`. A forwarded
+  rotation carries the `reason`, `ip` and `user_agent` the receiving instance observed, since
+  the person is at the other end of its connection and not the issuer's; the issuer writes
+  them to `last_refresh` unchecked, as it does the ones it observes itself
 
 A family remembers the refresh values it retired as digests in `retired`, kept until each
 value's own expiry — replicating the values themselves would be handing live secrets around,

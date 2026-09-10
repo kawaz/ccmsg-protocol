@@ -306,7 +306,21 @@ export const AuthResolveResponse = response("auth_resolve", AuthResolveResult);
  * parallel would merge by last write and lose a generation, which reads exactly
  * like a stolen token being replayed — so the rotation is forwarded rather than
  * done where the request landed. */
-export const AuthRotateArgs = Type.Object({ refresh_token: Base64Url });
+export const AuthRotateArgs = Type.Object({
+  refresh_token: Base64Url,
+  /** What the receiving instance observed of the caller, carried to the issuer
+   * for `last_refresh`. The person is at the other end of the receiver's
+   * connection, not the issuer's, so these are only knowable there; forwarded
+   * without them, a rotation would be remembered as a time and nothing else.
+   *
+   * Stated by the receiver and never checked by the issuer — the same standing
+   * as the values on a rotation that was not forwarded, which the client and
+   * its connection are equally the only source of. Nothing may be decided by
+   * them. */
+  reason: Type.Optional(AuthRefreshReason),
+  ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+  user_agent: Type.Optional(Type.String({ maxLength: 512 })),
+});
 export type AuthRotateArgs = Static<typeof AuthRotateArgs>;
 
 /** Both halves, unlike the person-facing ops: the instance that asked for the
