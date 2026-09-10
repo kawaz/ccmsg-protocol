@@ -91,7 +91,8 @@ export const InstanceInfo = Type.Object(
      * configured is known before anything answers there, and leaving such a
      * peer out of the list would hide the very entry whose link is down. */
     id: Type.Optional(InstanceId),
-    /** The base URL it is published at, which a peer dials as `<endpoint>ws`.
+    /** The base URL it is published at, which a peer dials as `<endpoint>ws`,
+     * that scheme included — the WebSocket upgrades from an HTTP request.
      * An attribute of the instance like the host below: it is what a peer
      * connects to and authenticates against, and it may change under a fixed
      * `id` when the instance moves. Absent for the same

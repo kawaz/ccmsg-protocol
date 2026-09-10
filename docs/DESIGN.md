@@ -233,10 +233,11 @@ fragment); several instances may share one origin, so the comparison is the whol
 than the origin, and the trailing slash is required so `/ccmsg` and `/ccmsg/` are not two
 spellings of one instance.
 
-The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for the WebSocket
-(with the scheme read as `ws`/`wss`), `<endpoint>mesh/*`, `<endpoint>auth/*`,
-`<endpoint>webhook/*`. Cut that way, the value that says where an instance lives does not
-change when a transport moves off `/ws`. Everything keyed by the id — `mid`, the store's keys, the issuer of a
+The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for the WebSocket,
+`<endpoint>mesh/*`, `<endpoint>auth/*`, `<endpoint>webhook/*`. Each keeps the endpoint's own
+scheme and none is rewritten to `ws(s)://` — a WebSocket begins as an HTTP request that
+upgrades, so one spelling of the URL is enough. Cut that way, the value that says where an
+instance lives does not change when a transport moves off `/ws`. Everything keyed by the id — `mid`, the store's keys, the issuer of a
 record or a token — survives the endpoint changing. `hello` answers with the answering
 instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
 reachability). An entry's `id` is optional, because it is unknown until the handshake with
@@ -306,6 +307,13 @@ settles on once per subject. The page creates the credential against it as `user
 instance keeps it as `CredentialRecord.user_handle`, and an assertion naming a handle is held
 to it. It is not left to the page because the authenticator keeps it beyond the instance's
 reach — two values for one person would be two accounts on their device.
+
+A credential record keeps the `endpoint` it was registered for, and an assertion is accepted
+only there: the origin has to match and the request's path has to fall under that base URL.
+`https://h/` and `https://h/personal/` are two endpoints and take two registrations, on one
+host and one RP ID alike — an RP ID says which domain an authenticator answers for, which is
+coarser than which instance a person has been admitted to. Binding to the base URL rather than
+the origin is what stops one instance's credential from being a way into its neighbour.
 
 A credential record keeps the `rp_id` it was registered under. A passkey answers only for the
 domain it was created against, so an assertion's `rpIdHash` is checked against that and not

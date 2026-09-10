@@ -322,6 +322,18 @@ export const CredentialRecord = Type.Object(
      * was created against and what an assertion naming a handle is checked
      * against. */
     user_handle: Base64Url,
+    /** The endpoint this credential was registered for, as the registration's
+     * claims stated it.
+     *
+     * What the credential is good for, and the whole of it: an assertion is
+     * accepted only where the origin matches and the request's path falls under
+     * this base URL. `https://h.example/` and `https://h.example/personal/` are
+     * two endpoints and take two registrations, even on one host and one
+     * relying party — the RP ID says which domain an authenticator will answer
+     * for, which is a coarser thing than which instance a person has been
+     * admitted to. Binding to the base URL rather than the origin is what keeps
+     * one instance's credential from being a way into its neighbour. */
+    endpoint: Endpoint,
     /** The relying party this credential was created under, as the claims of
      * the registration that made it stated. Written by the registration and not
      * derived later: a passkey only answers for the domain it was made under,

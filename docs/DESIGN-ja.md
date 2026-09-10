@@ -212,10 +212,11 @@ instance の公開 base URL (`http(s)://<host>[/<prefix>]/`、末尾 `/` 必須�
 で、同一 origin に複数 instance が相乗りするため比較は origin ではなく URL 全体で行う
 (末尾 `/` を必須にするのは `/ccmsg` と `/ccmsg/` が同じ instance の 2 通りの綴りにならないため)。
 
-route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws` (scheme は
-`ws(s)` に読み替え)、mesh は `<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は
-`<endpoint>webhook/*`。こう切っておくと、transport が `/ws` 以外に移っても「instance が
-どこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
+route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws`、mesh は
+`<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は `<endpoint>webhook/*`。どれも
+endpoint の scheme のままで、`ws(s)://` への書き換えは無い (WS も HTTP request として始まり
+upgrade するので、URL の綴りは 1 つで足りる)。こう切っておくと、transport が `/ws` 以外に
+移っても「instance がどこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
 endpoint が変わっても無効にならない。`hello` の応答は自 instance の id と endpoint、および
 mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は
 handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない
@@ -276,6 +277,12 @@ challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここ�
 `CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せに
 しないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの
 値が付けば端末上では 2 つのアカウントになる。
+
+credential record は登録時の `endpoint` を持ち、assertion はその endpoint (origin 一致 +
+パス prefix 一致) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で
+別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が
+答えるか」までで、「どの instance に入ってよいか」より粗いため。origin ではなく base URL 全体に
+束ねるのは、隣の instance への入口を兼ねさせないため。
 
 credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、
 assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。

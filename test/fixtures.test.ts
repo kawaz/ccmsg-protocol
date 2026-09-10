@@ -771,6 +771,7 @@ describe("authenticating a person", () => {
           authenticator_data: "YXV0aC1kYXRh",
           signature: "c2lnbmF0dXJl",
           user_handle: "dXNlci1oYW5kbGU",
+          endpoint: INSTANCE_ENDPOINT,
         },
       }),
     ).toBe(true);
@@ -916,6 +917,7 @@ describe("authenticating a person", () => {
                 credential_id: "Y3JlZC1pZA",
                 public_key: "pQECAyYgASFYIA",
                 user_handle: "dXNlci1oYW5kbGU",
+                endpoint: INSTANCE_ENDPOINT,
                 sign_count: 0,
                 registered_at: 1_757_300_000_000,
               },
@@ -924,6 +926,29 @@ describe("authenticating a person", () => {
         },
       }),
     ).toBe(true);
+  });
+
+  test("a credential says which endpoint it admits its holder to, and cannot leave it out", () => {
+    const record = {
+      kind: "credential",
+      sub: "personal-1",
+      credential_id: "Y3JlZC1pZA",
+      public_key: "pQECAyYgASFYIA",
+      user_handle: "dXNlci1oYW5kbGU",
+      registered_at: 1_757_300_000_000,
+    };
+    const frame = (body: unknown) => ({
+      ev: "topic",
+      topic: "auth_records",
+      instance: INSTANCE,
+      data: { records: [{ key: "credential/personal-1/Y3JlZC1pZA", updated_at: 1, body }] },
+    });
+    // A neighbour under the same host and the same relying party is a separate
+    // endpoint, so it takes a registration of its own.
+    expect(
+      isValid(AuthRecordsFrame, frame({ ...record, endpoint: "https://mba.example.ts.net/" })),
+    ).toBe(true);
+    expect(isValid(AuthRecordsFrame, frame(record))).toBe(false);
   });
 
   test("a record carries what a person reads it back by, none of it authenticating", () => {
@@ -943,6 +968,7 @@ describe("authenticating a person", () => {
                 credential_id: "Y3JlZC1pZA",
                 public_key: "pQECAyYgASFYIA",
                 user_handle: "dXNlci1oYW5kbGU",
+                endpoint: INSTANCE_ENDPOINT,
                 rp_id: "mba.example.ts.net",
                 issued_label: "for kawaz",
                 device_label: "work laptop",

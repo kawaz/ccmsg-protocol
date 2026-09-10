@@ -47,8 +47,10 @@ export type InstanceId = Static<typeof InstanceId>;
  * under, ending in a slash and naming no route of its own.
  *
  * The routes are below it and are not part of it — `<endpoint>ws` for the
- * WebSocket (the scheme swapped for `ws`/`wss`), `<endpoint>mesh/…`,
- * `<endpoint>auth/…`, `<endpoint>webhook/…`. Naming the base rather than one of
+ * WebSocket, `<endpoint>mesh/…`, `<endpoint>auth/…`, `<endpoint>webhook/…`. All
+ * of them keep the endpoint's own scheme: a WebSocket starts as an HTTP request
+ * that upgrades, so there is no second spelling of the URL and nothing to
+ * rewrite. Naming the base rather than one of
  * them is what lets a transport be added or replaced without the value that
  * identifies where an instance lives changing with it, and what lets the HTTP
  * routes be spelled without stripping a suffix off first.
