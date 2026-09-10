@@ -1,6 +1,6 @@
 ---
 title: 送出側 backpressure 用の rate_limited error code を契約に追加
-status: open
+status: resolved
 category: design
 created: 2026-09-10T21:44:12+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-11T00:31:17+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["done: 契約 1.15.0 で error code に rate_limited を追加、DESIGN.md/DESIGN-ja.md の「送る側が守る上限」節に意味を明記 (引数は正しく失敗も起きていない、読み手が追いついてから同じ呼び出しを送れば通る)", "done: notify_send / say_post の errors に rate_limited を宣言", "done: message_send は inbox で待てるため対象外のまま", "daemon 側の暫定 internal_error からの差し替えは daemon リポの追随issue"]
 blocked_by:
 origin: daemon リポ (v0.3.4 の送出側上限実装)
 ---
