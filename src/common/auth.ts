@@ -84,7 +84,9 @@ export const RegisterClaims = Type.Object(
     sub: Subject,
     /** The instance's name as a person operates it, for display. */
     unit: Type.String({ minLength: 1 }),
-    /** The endpoint the credential is being registered for. */
+    /** The endpoint the credential is being registered for. The base URL: the
+     * registration is posted to `<endpoint>auth/register`, and the cookie set
+     * for it hangs under the same prefix. */
     endpoint: Endpoint,
     /** The WebAuthn relying party: a domain, not an origin. Either the
      * endpoint's host or a registrable suffix of it. */

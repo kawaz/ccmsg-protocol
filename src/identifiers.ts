@@ -43,9 +43,20 @@ export const InstanceId = Type.String({
 });
 export type InstanceId = Static<typeof InstanceId>;
 
-/** Where an instance is reached: the URL other instances dial, compared as a
- * whole string including its path (mesh-peer-auth §4.2 — one origin may host
- * several instances, so origin-level comparison would confuse them).
+/** Where an instance is published: the base URL everything it serves hangs
+ * under, ending in a slash and naming no route of its own.
+ *
+ * The routes are below it and are not part of it — `<endpoint>ws` for the
+ * WebSocket (the scheme swapped for `ws`/`wss`), `<endpoint>mesh/…`,
+ * `<endpoint>auth/…`, `<endpoint>webhook/…`. Naming the base rather than one of
+ * them is what lets a transport be added or replaced without the value that
+ * identifies where an instance lives changing with it, and what lets the HTTP
+ * routes be spelled without stripping a suffix off first.
+ *
+ * Compared as a whole string, path included (mesh-peer-auth §4.2 — one origin
+ * may host several instances, so an origin-level comparison would confuse
+ * them). The trailing slash is required so that comparison is exact: `/ccmsg`
+ * and `/ccmsg/` would otherwise be two spellings of one instance.
  *
  * Apart from `InstanceId` because the two answer different questions and change
  * on different occasions. This is what a peer dials, what the TLS certificate
@@ -55,7 +66,7 @@ export type InstanceId = Static<typeof InstanceId>;
  * not alter. */
 export const Endpoint = Type.String({
   $id: "Endpoint",
-  pattern: "^wss?://[^\\s?#]+$",
+  pattern: "^https?://[^/?#\\s]+(/[^?#\\s]*)?/$",
 });
 export type Endpoint = Static<typeof Endpoint>;
 

@@ -227,9 +227,16 @@ There is no compatibility path.
 
 **Identity is the `instance` id; what is dialed and what TLS is checked against is the
 `endpoint` URL**, and the two are separate types. The id is an opaque random value an
-instance issues for itself once and keeps through a move. The endpoint is the URL other
-instances dial; several instances may share one origin, so the comparison is the whole URL
-rather than the origin. Everything keyed by the id — `mid`, the store's keys, the issuer of a
+instance issues for itself once and keeps through a move. The endpoint is the instance's
+published base URL (`http(s)://<host>[/<prefix>]/`, trailing slash required, no query or
+fragment); several instances may share one origin, so the comparison is the whole URL rather
+than the origin, and the trailing slash is required so `/ccmsg` and `/ccmsg/` are not two
+spellings of one instance.
+
+The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for the WebSocket
+(with the scheme read as `ws`/`wss`), `<endpoint>mesh/*`, `<endpoint>auth/*`,
+`<endpoint>webhook/*`. Cut that way, the value that says where an instance lives does not
+change when a transport moves off `/ws`. Everything keyed by the id — `mid`, the store's keys, the issuer of a
 record or a token — survives the endpoint changing. `hello` answers with the answering
 instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
 reachability). An entry's `id` is optional, because it is unknown until the handshake with
@@ -273,7 +280,8 @@ and answering before a connection exists, are things a frame on the WebSocket ca
 are in the attribute table all the same, because **authorization is not decided outside that
 table** — what a carrier decides is what an op can do, never who may call it. All four are
 `needs_hello: false` and reachable from a connection with no identity yet, as `hello` is; the
-`request_id` is composed by the HTTP carrier.
+`request_id` is composed by the HTTP carrier. They are served at `<endpoint>auth/*`, and
+`RegisterClaims.endpoint` names that same base URL.
 
 Besides the registration URL's token, `auth_register` takes the six digits the command line
 showed when that URL was made. They are not in the URL: the two halves reaching the browser by

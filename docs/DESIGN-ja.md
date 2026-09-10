@@ -208,8 +208,14 @@ CLI がその代理になる。
 
 **identity は `instance` (id)、dial 先と TLS の照合先は `endpoint` (URL)** で、2 つは別の型。
 id は instance が自分に 1 度だけ発行する不透明な乱数で、引っ越しても変わらない。endpoint は
-他 instance が dial する URL で、同一 origin に複数 instance が相乗りするため比較は origin
-ではなく URL 全体で行う。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
+instance の公開 base URL (`http(s)://<host>[/<prefix>]/`、末尾 `/` 必須、query/fragment 無し)
+で、同一 origin に複数 instance が相乗りするため比較は origin ではなく URL 全体で行う
+(末尾 `/` を必須にするのは `/ccmsg` と `/ccmsg/` が同じ instance の 2 通りの綴りにならないため)。
+
+route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws` (scheme は
+`ws(s)` に読み替え)、mesh は `<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は
+`<endpoint>webhook/*`。こう切っておくと、transport が `/ws` 以外に移っても「instance が
+どこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
 endpoint が変わっても無効にならない。`hello` の応答は自 instance の id と endpoint、および
 mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は
 handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない
@@ -246,7 +252,8 @@ challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここ�
 ことが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に
 置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」
 ではない。この 4 つは `needs_hello: false` で、`hello` と同じく identity 未確定の接続から
-呼べる (`request_id` は HTTP 側の carrier が合成する)。
+呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*` で、
+`RegisterClaims.endpoint` もこの base URL を指す。
 
 `auth_register` は登録 URL の token とは別に、URL を発行した CLI が表示した 6 桁のコードを
 受け取る。コードは URL に含めない — 2 つが別の経路でブラウザに届くことが「URL を持っている

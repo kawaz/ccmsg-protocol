@@ -13,9 +13,10 @@ export const MeshHello = Type.Object(
     /** Generation of the mesh handshake format, apart from the protocol
      * generation so the handshake can change without the wire changing. */
     ver: Type.Integer({ minimum: 1 }),
-    /** The endpoint URL the connecting instance claims to be reached at. */
+    /** The base URL the connecting instance claims to be published at — the
+     * endpoint itself, not the `<endpoint>ws` it dialed to get here. */
     iss: Endpoint,
-    /** The endpoint URL it believes it is connecting to. Compared whole
+    /** The base URL it believes it is connecting to. Compared whole
      * against the receiver's own URL, which is what stops a signature made for
      * one instance from being replayed at another on the same host. */
     aud: Endpoint,
@@ -90,9 +91,10 @@ export const InstanceInfo = Type.Object(
      * configured is known before anything answers there, and leaving such a
      * peer out of the list would hide the very entry whose link is down. */
     id: Type.Optional(InstanceId),
-    /** Where it is dialed. An attribute of the instance like the host below:
-     * it is what a peer connects to and authenticates against, and it may
-     * change under a fixed `id` when the instance moves. Absent for the same
+    /** The base URL it is published at, which a peer dials as `<endpoint>ws`.
+     * An attribute of the instance like the host below: it is what a peer
+     * connects to and authenticates against, and it may change under a fixed
+     * `id` when the instance moves. Absent for the same
      * reason it is absent from the reply's own `endpoint`: an instance in no
      * mesh has no URL to be dialed at, including on its own line. */
     endpoint: Type.Optional(Endpoint),
@@ -110,7 +112,8 @@ export const HelloResult = Type.Object({
   protocol_version: Type.Integer({ minimum: 1 }),
   /** The instance answering. Every other id in the reply is relative to it. */
   instance: InstanceId,
-  /** Where the answering instance is dialed. Stated beside the id because the
+  /** The base URL the answering instance is published at, under which its own
+   * routes (`ws`, `mesh/…`, `auth/…`) sit. Stated beside the id because the
    * caller reached it by some URL of its own — a proxy's, an alias — and what a
    * peer is to dial is neither that nor derivable from the id. Absent on an
    * instance that joins no mesh: it is reached by the people and sessions on

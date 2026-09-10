@@ -40,7 +40,7 @@ const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
 const OTHER_INSTANCE = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
 const OTHER_SID = "0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b";
 const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
-const INSTANCE_ENDPOINT = "wss://mba.example.ts.net/ccmsg/personal";
+const INSTANCE_ENDPOINT = "https://mba.example.ts.net/ccmsg/personal/";
 
 describe("hello", () => {
   const helloRequest = {
@@ -65,7 +65,7 @@ describe("hello", () => {
         protocol_version: 3,
         mesh: {
           ver: 1,
-          iss: "wss://nuc.example.ts.net/ccmsg/personal",
+          iss: "https://nuc.example.ts.net/ccmsg/personal/",
           aud: INSTANCE_ENDPOINT,
           id: OTHER_INSTANCE,
           kid: "9f2c7a5e1b4d8036af51c9e27d604b18",
@@ -125,7 +125,7 @@ describe("hello", () => {
           { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
           {
             id: OTHER_INSTANCE,
-            endpoint: "wss://nuc.example.ts.net/ccmsg/personal",
+            endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
             host: "nuc",
             reachable: false,
           },
@@ -185,6 +185,31 @@ describe("hello", () => {
     ).toBe(true);
   });
 
+  test("an endpoint naming a route rather than the base it hangs under is refused", () => {
+    // `/ws` is below the endpoint, not part of it, and the scheme is the one
+    // the HTTP routes are spelled with.
+    for (const endpoint of [
+      "wss://mba.example.ts.net/ccmsg/personal/",
+      "https://mba.example.ts.net/ccmsg/personal/ws",
+      "https://mba.example.ts.net/ccmsg/personal",
+      "https://mba.example.ts.net/ccmsg/?x=1",
+    ]) {
+      expect(
+        isValid(HelloResponse, {
+          ok: true,
+          request_id: "1",
+          protocol_version: 3,
+          instance: INSTANCE,
+          endpoint,
+          instances: [],
+          capabilities: [],
+          version: "0.1.0",
+          started_at: 1_757_300_000_000,
+        }),
+      ).toBe(false);
+    }
+  });
+
   test("a peer that has not finished greeting is listed by endpoint alone", () => {
     expect(
       isValid(HelloResponse, {
@@ -194,7 +219,7 @@ describe("hello", () => {
         instance: INSTANCE,
         endpoint: INSTANCE_ENDPOINT,
         instances: [
-          { endpoint: "wss://nuc.example.ts.net/ccmsg/personal", host: "nuc", reachable: false },
+          { endpoint: "https://nuc.example.ts.net/ccmsg/personal/", host: "nuc", reachable: false },
         ],
         capabilities: [],
         version: "0.1.0",
@@ -592,7 +617,7 @@ describe("the peers topic", () => {
             { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
             {
               id: OTHER_INSTANCE,
-              endpoint: "wss://nuc.example.ts.net/ccmsg/personal",
+              endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
               host: "nuc",
               reachable: false,
             },
