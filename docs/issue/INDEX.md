@@ -5,6 +5,7 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | date | category | status | slug | 概要 |
 |---|---|---|---|---|
 | 2026-09-10 | bug | open | [token-family-bound-to-endpoint](./2026-09-10-token-family-bound-to-endpoint.md) | TokenFamily が endpoint を持たず、access token が別 endpoint 登録を跨いで通る |
+| 2026-09-10 | design | open | [transcript-snapshot-implies-nothing-about-liveness](./2026-09-10-transcript-snapshot-implies-nothing-about-liveness.md) | transcript:<sid> の snapshot が返ることの意味を契約 DESIGN に明記するか |
 | 2026-09-10 | design | open | [schema-library-choice-record](./2026-09-10-schema-library-choice-record.md) | TypeBox (JSON Schema) 採用根拠が記録されていない |
 | 2026-09-09 | design | open | [passkey-list-for-people](./2026-09-09-passkey-list-for-people.md) | 人 (webui) が自分の passkey 一覧を見て保守する op が契約に無い |
 | 2026-09-09 | design | open | [inbox-invisible-to-user-and-lacks-tombstone](./2026-09-09-inbox-invisible-to-user-and-lacks-tombstone.md) | inbox topic が user role へ配送されず、要素の削除印も表現できない |
