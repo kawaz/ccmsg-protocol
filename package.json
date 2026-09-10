@@ -1,6 +1,6 @@
 {
   "name": "@ccmsg/protocol",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Wire contract (schema + types + op attribute table) shared by the ccmsg daemon and web UI",
   "license": "MIT",
   "author": "kawaz",
