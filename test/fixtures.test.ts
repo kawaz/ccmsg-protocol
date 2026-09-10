@@ -1,30 +1,38 @@
+import type { TSchema } from "@sinclair/typebox";
 import { describe, expect, test } from "bun:test";
+import { OP_NAMES } from "../src/attributes.ts";
 import {
   AUTH_CHALLENGE_TTL_MS,
   AuthAssertRequest,
-  AuthAssertResponse,
   AuthChallengeResponse,
   AuthRecordsFrame,
-  AuthRefreshRequest,
-  AuthRefreshResponse,
-  AuthRefreshTokenResponse,
   AuthRegisterRequest,
   AuthResolveRequest,
-  AuthResolveResponse,
-  AuthRotateResponse,
   FAMILY_TOMBSTONE_RETENTION_MS,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
 import { HelloRequest, HelloResponse } from "../src/common/hello.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
-import {
-  TopicSubscribeRequest,
-  TopicSubscribeResponse,
-  TopicUnsubscribeRequest,
-} from "../src/common/topics.ts";
+import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
 import { LAST_LIVE_RETENTION_MS, PeersFrame } from "../src/control/peers.ts";
 import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
+import {
+  AUTH_RECORDS_FAMILY_FRAME,
+  AUTH_RECORDS_TOMBSTONE_FRAME,
+  AUTH_RESOLVE_CHALLENGE_REQUEST,
+  AUTH_RESOLVE_CHALLENGE_RESPONSE,
+  ERROR_RESPONSE,
+  ERROR_RESPONSE_UNIDENTIFIED,
+  FIXTURE_IDS,
+  HELLO_MESH_REQUEST,
+  MESSAGE_SEND_FORWARDED_REQUEST,
+  MESSAGE_SEND_HELD_RESPONSE,
+  OP_FIXTURES,
+  TOPIC_FIXTURES,
+  TOPIC_SUBSCRIBE_SESSION_REQUEST,
+  TRANSCRIPT_SIZE_FRAME,
+} from "../src/fixtures/index.ts";
 import {
   INBOX_MAX_PER_SID,
   INBOX_RETENTION_MS,
@@ -32,67 +40,75 @@ import {
   MessageSendRequest,
   MessageSendResponse,
 } from "../src/messaging/message.ts";
-import { NotifyFrame, NotifySendRequest } from "../src/messaging/notify.ts";
-import { SayMarkReadRequest, SayPostRequest } from "../src/messaging/say.ts";
-import { isValid } from "../src/schemas.ts";
+import { NotifyFrame } from "../src/messaging/notify.ts";
+import { isValid, OP_SCHEMAS, TOPIC_SCHEMAS, validationErrors } from "../src/schemas.ts";
 
-const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
-const OTHER_INSTANCE = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
-const OTHER_SID = "0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b";
-const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
-const INSTANCE_ENDPOINT = "https://mba.example.ts.net/ccmsg/personal/";
+const { sid: SID, instance: INSTANCE, endpoint: INSTANCE_ENDPOINT } = FIXTURE_IDS;
+
+/** Assert against the schema and say what failed when it does — a fixture is
+ * only useful if a break in it names the field that broke. */
+function passes(schema: TSchema, value: unknown): void {
+  expect(validationErrors(schema, value)).toEqual([]);
+}
+
+const helloRequest = OP_FIXTURES.hello.request;
+const helloResponse = OP_FIXTURES.hello.response;
+const challenge = {
+  challenge: OP_FIXTURES.auth_challenge.response.challenge,
+  issuer: OP_FIXTURES.auth_challenge.response.issuer,
+  expires_at: OP_FIXTURES.auth_challenge.response.expires_at,
+};
+
+describe("the fixtures cover the contract", () => {
+  test.each(OP_NAMES)("%s carries a request and a reply that pass", (op) => {
+    const fixture = OP_FIXTURES[op];
+    passes(OP_SCHEMAS[op].request, fixture.request);
+    passes(OP_SCHEMAS[op].response, fixture.response);
+  });
+
+  test.each(Object.keys(TOPIC_SCHEMAS) as (keyof typeof TOPIC_SCHEMAS)[])(
+    "the %s topic carries a frame that passes",
+    (topic) => {
+      passes(TOPIC_SCHEMAS[topic], TOPIC_FIXTURES[topic]);
+    },
+  );
+
+  test.each([
+    ["an instance's hello", HelloRequest, HELLO_MESH_REQUEST],
+    ["a subscription naming one session", TopicSubscribeRequest, TOPIC_SUBSCRIBE_SESSION_REQUEST],
+    ["spending a challenge", AuthResolveRequest, AUTH_RESOLVE_CHALLENGE_REQUEST],
+    [
+      "what spending one answers",
+      OP_SCHEMAS.auth_resolve.response,
+      AUTH_RESOLVE_CHALLENGE_RESPONSE,
+    ],
+    ["a forwarded send", MessageSendRequest, MESSAGE_SEND_FORWARDED_REQUEST],
+    ["a send nobody took", MessageSendResponse, MESSAGE_SEND_HELD_RESPONSE],
+    ["a transcript's opening frame", TOPIC_SCHEMAS.transcript, TRANSCRIPT_SIZE_FRAME],
+    ["a token family", AuthRecordsFrame, AUTH_RECORDS_FAMILY_FRAME],
+    ["a removal", AuthRecordsFrame, AUTH_RECORDS_TOMBSTONE_FRAME],
+    ["a failed reply", ErrorResponse, ERROR_RESPONSE],
+    ["a reply that names no request", ErrorResponse, ERROR_RESPONSE_UNIDENTIFIED],
+  ] as [string, TSchema, unknown][])("%s passes", (_name, schema, fixture) => {
+    passes(schema, fixture);
+  });
+});
 
 describe("hello", () => {
-  const helloRequest = {
-    request_id: "1",
-    op: "hello",
-    role: "session",
-    protocol_version: 3,
-    sid: SID,
-    client_version: "0.1.0",
-  };
-
-  test("a session hello passes", () => {
-    expect(isValid(HelloRequest, helloRequest)).toBe(true);
-  });
-
-  test("an instance hello carries the mesh claim", () => {
-    expect(
-      isValid(HelloRequest, {
-        request_id: "1",
-        op: "hello",
-        role: "instance",
-        protocol_version: 3,
-        mesh: {
-          ver: 1,
-          iss: "https://nuc.example.ts.net/ccmsg/personal/",
-          aud: INSTANCE_ENDPOINT,
-          id: OTHER_INSTANCE,
-          kid: "9f2c7a5e1b4d8036af51c9e27d604b18",
-        },
-      }),
-    ).toBe(true);
-  });
-
-  test("a session may name where it lives and what it runs as", () => {
-    expect(
-      isValid(HelloRequest, {
-        ...helloRequest,
-        repo: "ccmsg-protocol",
-        ws: "main",
-        cwd: "/repos/kawaz/ccmsg-protocol/main",
-        repo_root: "/repos/kawaz/ccmsg-protocol",
-        branch: "main",
-        transcript_path: "/transcripts/6f1a2b3c.jsonl",
-        title: "pv2-contract",
-        model: "claude-opus-5",
-        effort: "high",
-      }),
-    ).toBe(true);
-  });
-
-  test("a session that names none of it is still a hello", () => {
-    expect(isValid(HelloRequest, helloRequest)).toBe(true);
+  test("a session that names none of where it lives is still a hello", () => {
+    const {
+      repo: _repo,
+      ws: _ws,
+      cwd: _cwd,
+      repo_root: _repoRoot,
+      branch: _branch,
+      transcript_path: _transcriptPath,
+      title: _title,
+      model: _model,
+      effort: _effort,
+      ...rest
+    } = helloRequest;
+    expect(isValid(HelloRequest, rest)).toBe(true);
   });
 
   test("a meta field is held to its type", () => {
@@ -112,75 +128,21 @@ describe("hello", () => {
     expect(isValid(HelloRequest, rest)).toBe(false);
   });
 
-  test("the reply carries the instance view and the capability set", () => {
-    expect(
-      isValid(HelloResponse, {
-        ok: true,
-        request_id: "1",
-        protocol_version: 3,
-        instance: INSTANCE,
-        endpoint: INSTANCE_ENDPOINT,
-        auth_expires_at: 1_757_310_000_000,
-        instances: [
-          { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
-          {
-            id: OTHER_INSTANCE,
-            endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
-            host: "nuc",
-            reachable: false,
-          },
-        ],
-        capabilities: ["fork", "launcher", "terminal"],
-        version: "0.1.0",
-        started_at: 1_757_300_000_000,
-      }),
-    ).toBe(true);
-  });
-
   test("a capability outside the set is refused", () => {
-    expect(
-      isValid(HelloResponse, {
-        ok: true,
-        request_id: "1",
-        protocol_version: 3,
-        instance: INSTANCE,
-        endpoint: INSTANCE_ENDPOINT,
-        instances: [],
-        capabilities: ["telepathy"],
-        version: "0.1.0",
-        started_at: 1_757_300_000_000,
-      }),
-    ).toBe(false);
+    expect(isValid(HelloResponse, { ...helloResponse, capabilities: ["telepathy"] })).toBe(false);
   });
 
   test("an instance id names the instance and not where it is reached", () => {
     // The URL is the endpoint, which moves; the id does not.
-    expect(
-      isValid(HelloResponse, {
-        ok: true,
-        request_id: "1",
-        protocol_version: 3,
-        instance: INSTANCE_ENDPOINT,
-        endpoint: INSTANCE_ENDPOINT,
-        instances: [],
-        capabilities: [],
-        version: "0.1.0",
-        started_at: 1_757_300_000_000,
-      }),
-    ).toBe(false);
+    expect(isValid(HelloResponse, { ...helloResponse, instance: INSTANCE_ENDPOINT })).toBe(false);
   });
 
   test("an instance in no mesh answers without an endpoint to be dialed at", () => {
+    const { endpoint: _dropped, ...rest } = helloResponse;
     expect(
       isValid(HelloResponse, {
-        ok: true,
-        request_id: "1",
-        protocol_version: 3,
-        instance: INSTANCE,
+        ...rest,
         instances: [{ id: INSTANCE, host: "mba", reachable: true }],
-        capabilities: [],
-        version: "0.1.0",
-        started_at: 1_757_300_000_000,
       }),
     ).toBe(true);
   });
@@ -194,370 +156,126 @@ describe("hello", () => {
       "https://mba.example.ts.net/ccmsg/personal",
       "https://mba.example.ts.net/ccmsg/?x=1",
     ]) {
-      expect(
-        isValid(HelloResponse, {
-          ok: true,
-          request_id: "1",
-          protocol_version: 3,
-          instance: INSTANCE,
-          endpoint,
-          instances: [],
-          capabilities: [],
-          version: "0.1.0",
-          started_at: 1_757_300_000_000,
-        }),
-      ).toBe(false);
+      expect(isValid(HelloResponse, { ...helloResponse, endpoint, instances: [] })).toBe(false);
     }
   });
 
   test("a peer that has not finished greeting is listed by endpoint alone", () => {
     expect(
       isValid(HelloResponse, {
-        ok: true,
-        request_id: "1",
-        protocol_version: 3,
-        instance: INSTANCE,
-        endpoint: INSTANCE_ENDPOINT,
+        ...helloResponse,
         instances: [
           { endpoint: "https://nuc.example.ts.net/ccmsg/personal/", host: "nuc", reachable: false },
         ],
-        capabilities: [],
-        version: "0.1.0",
-        started_at: 1_757_300_000_000,
       }),
     ).toBe(true);
   });
 });
 
 describe("instance_ping", () => {
-  const pong = {
-    ok: true,
-    request_id: "2",
-    instance: INSTANCE,
-    version: "0.1.0",
-    pid: 4821,
-    started_at: 1_757_300_000_000,
-    clients: 3,
-    http: ["127.0.0.1:8787"],
-    network: "online",
-  };
-
-  test("a pong passes", () => {
-    expect(isValid(InstancePingResponse, pong)).toBe(true);
-  });
-
   test("an ISO timestamp is refused", () => {
-    expect(isValid(InstancePingResponse, { ...pong, started_at: "2026-09-08T00:00:00Z" })).toBe(
-      false,
-    );
+    expect(
+      isValid(InstancePingResponse, {
+        ...OP_FIXTURES.instance_ping.response,
+        started_at: "2026-09-08T00:00:00Z",
+      }),
+    ).toBe(false);
   });
 });
 
 describe("session_stopping", () => {
   test("a session may say it is going without saying why", () => {
-    expect(isValid(SessionStoppingRequest, { request_id: "2b", op: "session_stopping" })).toBe(
-      true,
-    );
-  });
-
-  test("the reason travels in the harness's own spelling", () => {
-    expect(
-      isValid(SessionStoppingRequest, {
-        request_id: "2b",
-        op: "session_stopping",
-        reason: "prompt_input_exit",
-      }),
-    ).toBe(true);
+    const { reason: _dropped, ...rest } = OP_FIXTURES.session_stopping.request;
+    expect(isValid(SessionStoppingRequest, rest)).toBe(true);
   });
 
   test("an empty reason is refused — omit it instead", () => {
     expect(
-      isValid(SessionStoppingRequest, { request_id: "2b", op: "session_stopping", reason: "" }),
+      isValid(SessionStoppingRequest, { ...OP_FIXTURES.session_stopping.request, reason: "" }),
     ).toBe(false);
   });
 
-  test("the reply stamps the instant the pause will carry", () => {
-    expect(
-      isValid(SessionStoppingResponse, {
-        ok: true,
-        request_id: "2b",
-        stopped_at: 1_757_299_000_000,
-      }),
-    ).toBe(true);
-  });
-
-  test("a reply without that instant is refused", () => {
-    expect(isValid(SessionStoppingResponse, { ok: true, request_id: "2b" })).toBe(false);
+  test("a reply without the instant the pause will carry is refused", () => {
+    const { stopped_at: _dropped, ...rest } = OP_FIXTURES.session_stopping.response;
+    expect(isValid(SessionStoppingResponse, rest)).toBe(false);
   });
 });
 
 describe("topic subscription", () => {
-  test("a plain topic passes", () => {
-    expect(
-      isValid(TopicSubscribeRequest, { request_id: "3", op: "topic_subscribe", topic: "peers" }),
-    ).toBe(true);
-  });
-
-  test("a per-session topic carries its sid", () => {
-    expect(
-      isValid(TopicSubscribeRequest, {
-        request_id: "3",
-        op: "topic_subscribe",
-        topic: `transcript:${SID}`,
-      }),
-    ).toBe(true);
-  });
-
   test("a per-session topic without a sid is refused", () => {
     expect(
-      isValid(TopicSubscribeRequest, {
-        request_id: "3",
-        op: "topic_subscribe",
-        topic: "transcript",
-      }),
+      isValid(TopicSubscribeRequest, { ...TOPIC_SUBSCRIBE_SESSION_REQUEST, topic: "transcript" }),
     ).toBe(false);
   });
 
   test("an unknown topic is refused", () => {
     expect(
       isValid(TopicUnsubscribeRequest, {
-        request_id: "4",
-        op: "topic_unsubscribe",
+        ...OP_FIXTURES.topic_unsubscribe.request,
         topic: "rooms",
       }),
     ).toBe(false);
   });
-
-  test("the ack names the topic", () => {
-    expect(isValid(TopicSubscribeResponse, { ok: true, request_id: "3", topic: "peers" })).toBe(
-      true,
-    );
-  });
 });
 
 describe("message_send", () => {
-  test("a plain send passes", () => {
-    expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "op 表の control 25 op を書き始める",
-      }),
-    ).toBe(true);
-  });
-
-  test("a reply points at a delivery frame", () => {
-    expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "了解",
-        reply_to: `${INSTANCE}/1841`,
-      }),
-    ).toBe(true);
-  });
-
   test("a reply_to that is not a mid is refused", () => {
     expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "了解",
-        reply_to: "1841",
-      }),
+      isValid(MessageSendRequest, { ...OP_FIXTURES.message_send.request, reply_to: "1841" }),
     ).toBe(false);
   });
 
   test("an empty body is refused", () => {
-    expect(
-      isValid(MessageSendRequest, { request_id: "5", op: "message_send", to: OTHER_SID, text: "" }),
-    ).toBe(false);
-  });
-
-  test("a forwarded request carries the mesh envelope", () => {
-    expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "hi",
-        to_instance: OTHER_INSTANCE,
-        from_instance: INSTANCE,
-        hops: [INSTANCE],
-      }),
-    ).toBe(true);
-  });
-
-  test("a forwarded request may name the connection it came from", () => {
-    expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "hi",
-        from_instance: INSTANCE,
-        hops: [INSTANCE],
-        caller: { role: "session", sid: SID },
-      }),
-    ).toBe(true);
+    expect(isValid(MessageSendRequest, { ...OP_FIXTURES.message_send.request, text: "" })).toBe(
+      false,
+    );
   });
 
   test("a person's request names a role and no session", () => {
     expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "hi",
-        caller: { role: "user" },
-      }),
+      isValid(MessageSendRequest, { ...MESSAGE_SEND_FORWARDED_REQUEST, caller: { role: "user" } }),
     ).toBe(true);
   });
 
   test("a caller without a role is refused — the role is what is dispatched on", () => {
     expect(
-      isValid(MessageSendRequest, {
-        request_id: "5",
-        op: "message_send",
-        to: OTHER_SID,
-        text: "hi",
-        caller: { sid: SID },
-      }),
+      isValid(MessageSendRequest, { ...MESSAGE_SEND_FORWARDED_REQUEST, caller: { sid: SID } }),
     ).toBe(false);
-  });
-
-  test("delivery succeeded", () => {
-    expect(isValid(MessageSendResponse, { ok: true, request_id: "5", delivered: true })).toBe(true);
-  });
-
-  test("held with a reason and candidates", () => {
-    expect(
-      isValid(MessageSendResponse, {
-        ok: true,
-        request_id: "5",
-        delivered: false,
-        reason: "disappeared",
-        candidates: [{ sid: SID, ws: "main", instance: INSTANCE }],
-      }),
-    ).toBe(true);
-  });
-
-  test("held because the recipient would not take it just now", () => {
-    expect(
-      isValid(MessageSendResponse, {
-        ok: true,
-        request_id: "5",
-        delivered: false,
-        reason: "throttled",
-      }),
-    ).toBe(true);
   });
 
   test("a reason outside the list is refused", () => {
-    expect(
-      isValid(MessageSendResponse, {
-        ok: true,
-        request_id: "5",
-        delivered: false,
-        reason: "busy",
-      }),
-    ).toBe(false);
-  });
-});
-
-describe("say and notify", () => {
-  test("say_post carries only its text", () => {
-    expect(isValid(SayPostRequest, { request_id: "6", op: "say_post", text: "終わりました" })).toBe(
-      true,
+    expect(isValid(MessageSendResponse, { ...MESSAGE_SEND_HELD_RESPONSE, reason: "busy" })).toBe(
+      false,
     );
-  });
-
-  test("say_mark_read may name one session or none", () => {
-    expect(isValid(SayMarkReadRequest, { request_id: "7", op: "say_mark_read" })).toBe(true);
-    expect(isValid(SayMarkReadRequest, { request_id: "7", op: "say_mark_read", sid: SID })).toBe(
-      true,
-    );
-  });
-
-  test("notify_send passes", () => {
-    expect(
-      isValid(NotifySendRequest, {
-        request_id: "8",
-        op: "notify_send",
-        sid: SID,
-        text: "確認して",
-      }),
-    ).toBe(true);
   });
 });
 
 describe("the peers topic", () => {
-  const peer = {
-    sid: SID,
-    instance: INSTANCE,
-    repo: "ccmsg-protocol",
-    ws: "main",
-    cwd: "/repos/kawaz/ccmsg-protocol/main",
-    protocol_version: 3,
-  };
-  const lastLive = {
-    sid: OTHER_SID,
-    instance: INSTANCE,
-    repo: "ccmsg",
-    ws: "daemon-v2",
-    cwd: "/repos/kawaz/ccmsg/daemon-v2",
-    last_seen_at: 1_757_300_000_000,
-  };
-
-  test("each entry carries the classification the instance derived", () => {
-    expect(
-      isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        snapshot: true,
-        instance: INSTANCE,
-        data: {
-          peers: [
-            { ...peer, state: "waiting", pinned: true },
-            { ...peer, sid: OTHER_SID, state: "live_unmanaged" },
-          ],
-          last_live: [{ ...lastLive, state: "paused", stopped_at: 1_757_299_000_000 }],
-        },
-      }),
-    ).toBe(true);
-  });
+  const peersFrame = TOPIC_FIXTURES.peers;
+  const [peer] = peersFrame.data.peers;
+  const [lastLive] = peersFrame.data.last_live;
 
   test("a session gone without a word carries no stopped_at", () => {
+    const { stopped_at: _dropped, ...rest } = lastLive;
     expect(
       isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
-        data: { peers: [], last_live: [{ ...lastLive, state: "disappeared" }] },
+        ...peersFrame,
+        data: { peers: [], last_live: [{ ...rest, state: "disappeared" }] },
       }),
     ).toBe(true);
   });
 
   test("an entry that states no classification passes", () => {
-    expect(
-      isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
-        data: { peers: [peer], last_live: [] },
-      }),
-    ).toBe(true);
+    const { state: _dropped, ...rest } = peer;
+    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest], last_live: [] } })).toBe(
+      true,
+    );
   });
 
   test("a classification outside the list is refused", () => {
     expect(
       isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
+        ...peersFrame,
         data: { peers: [{ ...peer, state: "busy" }], last_live: [] },
       }),
     ).toBe(false);
@@ -566,73 +284,24 @@ describe("the peers topic", () => {
   test("a busy session carries when inference last ran, not a flag", () => {
     // Busy is an attribute of the row: the session is `live` and busy at once,
     // and a client reads recency against its own threshold.
-    expect(
-      isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
-        data: {
-          peers: [
-            { ...peer, state: "live", title: "契約 0.4.0", gateway_active_at: 1_757_300_000_000 },
-          ],
-          last_live: [],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  test("an instance with no gateway simply omits it", () => {
-    expect(
-      isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
-        data: { peers: [{ ...peer, state: "live" }], last_live: [] },
-      }),
-    ).toBe(true);
+    expect(isValid(PeersFrame, peersFrame)).toBe(true);
+    expect(peer.state).toBe("live");
+    expect(typeof peer.gateway_active_at).toBe("number");
   });
 
   test("a boolean in place of the instant is refused", () => {
     expect(
       isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
+        ...peersFrame,
         data: { peers: [{ ...peer, gateway_active_at: true }], last_live: [] },
       }),
     ).toBe(false);
   });
 
-  test("a frame may carry the sending instance's view of the mesh", () => {
-    expect(
-      isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        snapshot: true,
-        instance: INSTANCE,
-        data: {
-          peers: [peer],
-          last_live: [],
-          instances: [
-            { id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba", reachable: true },
-            {
-              id: OTHER_INSTANCE,
-              endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
-              host: "nuc",
-              reachable: false,
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
-  });
-
   test("an instance entry without its reachability is refused", () => {
     expect(
       isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
+        ...peersFrame,
         data: {
           peers: [],
           last_live: [],
@@ -645,12 +314,10 @@ describe("the peers topic", () => {
   test("an ISO stopped_at is refused", () => {
     expect(
       isValid(PeersFrame, {
-        ev: "topic",
-        topic: "peers",
-        instance: INSTANCE,
+        ...peersFrame,
         data: {
           peers: [],
-          last_live: [{ ...lastLive, state: "paused", stopped_at: "2026-09-08T00:00:00Z" }],
+          last_live: [{ ...lastLive, stopped_at: "2026-09-08T00:00:00Z" }],
         },
       }),
     ).toBe(false);
@@ -658,427 +325,108 @@ describe("the peers topic", () => {
 });
 
 describe("authenticating a person", () => {
-  const challenge = {
-    challenge: "Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA",
-    issuer: INSTANCE,
-    expires_at: 1_757_300_300_000,
-  };
-  const session = {
-    ok: true,
-    request_id: "a1",
-    sub: "personal-1",
-    access: { value: "YWNjZXNzLXRva2Vu", expires_at: 1_757_310_000_000 },
-  };
-
-  test("a challenge says who can spend it", () => {
-    expect(isValid(AuthChallengeResponse, { ok: true, request_id: "a1", ...challenge })).toBe(true);
-  });
-
   test("a challenge without its issuer is refused — nobody could consume it", () => {
-    const { issuer: _dropped, ...rest } = challenge;
-    expect(isValid(AuthChallengeResponse, { ok: true, request_id: "a1", ...rest })).toBe(false);
+    const { issuer: _dropped, ...rest } = OP_FIXTURES.auth_challenge.response;
+    expect(isValid(AuthChallengeResponse, rest)).toBe(false);
   });
 
   test("an issuer spelled as a URL is refused", () => {
     expect(
       isValid(AuthChallengeResponse, {
-        ok: true,
-        request_id: "a1",
-        ...challenge,
+        ...OP_FIXTURES.auth_challenge.response,
         issuer: INSTANCE_ENDPOINT,
       }),
     ).toBe(false);
   });
 
-  test("registration carries the URL's token, the typed code and what the authenticator made", () => {
-    expect(
-      isValid(AuthRegisterRequest, {
-        request_id: "a2",
-        op: "auth_register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        code: "048213",
-        device_label: "work laptop",
-        challenge,
-        credential: {
-          id: "Y3JlZC1pZA",
-          raw_id: "Y3JlZC1pZA",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
-          attestation_object: "o2NmbXRkbm9uZQ",
-        },
-      }),
-    ).toBe(true);
-  });
-
   test("a registration with only the URL, and no code beside it, is refused", () => {
-    expect(
-      isValid(AuthRegisterRequest, {
-        request_id: "a2",
-        op: "auth_register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        credential: {
-          id: "Y3JlZC1pZA",
-          raw_id: "Y3JlZC1pZA",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
-          attestation_object: "o2NmbXRkbm9uZQ",
-        },
-      }),
-    ).toBe(false);
+    const { code: _dropped, ...rest } = OP_FIXTURES.auth_register.request;
+    expect(isValid(AuthRegisterRequest, rest)).toBe(false);
   });
 
   test("a code that is not six digits is refused", () => {
     expect(
-      isValid(AuthRegisterRequest, {
-        request_id: "a2",
-        op: "auth_register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        code: "4821",
-        credential: {
-          id: "Y3JlZC1pZA",
-          raw_id: "Y3JlZC1pZA",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
-          attestation_object: "o2NmbXRkbm9uZQ",
-        },
-      }),
+      isValid(AuthRegisterRequest, { ...OP_FIXTURES.auth_register.request, code: "4821" }),
     ).toBe(false);
   });
 
   test("a credential field that is not base64url is refused", () => {
+    const request = OP_FIXTURES.auth_register.request;
     expect(
       isValid(AuthRegisterRequest, {
-        request_id: "a2",
-        op: "auth_register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        code: "048213",
-        credential: {
-          id: "Y3JlZC1pZA",
-          raw_id: "cred id!",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uY3JlYXRlIn0",
-          attestation_object: "o2NmbXRkbm9uZQ",
-        },
+        ...request,
+        credential: { ...request.credential, raw_id: "cred id!" },
       }),
     ).toBe(false);
-  });
-
-  test("an assertion names the challenge it answers", () => {
-    expect(
-      isValid(AuthAssertRequest, {
-        request_id: "a3",
-        op: "auth_assert",
-        challenge,
-        credential: {
-          raw_id: "Y3JlZC1pZA",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
-          authenticator_data: "YXV0aC1kYXRh",
-          signature: "c2lnbmF0dXJl",
-          user_handle: "dXNlci1oYW5kbGU",
-          endpoint: INSTANCE_ENDPOINT,
-        },
-      }),
-    ).toBe(true);
   });
 
   test("an assertion from a resident credential names no account", () => {
-    expect(
-      isValid(AuthAssertRequest, {
-        request_id: "a3",
-        op: "auth_assert",
-        challenge,
-        credential: {
-          raw_id: "Y3JlZC1pZA",
-          client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
-          authenticator_data: "YXV0aC1kYXRh",
-          signature: "c2lnbmF0dXJl",
-        },
-      }),
-    ).toBe(true);
-  });
-
-  test("what a person gets back is the access token alone", () => {
-    expect(isValid(AuthAssertResponse, session)).toBe(true);
+    const request = OP_FIXTURES.auth_assert.request;
+    const { user_handle: _dropped, ...credential } = request.credential;
+    expect(isValid(AuthAssertRequest, { ...request, credential })).toBe(true);
   });
 
   test("the refresh token is not in the reply — it is the cookie's", () => {
-    expect(
-      isValid(AuthRefreshTokenResponse, {
-        ...session,
-        refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
-      }),
-    ).toBe(true);
     // Carried, not refused, like any field this generation does not name — but
     // nothing reads it, and an instance that answered one would be handing the
     // browser's script the value the cookie exists to keep from it.
-    expect(isValid(AuthRefreshTokenResponse, session)).toBe(true);
-  });
-
-  test("renewing a live connection moves its deadline", () => {
-    expect(
-      isValid(AuthRefreshRequest, {
-        request_id: "a4",
-        op: "auth_refresh",
-        access_token: "YWNjZXNzLXRva2Vu",
-      }),
-    ).toBe(true);
-    expect(
-      isValid(AuthRefreshResponse, {
-        ok: true,
-        request_id: "a4",
-        auth_expires_at: 1_757_320_000_000,
-      }),
-    ).toBe(true);
-  });
-
-  test("the issuer is asked to spend a registration, and answers what it authorized", () => {
-    expect(
-      isValid(AuthResolveRequest, {
-        request_id: "a5",
-        op: "auth_resolve",
-        kind: "register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        code: "048213",
-        to_instance: INSTANCE,
-      }),
-    ).toBe(true);
-    expect(
-      isValid(AuthResolveResponse, {
-        ok: true,
-        request_id: "a5",
-        kind: "register",
-        claims: {
-          iss: INSTANCE,
-          sub: "personal-1",
-          unit: "personal",
-          endpoint: INSTANCE_ENDPOINT,
-          rp_id: "mba.example.ts.net",
-          expires_at: 1_757_300_600_000,
-          jti: "01J9Z3W2Q",
-          user_id: "dXNlci1oYW5kbGU",
-          issued_label: "for kawaz",
-        },
-      }),
-    ).toBe(true);
+    expect(OP_FIXTURES.auth_refresh_token.response).not.toHaveProperty("refresh");
   });
 
   test("a forwarded registration without the typed code is refused", () => {
-    expect(
-      isValid(AuthResolveRequest, {
-        request_id: "a5",
-        op: "auth_resolve",
-        kind: "register",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-        to_instance: INSTANCE,
-      }),
-    ).toBe(false);
-  });
-
-  test("spending a challenge answers nothing beyond having spent it", () => {
-    expect(isValid(AuthResolveResponse, { ok: true, request_id: "a5", kind: "challenge" })).toBe(
-      true,
-    );
+    const { code: _dropped, ...rest } = OP_FIXTURES.auth_resolve.request;
+    expect(isValid(AuthResolveRequest, rest)).toBe(false);
   });
 
   test("a resolve that mixes the two subjects is refused", () => {
     expect(
-      isValid(AuthResolveRequest, {
-        request_id: "a5",
-        op: "auth_resolve",
-        kind: "challenge",
-        token: "eyJhbGciOiJIUzI1NiJ9.e30.c2ln",
-      }),
+      isValid(AuthResolveRequest, { ...OP_FIXTURES.auth_resolve.request, kind: "challenge" }),
     ).toBe(false);
-  });
-
-  test("a rotation answers both halves — the caller has a cookie to set", () => {
-    expect(
-      isValid(AuthRotateResponse, {
-        ok: true,
-        request_id: "a6",
-        sub: "personal-1",
-        access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
-        refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
-      }),
-    ).toBe(true);
-  });
-
-  test("a credential record is complete without the instance that wrote it", () => {
-    expect(
-      isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        snapshot: true,
-        instance: INSTANCE,
-        data: {
-          records: [
-            {
-              key: "credential/personal-1/Y3JlZC1pZA",
-              updated_at: 1_757_300_000_000,
-              body: {
-                kind: "credential",
-                sub: "personal-1",
-                credential_id: "Y3JlZC1pZA",
-                public_key: "pQECAyYgASFYIA",
-                user_handle: "dXNlci1oYW5kbGU",
-                endpoint: INSTANCE_ENDPOINT,
-                sign_count: 0,
-                registered_at: 1_757_300_000_000,
-              },
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
   });
 
   test("a credential says which endpoint it admits its holder to, and cannot leave it out", () => {
-    const record = {
-      kind: "credential",
-      sub: "personal-1",
-      credential_id: "Y3JlZC1pZA",
-      public_key: "pQECAyYgASFYIA",
-      user_handle: "dXNlci1oYW5kbGU",
-      registered_at: 1_757_300_000_000,
-    };
-    const frame = (body: unknown) => ({
-      ev: "topic",
-      topic: "auth_records",
-      instance: INSTANCE,
-      data: { records: [{ key: "credential/personal-1/Y3JlZC1pZA", updated_at: 1, body }] },
-    });
+    const frame = TOPIC_FIXTURES.auth_records;
+    const [record] = frame.data.records;
+    const { endpoint: _dropped, ...body } = record.body;
     // A neighbour under the same host and the same relying party is a separate
     // endpoint, so it takes a registration of its own.
     expect(
-      isValid(AuthRecordsFrame, frame({ ...record, endpoint: "https://mba.example.ts.net/" })),
-    ).toBe(true);
-    expect(isValid(AuthRecordsFrame, frame(record))).toBe(false);
-  });
-
-  test("a record carries what a person reads it back by, none of it authenticating", () => {
-    expect(
       isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        instance: INSTANCE,
+        ...frame,
         data: {
-          records: [
-            {
-              key: "credential/personal-1/Y3JlZC1pZA",
-              updated_at: 1_757_400_000_000,
-              body: {
-                kind: "credential",
-                sub: "personal-1",
-                credential_id: "Y3JlZC1pZA",
-                public_key: "pQECAyYgASFYIA",
-                user_handle: "dXNlci1oYW5kbGU",
-                endpoint: INSTANCE_ENDPOINT,
-                rp_id: "mba.example.ts.net",
-                issued_label: "for kawaz",
-                device_label: "work laptop",
-                registered_at: 1_757_300_000_000,
-                registered_ip: "203.0.113.7",
-                registered_user_agent: "Mozilla/5.0",
-                last_used_at: 1_757_400_000_000,
-                last_used_ip: "203.0.113.7",
-                last_used_user_agent: "Mozilla/5.0",
-              },
-            },
-          ],
+          records: [{ ...record, body: { ...body, endpoint: "https://mba.example.ts.net/" } }],
         },
       }),
     ).toBe(true);
-  });
-
-  test("a family names the one instance allowed to write it", () => {
-    expect(
-      isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        instance: INSTANCE,
-        data: {
-          records: [
-            {
-              key: "family/01J9Z3W2Q",
-              updated_at: 1_757_300_100_000,
-              body: {
-                kind: "token_family",
-                sub: "personal-1",
-                iss: INSTANCE,
-                access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
-                refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
-                previous_refresh: { value: "b2xkLXJlZnJlc2g", expires_at: 1_757_400_000_000 },
-                retired: [
-                  {
-                    hash: "9f".repeat(32),
-                    expires_at: 1_757_380_000_000,
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
+    expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
+      false,
+    );
   });
 
   test("a retired generation is remembered as a digest and not as the token", () => {
+    const [record] = AUTH_RECORDS_FAMILY_FRAME.data.records;
     expect(
       isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        instance: INSTANCE,
+        ...AUTH_RECORDS_FAMILY_FRAME,
         data: {
           records: [
             {
-              key: "family/01J9Z3W2Q",
-              updated_at: 1_757_300_100_000,
+              ...record,
               body: {
-                kind: "token_family",
-                sub: "personal-1",
-                iss: INSTANCE,
-                access: { value: "YWNjZXNz", expires_at: 1_757_310_000_000 },
-                refresh: { value: "cmVmcmVzaA", expires_at: 1_757_900_000_000 },
-                retired: [{ hash: "b2xkLXJlZnJlc2g", expires_at: 1_757_380_000_000 }],
+                ...record.body,
+                retired: [{ hash: "b2xkLXJlZnJlc2g", expires_at: record.updated_at }],
               },
             },
           ],
         },
       }),
     ).toBe(false);
-  });
-
-  test("a removal travels as a record, and a credential's never expires", () => {
-    expect(
-      isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        instance: INSTANCE,
-        data: {
-          records: [
-            {
-              key: "credential/personal-1/Y3JlZC1pZA",
-              updated_at: 1_757_400_000_000,
-              body: { kind: "tombstone", sub: "personal-1", deleted_at: 1_757_400_000_000 },
-            },
-            {
-              key: "family/01J9Z3W2Q",
-              updated_at: 1_757_400_000_000,
-              body: {
-                kind: "tombstone",
-                sub: "personal-1",
-                deleted_at: 1_757_400_000_000,
-                expires_at: 1_758_004_800_000,
-              },
-            },
-          ],
-        },
-      }),
-    ).toBe(true);
   });
 
   test("a record of no known kind is refused", () => {
     expect(
       isValid(AuthRecordsFrame, {
-        ev: "topic",
-        topic: "auth_records",
-        instance: INSTANCE,
+        ...TOPIC_FIXTURES.auth_records,
         data: {
           records: [{ key: "k", updated_at: 1, body: { kind: "password", sub: "personal-1" } }],
         },
@@ -1089,6 +437,11 @@ describe("authenticating a person", () => {
   test("a family expires within the window its tombstone is kept for", () => {
     expect(FAMILY_TOMBSTONE_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
     expect(AUTH_CHALLENGE_TTL_MS).toBeLessThan(REGISTER_TTL_MS);
+  });
+
+  test("a challenge is spent at the instance that issued it", () => {
+    expect(challenge.issuer).toBe(INSTANCE);
+    expect(AUTH_RESOLVE_CHALLENGE_RESPONSE.kind).toBe("challenge");
   });
 });
 
@@ -1110,136 +463,34 @@ describe("retention", () => {
 });
 
 describe("topic frames", () => {
-  test("the inbox snapshot is the undelivered messages", () => {
-    expect(
-      isValid(InboxFrame, {
-        ev: "topic",
-        topic: "inbox",
-        snapshot: true,
-        instance: INSTANCE,
-        data: [
-          {
-            mid: `${INSTANCE}/1841`,
-            from: OTHER_SID,
-            from_label: "pv2-op-table",
-            text: "op 表を書き終えた",
-            sent_at: 1_757_300_000_000,
-          },
-        ],
-      }),
-    ).toBe(true);
-  });
-
-  test("a delta frame carries no snapshot mark", () => {
-    expect(
-      isValid(InboxFrame, {
-        ev: "topic",
-        topic: "inbox",
-        instance: INSTANCE,
-        data: [
-          {
-            mid: `${INSTANCE}/1842`,
-            from: OTHER_SID,
-            from_label: "pv2-op-table",
-            text: "続き",
-            reply_to: `${INSTANCE}/1841`,
-            sent_at: 1_757_300_001_000,
-          },
-        ],
-      }),
-    ).toBe(true);
-  });
-
   test("a message a person sent names them as the sender", () => {
-    expect(
-      isValid(InboxFrame, {
-        ev: "topic",
-        topic: "inbox",
-        instance: INSTANCE,
-        data: [
-          {
-            mid: `${INSTANCE}/1843`,
-            from: "user",
-            from_label: "kawaz",
-            text: "契約の 4 件をまとめて",
-            sent_at: 1_757_300_002_000,
-          },
-        ],
-      }),
-    ).toBe(true);
+    const senders = TOPIC_FIXTURES.inbox.data.map((message) => message.from);
+    expect(senders).toContain("user");
   });
 
   test("a sender that is neither a sid nor the person is refused", () => {
-    expect(
-      isValid(InboxFrame, {
-        ev: "topic",
-        topic: "inbox",
-        instance: INSTANCE,
-        data: [
-          {
-            mid: `${INSTANCE}/1844`,
-            from: "instance",
-            from_label: "nuc",
-            text: "誰",
-            sent_at: 1_757_300_003_000,
-          },
-        ],
-      }),
-    ).toBe(false);
+    const frame = TOPIC_FIXTURES.inbox;
+    const [message] = frame.data;
+    expect(isValid(InboxFrame, { ...frame, data: [{ ...message, from: "instance" }] })).toBe(false);
   });
 
   test("`snapshot: false` is refused — the mark is present or absent", () => {
-    expect(
-      isValid(InboxFrame, {
-        ev: "topic",
-        topic: "inbox",
-        snapshot: false,
-        instance: INSTANCE,
-        data: [],
-      }),
-    ).toBe(false);
+    expect(isValid(InboxFrame, { ...TOPIC_FIXTURES.inbox, snapshot: false })).toBe(false);
   });
 
   test("a frame without its originating instance is refused", () => {
-    expect(isValid(NotifyFrame, { ev: "topic", topic: "notify", data: {} })).toBe(false);
-  });
-
-  test("a notification frame passes", () => {
-    expect(
-      isValid(NotifyFrame, {
-        ev: "topic",
-        topic: "notify",
-        instance: INSTANCE,
-        data: { sid: SID, sid_label: "pv2-skeleton", text: "確認して", sent_at: 1_757_300_000_000 },
-      }),
-    ).toBe(true);
+    const { instance: _dropped, ...rest } = TOPIC_FIXTURES.notify;
+    expect(isValid(NotifyFrame, rest)).toBe(false);
   });
 });
 
 describe("errors", () => {
-  test("an error reply passes", () => {
-    expect(
-      isValid(ErrorResponse, {
-        ok: false,
-        request_id: "9",
-        error: { code: "capability_unavailable", msg: "launcher is not configured" },
-      }),
-    ).toBe(true);
-  });
-
-  test("a reply that could not name its request passes without the id", () => {
-    expect(
-      isValid(ErrorResponse, { ok: false, error: { code: "bad_request", msg: "no request_id" } }),
-    ).toBe(true);
-  });
-
   test("a failure that is not the caller's says so", () => {
     // Not `bad_request`: the arguments were right, so re-reading them is the
     // one thing that cannot help.
     expect(
       isValid(ErrorResponse, {
-        ok: false,
-        request_id: "9",
+        ...ERROR_RESPONSE,
         error: { code: "internal_error", msg: "the transcript reader threw" },
       }),
     ).toBe(true);
@@ -1247,11 +498,7 @@ describe("errors", () => {
 
   test("a code outside the union is refused", () => {
     expect(
-      isValid(ErrorResponse, {
-        ok: false,
-        request_id: "9",
-        error: { code: "room_not_found", msg: "gone" },
-      }),
+      isValid(ErrorResponse, { ...ERROR_RESPONSE, error: { code: "room_not_found", msg: "gone" } }),
     ).toBe(false);
   });
 });

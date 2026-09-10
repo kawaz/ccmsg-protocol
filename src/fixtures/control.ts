@@ -1,0 +1,557 @@
+import type { Static } from "@sinclair/typebox";
+import type {
+  DirListRequest,
+  DirListResponse,
+  DirTreeRequest,
+  DirTreeResponse,
+  FileCreateRequest,
+  FileCreateResponse,
+  FileDeleteRequest,
+  FileDeleteResponse,
+  FileEditRequest,
+  FileEditResponse,
+  FileFindRequest,
+  FileFindResponse,
+  FileReadRequest,
+  FileReadResponse,
+  FileStatBatchRequest,
+  FileStatBatchResponse,
+  FileWriteRequest,
+  FileWriteResponse,
+} from "../control/files.ts";
+import type {
+  KvDeleteRequest,
+  KvDeleteResponse,
+  KvReadRequest,
+  KvReadResponse,
+  KvWriteRequest,
+  KvWriteResponse,
+} from "../control/kv.ts";
+import type {
+  LauncherConfigReadRequest,
+  LauncherConfigReadResponse,
+  LauncherRunRequest,
+  LauncherRunResponse,
+} from "../control/launcher.ts";
+import type {
+  LlmStatsReadRequest,
+  LlmStatsReadResponse,
+  LlmUsageReadRequest,
+  LlmUsageReadResponse,
+} from "../control/llm.ts";
+import type {
+  SandboxGrantRequest,
+  SandboxGrantResponse,
+  SandboxRevokeRequest,
+  SandboxRevokeResponse,
+} from "../control/sandbox.ts";
+import type {
+  SessionDumpWriteRequest,
+  SessionDumpWriteResponse,
+  SessionEnvReadRequest,
+  SessionEnvReadResponse,
+  SessionForkOriginRequest,
+  SessionForkOriginResponse,
+  SessionKillRequest,
+  SessionKillResponse,
+  SessionLastLiveRemoveRequest,
+  SessionLastLiveRemoveResponse,
+  SessionRenameRequest,
+  SessionRenameResponse,
+  SessionSearchRequest,
+  SessionSearchResponse,
+} from "../control/session.ts";
+import type { TranscriptReadRequest, TranscriptReadResponse } from "../control/transcript.ts";
+import type { TranslateRunRequest, TranslateRunResponse } from "../control/translate.ts";
+import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
+
+const { sid, other_sid, instance, request_id } = FIXTURE_IDS;
+
+const WORKSPACE = "/repos/kawaz/ccmsg-protocol/main";
+const FILE_PATH = "src/fixtures/index.ts";
+
+export const SESSION_KILL_REQUEST: Static<typeof SessionKillRequest> = {
+  request_id,
+  op: "session_kill",
+  to_instance: instance,
+  sid,
+  force: false,
+};
+
+export const SESSION_KILL_RESPONSE: Static<typeof SessionKillResponse> = {
+  ok: true,
+  request_id,
+  terminated: true,
+};
+
+export const SESSION_RENAME_REQUEST: Static<typeof SessionRenameRequest> = {
+  request_id,
+  op: "session_rename",
+  sid,
+  title: "contract fixtures",
+};
+
+export const SESSION_RENAME_RESPONSE: Static<typeof SessionRenameResponse> = {
+  ok: true,
+  request_id,
+  terminal_id: "%17",
+  instance,
+  title: "contract fixtures",
+};
+
+export const SESSION_ENV_READ_REQUEST: Static<typeof SessionEnvReadRequest> = {
+  request_id,
+  op: "session_env_read",
+  sid,
+};
+
+export const SESSION_ENV_READ_RESPONSE: Static<typeof SessionEnvReadResponse> = {
+  ok: true,
+  request_id,
+  pid: 4821,
+  instance,
+  env: { CLAUDE_CONFIG_DIR: "/config/claude-personal", PWD: WORKSPACE },
+};
+
+export const SESSION_SEARCH_REQUEST: Static<typeof SessionSearchRequest> = {
+  request_id,
+  op: "session_search",
+  query: "fixture",
+  target_agent: true,
+  modified_within_ms: 86_400_000,
+};
+
+export const SESSION_SEARCH_RESPONSE: Static<typeof SessionSearchResponse> = {
+  ok: true,
+  request_id,
+  hits: [
+    {
+      sid,
+      instance,
+      config_dir: "/config/claude-personal",
+      file: "/transcripts/6f1a2b3c.jsonl",
+      cwd: WORKSPACE,
+      repo: "ccmsg-protocol",
+      ws: "main",
+      title: "contract fixtures",
+      created_at: FIXTURE_NOW - 3_600_000,
+      updated_at: FIXTURE_NOW,
+      size: 182_400,
+      matches: [{ role: "agent", text: "fixture を export する", said_at: FIXTURE_NOW }],
+      model: "claude-opus-5",
+      effort: "high",
+    },
+  ],
+  truncated: false,
+};
+
+export const SESSION_DUMP_WRITE_REQUEST: Static<typeof SessionDumpWriteRequest> = {
+  request_id,
+  op: "session_dump_write",
+  sid,
+  since_at: FIXTURE_NOW - 3_600_000,
+  no_thinking: true,
+};
+
+export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse> = {
+  ok: true,
+  request_id,
+  path: "/transcripts/6f1a2b3c.dump.md",
+  instance,
+  entries: 128,
+  bytes: 65_536,
+};
+
+export const TRANSCRIPT_READ_REQUEST: Static<typeof TranscriptReadRequest> = {
+  request_id,
+  op: "transcript_read",
+  sid,
+  before: 182_400,
+  max_bytes: 65_536,
+};
+
+export const TRANSCRIPT_READ_RESPONSE: Static<typeof TranscriptReadResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  lines: ['{"type":"assistant","text":"fixture を export した"}'],
+  start: 182_300,
+  end: 182_400,
+  size: 182_400,
+};
+
+export const SESSION_FORK_ORIGIN_REQUEST: Static<typeof SessionForkOriginRequest> = {
+  request_id,
+  op: "session_fork_origin",
+  sid,
+};
+
+export const SESSION_FORK_ORIGIN_RESPONSE: Static<typeof SessionForkOriginResponse> = {
+  ok: true,
+  request_id,
+  origin: { sid: other_sid, boundary_uuid: "6d1f0c2e-8a44-4b1e-9f30-5c7a2d9e4b81", copied: 128 },
+};
+
+export const SESSION_LAST_LIVE_REMOVE_REQUEST: Static<typeof SessionLastLiveRemoveRequest> = {
+  request_id,
+  op: "session_last_live_remove",
+  sid: other_sid,
+};
+
+export const SESSION_LAST_LIVE_REMOVE_RESPONSE: Static<typeof SessionLastLiveRemoveResponse> = {
+  ok: true,
+  request_id,
+  removed: true,
+};
+
+export const DIR_LIST_REQUEST: Static<typeof DirListRequest> = {
+  request_id,
+  op: "dir_list",
+  sid,
+  kind: "workspace",
+  path: "src/fixtures",
+};
+
+export const DIR_LIST_RESPONSE: Static<typeof DirListResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: "src/fixtures",
+  entries: [
+    { name: "index.ts", type: "file", size: 2_048, mtime_at: FIXTURE_NOW },
+    { name: "topics.ts", type: "file", size: 4_096, mtime_at: FIXTURE_NOW },
+  ],
+};
+
+export const FILE_READ_REQUEST: Static<typeof FileReadRequest> = {
+  request_id,
+  op: "file_read",
+  sid,
+  kind: "workspace",
+  path: FILE_PATH,
+};
+
+export const FILE_READ_RESPONSE: Static<typeof FileReadResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: FILE_PATH,
+  size: 2_048,
+  truncated: false,
+  binary: false,
+  content: "export const OP_FIXTURES = {} as const;\n",
+  mtime_at: FIXTURE_NOW,
+};
+
+export const FILE_WRITE_REQUEST: Static<typeof FileWriteRequest> = {
+  request_id,
+  op: "file_write",
+  sid,
+  path: FILE_PATH,
+  content: "export const OP_FIXTURES = {} as const;\n",
+};
+
+export const FILE_WRITE_RESPONSE: Static<typeof FileWriteResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: FILE_PATH,
+};
+
+export const FILE_CREATE_REQUEST: Static<typeof FileCreateRequest> = {
+  request_id,
+  op: "file_create",
+  sid,
+  kind: "workspace",
+  path: "src/fixtures/ids.ts",
+  content: "export const FIXTURE_IDS = {} as const;\n",
+};
+
+export const FILE_CREATE_RESPONSE: Static<typeof FileCreateResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: "src/fixtures/ids.ts",
+};
+
+export const FILE_EDIT_REQUEST: Static<typeof FileEditRequest> = {
+  request_id,
+  op: "file_edit",
+  sid,
+  kind: "workspace",
+  path: FILE_PATH,
+  content: "export const OP_FIXTURES = {} as const;\n",
+  expected_mtime_at: FIXTURE_NOW,
+  expected_size: 2_048,
+};
+
+export const FILE_EDIT_RESPONSE: Static<typeof FileEditResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: FILE_PATH,
+  size: 2_112,
+  mtime_at: FIXTURE_NOW + 1_000,
+};
+
+export const FILE_DELETE_REQUEST: Static<typeof FileDeleteRequest> = {
+  request_id,
+  op: "file_delete",
+  sid,
+  kind: "workspace",
+  path: "src/fixtures/scratch.ts",
+};
+
+export const FILE_DELETE_RESPONSE: Static<typeof FileDeleteResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: "src/fixtures/scratch.ts",
+};
+
+export const FILE_FIND_REQUEST: Static<typeof FileFindRequest> = {
+  request_id,
+  op: "file_find",
+  sid,
+  kind: "workspace",
+  root: "src",
+  query: "fixtures",
+  respect_gitignore: true,
+};
+
+export const FILE_FIND_RESPONSE: Static<typeof FileFindResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  hits: [
+    { path: "src/fixtures", type: "dir" },
+    { path: FILE_PATH, type: "file" },
+  ],
+  truncated: false,
+};
+
+export const FILE_STAT_BATCH_REQUEST: Static<typeof FileStatBatchRequest> = {
+  request_id,
+  op: "file_stat_batch",
+  sid,
+  paths: [FILE_PATH, "/etc/hosts"],
+};
+
+/** A path the session may not reach answers `null` in its place rather than
+ * dropping out of the list, so the results line up with the paths asked for. */
+export const FILE_STAT_BATCH_RESPONSE: Static<typeof FileStatBatchResponse> = {
+  ok: true,
+  request_id,
+  results: [{ kind: "workspace", path: FILE_PATH }, null],
+};
+
+export const DIR_TREE_REQUEST: Static<typeof DirTreeRequest> = {
+  request_id,
+  op: "dir_tree",
+  roots: ["/repos/kawaz"],
+  depth: 2,
+  filter: "ccmsg",
+};
+
+export const DIR_TREE_RESPONSE: Static<typeof DirTreeResponse> = {
+  ok: true,
+  request_id,
+  entries: [
+    {
+      path: "/repos/kawaz/ccmsg-protocol",
+      children: [{ path: WORKSPACE }],
+    },
+  ],
+};
+
+export const LAUNCHER_CONFIG_READ_REQUEST: Static<typeof LauncherConfigReadRequest> = {
+  request_id,
+  op: "launcher_config_read",
+};
+
+export const LAUNCHER_CONFIG_READ_RESPONSE: Static<typeof LauncherConfigReadResponse> = {
+  ok: true,
+  request_id,
+  root_dirs: ["/repos/kawaz"],
+  templates: [
+    {
+      name: "claude",
+      command: "claude --effort {effort}",
+      params: [{ name: "effort", default: "high" }],
+    },
+  ],
+};
+
+export const LAUNCHER_RUN_REQUEST: Static<typeof LauncherRunRequest> = {
+  request_id,
+  op: "launcher_run",
+  cwd: WORKSPACE,
+  params: { effort: "high" },
+  template: "claude",
+};
+
+export const LAUNCHER_RUN_RESPONSE: Static<typeof LauncherRunResponse> = {
+  ok: true,
+  request_id,
+  stdout: "started\n",
+  stderr: "",
+  exit_code: 0,
+  timed_out: false,
+};
+
+export const SANDBOX_GRANT_REQUEST: Static<typeof SandboxGrantRequest> = {
+  request_id,
+  op: "sandbox_grant",
+  sid,
+  kind: "workspace",
+  path: FILE_PATH,
+};
+
+export const SANDBOX_GRANT_RESPONSE: Static<typeof SandboxGrantResponse> = {
+  ok: true,
+  request_id,
+  gid: "g-01J9Z3W2Q",
+  token: "c2FuZGJveC10b2tlbg",
+  url: "https://mba.example.ts.net/ccmsg/personal/sandbox/g-01J9Z3W2Q/",
+  expires_at: FIXTURE_NOW + 600_000,
+};
+
+export const SANDBOX_REVOKE_REQUEST: Static<typeof SandboxRevokeRequest> = {
+  request_id,
+  op: "sandbox_revoke",
+  gid: "g-01J9Z3W2Q",
+};
+
+export const SANDBOX_REVOKE_RESPONSE: Static<typeof SandboxRevokeResponse> = {
+  ok: true,
+  request_id,
+};
+
+export const TRANSLATE_RUN_REQUEST: Static<typeof TranslateRunRequest> = {
+  request_id,
+  op: "translate_run",
+  texts: ["the contract's own fixtures", "one that the helper could not take"],
+};
+
+/** One text per result, each of them either the translation or why there is
+ * none. */
+export const TRANSLATE_RUN_RESPONSE: Static<typeof TranslateRunResponse> = {
+  ok: true,
+  request_id,
+  results: [
+    { ok: true, text: "契約自身の fixture" },
+    { ok: false, error: "helper exited 1" },
+  ],
+};
+
+export const LLM_USAGE_READ_REQUEST: Static<typeof LlmUsageReadRequest> = {
+  request_id,
+  op: "llm_usage_read",
+  refresh: true,
+};
+
+export const LLM_USAGE_READ_RESPONSE: Static<typeof LlmUsageReadResponse> = {
+  ok: true,
+  request_id,
+  generated_at: FIXTURE_NOW,
+  credentials: [
+    {
+      name: "personal",
+      type: "oauth",
+      support: "full",
+      auth: { status: "ok", observed_at: FIXTURE_NOW },
+      snapshot: {
+        observed_at: FIXTURE_NOW,
+        overage: { status: "off" },
+        windows: {
+          five_hour: {
+            utilization: 0.42,
+            status: "allowed",
+            reset_at: FIXTURE_NOW + 7_200_000,
+            window_secs: 18_000,
+          },
+        },
+      },
+      limits: [
+        {
+          kind: "five_hour",
+          percent: 42,
+          severity: "ok",
+          resets_at: FIXTURE_NOW + 7_200_000,
+          is_active: true,
+          window_secs: 18_000,
+        },
+      ],
+    },
+  ],
+};
+
+export const LLM_STATS_READ_REQUEST: Static<typeof LlmStatsReadRequest> = {
+  request_id,
+  op: "llm_stats_read",
+  days: 7,
+};
+
+export const LLM_STATS_READ_RESPONSE: Static<typeof LlmStatsReadResponse> = {
+  ok: true,
+  request_id,
+  generated_at: FIXTURE_NOW,
+  days: {
+    "2026-09-08": {
+      credentials: {
+        personal: {
+          "claude-opus-5": {
+            requests: 12,
+            input_tokens: 48_000,
+            output_tokens: 6_400,
+            cache_creation_input_tokens: 12_000,
+            cache_read_input_tokens: 320_000,
+            usd: 1.23,
+          },
+        },
+      },
+      total_usd: 1.23,
+    },
+  },
+};
+
+export const KV_READ_REQUEST: Static<typeof KvReadRequest> = {
+  request_id,
+  op: "kv_read",
+  ns: "webui",
+  key: "layout",
+};
+
+export const KV_READ_RESPONSE: Static<typeof KvReadResponse> = {
+  ok: true,
+  request_id,
+  value: { pane: "peers", collapsed: false },
+  updated_at: FIXTURE_NOW,
+};
+
+export const KV_WRITE_REQUEST: Static<typeof KvWriteRequest> = {
+  request_id,
+  op: "kv_write",
+  ns: "webui",
+  key: "layout",
+  value: { pane: "peers", collapsed: true },
+  updated_at: FIXTURE_NOW,
+};
+
+export const KV_WRITE_RESPONSE: Static<typeof KvWriteResponse> = {
+  ok: true,
+  request_id,
+  updated_at: FIXTURE_NOW,
+};
+
+export const KV_DELETE_REQUEST: Static<typeof KvDeleteRequest> = {
+  request_id,
+  op: "kv_delete",
+  ns: "webui",
+  key: "layout",
+};
+
+export const KV_DELETE_RESPONSE: Static<typeof KvDeleteResponse> = {
+  ok: true,
+  request_id,
+};

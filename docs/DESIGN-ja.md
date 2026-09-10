@@ -338,3 +338,9 @@ credential record と token family は topic `auth_records` (`roles: ["instance"
 は `upstream()` の印を持つ。印が言うのは「知らない値が来たらそれは上流のもの」であって、
 表記規約の免除ではない。上流の文書は daemon が受け取った時点で snake_case と Unix ms に
 写され、wire にはこの契約の綴りで出る。
+
+## 契約が持つ fixture
+
+全 op の request / response と全 topic の frame について、実 wire の代表 JSON を `src/fixtures/` が持ち、`@ccmsg/protocol/fixtures` として export する。本体の `.` からは出さない — 実装の本番コードに例が混ざる理由がないため、fixture を読むのはテストだけになる。契約自身のテストが `OP_NAMES` と `TOPIC_SCHEMAS` を走査して全件を schema に通すので、op や frame の形が変われば fixture の側が落ちる。
+
+実装側 (daemon / web UI) のテストはこの fixture を読む。期待値の JSON を実装側に書き写すと、契約が変わったとき写しは黙って古いままになり、テストは「実装が自分の写しと一致する」ことしか言わなくなる。契約から読めば、その一致は契約との一致になる。

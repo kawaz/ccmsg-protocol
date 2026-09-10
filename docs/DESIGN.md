@@ -377,3 +377,9 @@ Types whose vocabulary belongs to `claude` or to `llm-gateway` (`AgentInfo`,
 mark says that an unfamiliar value is theirs to add — it does not exempt the type from the
 spelling above. Their documents are rewritten into snake_case and Unix milliseconds as the
 daemon takes them in, so what travels here is this contract's spelling.
+
+## The fixtures the contract holds
+
+For every op's request and reply, and for every topic's frame, `src/fixtures/` holds a representative JSON of the real wire, exported as `@ccmsg/protocol/fixtures`. It is not reachable from `.`: nothing in an implementation's production code has a reason to hold an example, so the fixtures are read by tests alone. The contract's own tests walk `OP_NAMES` and `TOPIC_SCHEMAS` and put every one of them through its schema, so a change to an op or a frame breaks the fixture with it.
+
+An implementation's tests (the daemon's, the web UI's) read these. Copying the expected JSON into the implementation leaves the copy silently stale when the contract moves, and the test then says only that the implementation agrees with its own copy. Read from the contract, that agreement is agreement with the contract.
