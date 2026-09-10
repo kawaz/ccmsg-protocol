@@ -129,6 +129,21 @@ export const HelloResult = Type.Object({
   /** The daemon build, for display. */
   version: Type.String(),
   started_at: Timestamp,
+  /** Where a person opens the terminal a session runs in: the base URL of the
+   * gateway that fronts this instance's terminals. A session's terminal names
+   * itself in `terminal_id` on the `agents` topic, and the gateway's URL for it
+   * is `<terminal_gateway>/sessions/<terminal_id>` — so the base URL carries no
+   * trailing slash, the path below it being the gateway's spelling and not this
+   * contract's.
+   *
+   * Stated by the instance because only it knows which gateway stands in front
+   * of the machine its sessions run on; a client has no way to derive one from
+   * the endpoint it reached. Absent where the instance cannot reach its
+   * sessions' terminals at all, which is the same condition that leaves the
+   * `terminal` capability out of the set above. */
+  terminal_gateway: Type.Optional(
+    Type.String({ pattern: "^https?://[^/?#\\s]+(/[^?#\\s]*[^/?#\\s])?$" }),
+  ),
   /** When this connection's authorization runs out, after which the instance
    * closes it. Present on a connection an access token opened; absent where
    * reaching the instance is itself the permission (the Unix socket) or where

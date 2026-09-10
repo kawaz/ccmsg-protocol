@@ -244,7 +244,11 @@ reachability). An entry's `id` is optional, because it is unknown until the hand
 that peer has settled — a configured endpoint is known before anything answers there, and a
 peer whose link is down is the last one to drop from the list. `endpoint` is optional on every
 line and on the answering instance's own: an instance that joins no mesh has no URL to give a
-peer.
+peer. The reply also carries `terminal_gateway` where one stands in front of the machine the
+instance's sessions run on — the base URL a person opens a session's terminal under, as
+`<terminal_gateway>/sessions/<terminal_id>` with the handle the `agents` topic names. It is
+absent where the instance cannot reach its sessions' terminals, the same condition that leaves
+`terminal` out of `capabilities`.
 
 Authentication between instances happens once, at connection time, and a `role: "instance"`
 `hello` starts it (its `mesh` field is the claim and the location of a single-use key). The

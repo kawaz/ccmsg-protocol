@@ -79,6 +79,7 @@ export const HELLO_RESPONSE: Static<typeof HelloResponse> = {
     { id: other_instance, endpoint: other_endpoint, host: "nuc", reachable: false },
   ],
   capabilities: ["fork", "launcher", "terminal"],
+  terminal_gateway: "https://mba.example.ts.net/hyoui",
   version: "0.1.0",
   started_at: FIXTURE_NOW - 3_600_000,
 };
