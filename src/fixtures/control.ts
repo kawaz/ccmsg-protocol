@@ -336,6 +336,23 @@ export const TRANSCRIPT_ITEMS_READ_RESPONSE: Static<typeof TranscriptItemsReadRe
   ids: [{ kind: "agent", id: "a471372f2", label: "dump-kinds-design", status: "running" }],
 };
 
+/** A client drawing the newest items first asks with an upper bound alone, and
+ * walks back by handing the `prev` it was given to the next call. */
+export const TRANSCRIPT_ITEMS_READ_BACKWARD_REQUEST: Static<typeof TranscriptItemsReadRequest> = {
+  request_id,
+  op: "transcript_items_read",
+  sid,
+  until_id: "18d6f2c9:0",
+  limit: 2,
+};
+
+export const TRANSCRIPT_ITEMS_READ_BACKWARD_RESPONSE: Static<typeof TranscriptItemsReadResponse> = {
+  ok: true,
+  request_id,
+  items: TRANSCRIPT_ITEMS.slice(1, 3),
+  prev: "f10b6d43:0",
+};
+
 export const SESSION_FORK_ORIGIN_REQUEST: Static<typeof SessionForkOriginRequest> = {
   request_id,
   op: "session_fork_origin",

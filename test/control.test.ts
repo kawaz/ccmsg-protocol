@@ -447,6 +447,45 @@ describe("transcript", () => {
     ).toBe(false);
   });
 
+  test("an upper bound alone reads the range's end and pages back by item id", () => {
+    expect(
+      isValid(TranscriptItemsReadRequest, {
+        request_id: "8",
+        op: "transcript_items_read",
+        sid: SID,
+        until_id: "18d6f2c9:0",
+        limit: 50,
+      }),
+    ).toBe(true);
+    // The bound is an item, not the record it came from: stopping at a record
+    // would answer again the items of it a backward read already held.
+    expect(
+      isValid(TranscriptItemsReadRequest, {
+        request_id: "8",
+        op: "transcript_items_read",
+        sid: SID,
+        until_id: "18d6f2c9",
+      }),
+    ).toBe(false);
+    expect(
+      isValid(TranscriptItemsReadResponse, {
+        ok: true,
+        request_id: "8",
+        items: TRANSCRIPT_ITEMS,
+        prev: "3f9a21c4:0",
+      }),
+    ).toBe(true);
+    // A record id is no more a continuation than it is a bound.
+    expect(
+      isValid(TranscriptItemsReadResponse, {
+        ok: true,
+        request_id: "8",
+        items: TRANSCRIPT_ITEMS,
+        prev: "3f9a21c4",
+      }),
+    ).toBe(false);
+  });
+
   test("a read that answered the whole range names nothing to come next", () => {
     expect(
       isValid(TranscriptItemsReadResponse, { ok: true, request_id: "8", items: TRANSCRIPT_ITEMS }),

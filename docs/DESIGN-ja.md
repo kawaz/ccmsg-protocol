@@ -198,7 +198,7 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 各アイテムは `source` (`offset` / `bytes`) で**元 record のファイル内の位置**も持つ。分類は誤りうるもので、それが答えられない唯一の問いが「その行は実際に何と書いてあったか」になる。`transcript_read` を `offset + bytes` で終わるよう指定すればその record 自体が返るので、client は普段は型付きアイテムを描き、怪しいものだけ生の record を取り寄せられる。1 record から複数アイテムが出た場合は同じ番地を共有し、取り寄せは record 単位になる。
 
-型付きの読み取り経路は 2 つ。`transcript_items_read` は dump と同じ範囲指定 (`since_at` / `since_uuid` / `until_*`) と `types` 選択でアイテムを返し、`limit` で切れたら `next` が次のアイテム id を名乗る (`since_id` で続きを読む)。`transcript_items:<sid>` topic は `transcript:<sid>` の型付き版で、snapshot が末尾側のアイテム (件数は instance が決める)、以降の frame が新しく分類されたアイテムを運ぶ。生の `transcript_read` と `transcript:<sid>` はそのまま残る — 型付きが普段の経路で、生は `source` で record を取り寄せる経路になる。
+型付きの読み取り経路は 2 つ。`transcript_items_read` は dump と同じ範囲指定 (`since_at` / `since_uuid` / `until_*`) と `types` 選択でアイテムを返し、`limit` がどちら端を残すかは与えた境界で決まる。下限 (`since_at` / `since_uuid` / `since_id`) があれば範囲の先頭から返し、切れたら `next` が次のアイテム id を名乗る (`since_id` で続きを読む)。上限 (`until_at` / `until_uuid` / `until_id`) だけなら範囲の末尾から返し、`prev` が返した先頭のアイテム id を名乗る (`until_id` で手前を読む) — 新しい方から描く client が transcript 全体を読まずに遡れる経路で、`transcript_read` の byte 逆送りと同じ役割を型付き側で果たす。`transcript_items:<sid>` topic は `transcript:<sid>` の型付き版で、snapshot が末尾側のアイテム (件数は instance が決める)、以降の frame が新しく分類されたアイテムを運ぶ。生の `transcript_read` と `transcript:<sid>` はそのまま残る — 型付きが普段の経路で、生は `source` で record を取り寄せる経路になる。
 
 選択 (`types`) の要素は型名・prefix・`-` 付きの除外・`@<preset 名>` で、左から順に適用する。preset は契約に焼かず instance の config が持つ (`dump_presets_read` で引く)。preset が名付けるのは「調査のノウハウ」「引き継ぎ」といった**関心の切り方**であって wire の性質ではない。型名は行の実体と 1 対 1 に保ち、束ね方は operator が名付ける側に置く。展開の再帰と、循環・未定義名の拒否は config を検証する場所の責務。
 

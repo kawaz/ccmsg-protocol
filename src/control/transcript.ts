@@ -61,8 +61,12 @@ export const TranscriptReadResponse = response("transcript_read", TranscriptRead
  * `source` that item carries.
  *
  * The range is cut the way a dump's is — an instant or a record on either side
- * — and `since_id` resumes a read that stopped at a limit. The role decides how
- * much is visible, as it does for the raw read. */
+ * — and which end of it a limit keeps follows from which bound was given. A
+ * lower bound reads forward from it and `next` names the continuation; an upper
+ * bound alone reads the range's last items and `prev` names the continuation
+ * backwards, which is how a client that draws the newest items first walks back
+ * through a transcript it never has to read whole. The role decides how much is
+ * visible, as it does for the raw read. */
 export const TranscriptItemsReadArgs = Type.Object({
   sid: Sid,
   /** Read one agent below the session instead of the session itself. */
@@ -78,11 +82,16 @@ export const TranscriptItemsReadArgs = Type.Object({
   since_id: Type.Optional(TranscriptItemId),
   until_at: Type.Optional(Timestamp),
   until_uuid: Type.Optional(Type.String()),
+  /** Exclusive upper bound as an item id, the one a previous reply named as
+   * `prev`. Finer than `until_uuid`, which would stop at a record whose earlier
+   * items were already read. */
+  until_id: Type.Optional(TranscriptItemId),
   /** Which item types to keep, applied left to right. Absent keeps everything
    * but the attachments, as a dump's absent selection does. */
   types: Type.Optional(Type.Array(TranscriptItemSelector)),
-  /** How many items to answer with; the instance narrows this to its own
-   * limit. */
+  /** How many items to answer with, taken from the range's start when a lower
+   * bound was given and from its end when only an upper one was; the instance
+   * narrows this to its own limit. */
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 export type TranscriptItemsReadArgs = Static<typeof TranscriptItemsReadArgs>;
@@ -90,9 +99,13 @@ export type TranscriptItemsReadArgs = Static<typeof TranscriptItemsReadArgs>;
 export const TranscriptItemsReadResult = Type.Object({
   /** Oldest first, as the transcript had them. */
   items: Type.Array(TranscriptItem),
-  /** The first item left out, when a limit cut the answer short. Absent means
-   * the range was answered whole. */
+  /** The first item left out after the ones answered, when a limit cut a
+   * forward read short. Absent means nothing follows within the range. */
   next: Type.Optional(TranscriptItemId),
+  /** The first item answered, when a limit left older ones inside the range
+   * unread. Pass it back as `until_id` to read what came before. Absent means
+   * the range reaches back to its start. */
+  prev: Type.Optional(TranscriptItemId),
   /** The ids the answered items carried, gathered as a dump gathers them.
    * Absent when the caller did not ask the instance to collect them. */
   ids: Type.Optional(DumpIds),
