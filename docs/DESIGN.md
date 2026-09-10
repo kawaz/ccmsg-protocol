@@ -328,6 +328,14 @@ decided by it — an address is chosen freely by whoever makes the request. It i
 because the address is their home provider's and the browser is the one they use, or fails to,
 and removes it.
 
+A credential record also keeps the BE and BS flags of the authenticator data it was
+registered with (`backup_eligible`, `backup_state`), and a token family keeps its most recent
+rotation (`last_refresh`: when, from where, and the `reason` the client stated). Both are
+hints of the same order as the addresses above — **nothing is admitted or refused by either**.
+BE and BS say whether a passkey is one synced across a person's devices or one bound to the
+device it was made on, which is what removing a line costs them; `reason` is the caller's
+unchecked word, and a refresh that states none is as valid as any.
+
 The other three:
 
 - `auth_refresh` is a WebSocket op. It moves a live connection's deadline (`hello`'s

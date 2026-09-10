@@ -294,6 +294,13 @@ record は両方と、登録時・最終使用時の IP と User-Agent を持つ
 人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、
 という判断のためだけに置く。
 
+credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` /
+`backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、
+client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、
+**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、
+作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。
+`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
+
 残り 3 op:
 
 - `auth_refresh` は WS。生きている接続の期限 (`hello` 応答の `auth_expires_at`) を、

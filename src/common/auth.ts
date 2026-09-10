@@ -212,9 +212,28 @@ export const AuthAssertResponse = response("auth_assert", AuthAssertResult);
 
 // --- refreshing a token pair ----------------------------------------------
 
-/** Takes no arguments: the refresh token is a cookie the carrier already holds,
- * and a caller that could state it is a caller that could read it. */
-export const AuthRefreshTokenArgs = Type.Object({});
+/** Why a client asked for a fresh pair. Stated by the caller and never checked,
+ * so nothing may be decided by it; it is kept only to be recognised later by
+ * the person whose sessions they are. */
+export const AuthRefreshReason = Type.Union(
+  [Type.Literal("reload"), Type.Literal("expiring"), Type.Literal("reconnect")],
+  { $id: "AuthRefreshReason" },
+);
+export type AuthRefreshReason = Static<typeof AuthRefreshReason>;
+
+/** The refresh token is not among the arguments: it is a cookie the carrier
+ * already holds, and a caller that could state it is a caller that could read
+ * it. What is left is why the caller is asking, which nothing is decided by. */
+export const AuthRefreshTokenArgs = Type.Object({
+  /** What prompted this refresh, as the client knows it: the page was loaded
+   * again, the access token was about to expire, or a dropped connection is
+   * being remade. A hint kept on the family (`last_refresh`) for a person
+   * reading their own sessions back — a run of `reconnect` at an hour they were
+   * asleep is something to recognise. The value is the caller's word and is
+   * never checked, so nothing may turn on it; an unstated reason is as valid a
+   * refresh as any. */
+  reason: Type.Optional(AuthRefreshReason),
+});
 export type AuthRefreshTokenArgs = Static<typeof AuthRefreshTokenArgs>;
 
 export const AuthRefreshTokenResult = AuthSession;
@@ -345,6 +364,22 @@ export const CredentialRecord = Type.Object(
      * zero forever, so only a pair of non-zero readings says anything, and a
      * reading below the last one is a refusal. */
     sign_count: Type.Optional(Type.Integer({ minimum: 0 })),
+    /** The BE flag of the authenticator data at registration: whether this
+     * credential is one the authenticator may back up, which in practice is
+     * what separates a passkey synced across a person's devices from one that
+     * lives on the single device it was made on.
+     *
+     * A hint and nothing else, like the address and the user agent beside it:
+     * nothing is admitted or refused by it. It is here so the person reading
+     * their own list can tell "this is my iCloud passkey, it is on every device
+     * I own" from "this is the key on the stick in my drawer" — which decides
+     * what removing the line actually costs them. */
+    backup_eligible: Type.Optional(Type.Boolean()),
+    /** The BS flag of the same authenticator data: whether the credential was
+     * backed up at that moment. Read beside `backup_eligible` — eligible and
+     * not yet backed up is an ordinary state on a device that has just made the
+     * key, and it too decides nothing. */
+    backup_state: Type.Optional(Type.Boolean()),
     /** The label the administrator put on the registration URL, carried over
      * from the claims it was spent against. */
     issued_label: Type.Optional(Type.String({ maxLength: 128 })),
@@ -385,6 +420,22 @@ export const TokenFamily = Type.Object(
     iss: InstanceId,
     access: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
+    /** When the family was last rotated, and what the client said prompted it.
+     *
+     * The same kind of thing as a credential's `last_used_*`: a hint for the
+     * one person reading their own sessions, never a reason to admit or refuse
+     * anything. `reason` in particular is the caller's unchecked word. Only the
+     * most recent rotation is kept — a family holds what stands now, and a log
+     * of every generation would be a second store hidden inside a record that
+     * travels to every instance. */
+    last_refresh: Type.Optional(
+      Type.Object({
+        at: Timestamp,
+        reason: Type.Optional(AuthRefreshReason),
+        ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+        user_agent: Type.Optional(Type.String({ maxLength: 512 })),
+      }),
+    ),
     /** The generation before the current one, while the grace for it lasts. */
     previous_refresh: Type.Optional(Type.Object({ value: Base64Url, expires_at: Timestamp })),
     /** What every generation retired before that was, kept only as a digest and
