@@ -63,7 +63,13 @@ import {
   SessionSearchResponse,
   TITLE_MAX_CHARS,
 } from "../src/control/session.ts";
-import { TranscriptFrame, TranscriptReadRequest } from "../src/control/transcript.ts";
+import {
+  TranscriptFrame,
+  TranscriptItemsFrame,
+  TranscriptItemsReadRequest,
+  TranscriptItemsReadResponse,
+  TranscriptReadRequest,
+} from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
 import { SESSION_DUMP_FILE, TRANSCRIPT_ITEMS } from "../src/fixtures/control.ts";
 import { isValid } from "../src/schemas.ts";
@@ -275,7 +281,9 @@ describe("transcript items", () => {
   test("a tool nobody wrote fields for still arrives, with what it was called with", () => {
     expect(
       isValid(TranscriptItem, {
+        id: "aa11bb22:0",
         uuid: "aa11bb22",
+        source: { offset: 4_096, bytes: 310 },
         type: "tool:Workflow",
         at: 1_757_300_000_000,
         role: "use",
@@ -288,7 +296,9 @@ describe("transcript items", () => {
   test("an attachment of a kind nobody has seen keeps its own name", () => {
     expect(
       isValid(TranscriptItem, {
+        id: "bb22cc33:0",
         uuid: "bb22cc33",
+        source: { offset: 4_406, bytes: 120 },
         type: "system:attachment:telemetry",
         at: 1_757_300_000_000,
         attachment: { type: "telemetry" },
@@ -300,7 +310,9 @@ describe("transcript items", () => {
     // `hook:PreToolUse:Bash` would read as a third level of the hierarchy and
     // leave `hook:PreToolUse` selecting nothing.
     const hook = {
+      id: "cc33dd44:0",
       uuid: "cc33dd44",
+      source: { offset: 4_526, bytes: 240 },
       type: "hook:PreToolUse",
       at: 1_757_300_000_000,
       hook_name: "PreToolUse:Bash",
@@ -310,9 +322,40 @@ describe("transcript items", () => {
     expect(isValid(TranscriptItem, { ...hook, outcome: "allowed" })).toBe(false);
   });
 
-  test("an item without the record it is addressed by is refused", () => {
+  test("an item without the record it came out of is refused", () => {
     const { uuid: _dropped, ...rest } = TRANSCRIPT_ITEMS[0] as Record<string, unknown>;
     expect(isValid(TranscriptItem, rest)).toBe(false);
+  });
+
+  test("an item without its own identity is refused", () => {
+    const { id: _dropped, ...rest } = TRANSCRIPT_ITEMS[0] as Record<string, unknown>;
+    expect(isValid(TranscriptItem, rest)).toBe(false);
+  });
+
+  test("several items out of one record are told apart by index and share an address", () => {
+    // The record id alone names all of them at once, which is what a link
+    // pointing by `uuid` could not resolve.
+    const [thinking, call] = TRANSCRIPT_ITEMS.filter((item) => item.uuid === "f10b6d43");
+    expect(thinking?.id).toBe("f10b6d43:0");
+    expect(call?.id).toBe("f10b6d43:1");
+    expect(call?.source).toEqual(thinking?.source);
+  });
+
+  test("a link names an item, not the record it sits in", () => {
+    const result = TRANSCRIPT_ITEMS.find((item) => item.id === "18d6f2c9:0") as Record<
+      string,
+      unknown
+    >;
+    expect(result["parent_item"]).toBe("f10b6d43:1");
+    expect(isValid(TranscriptItem, { ...result, parent_item: "f10b6d43" })).toBe(false);
+  });
+
+  test("an item names where its record begins and how far it runs, so it can be fetched raw", () => {
+    const [first] = TRANSCRIPT_ITEMS as Record<string, unknown>[];
+    expect(isValid(TranscriptItem, { ...first, source: { offset: 0 } })).toBe(false);
+    // A record occupies at least one byte; a zero-length one is nothing to read.
+    expect(isValid(TranscriptItem, { ...first, source: { offset: 0, bytes: 0 } })).toBe(false);
+    expect(isValid(TranscriptItem, { ...first, source: { offset: 0, bytes: 1 } })).toBe(true);
   });
 
   test("the file says what it is a dump of, so the path alone is enough to read it", () => {
@@ -323,6 +366,13 @@ describe("transcript items", () => {
     const { items: _dropped, ...rest } = file;
     expect(isValid(SessionDumpFile, rest)).toBe(false);
     expect(isValid(SessionDumpFile, { ...file, items: [] })).toBe(true);
+  });
+
+  test("an item keeps its shape in TypeScript, so a reader writes `item.uuid` and not a cast", () => {
+    for (const item of TRANSCRIPT_ITEMS) {
+      const uuid: string = item.uuid;
+      expect(typeof uuid).toBe("string");
+    }
   });
 
   test("a selection names types, prefixes, exclusions and presets", () => {
@@ -370,6 +420,60 @@ describe("transcript", () => {
         op: "transcript_read",
         sid: SID,
         before: "1048576",
+      }),
+    ).toBe(false);
+  });
+
+  test("the typed read is cut like a dump and resumed by the item it stopped at", () => {
+    expect(
+      isValid(TranscriptItemsReadRequest, {
+        request_id: "8",
+        op: "transcript_items_read",
+        sid: SID,
+        since_id: "f10b6d43:1",
+        types: ["tool", "-tool:Read"],
+        limit: 100,
+      }),
+    ).toBe(true);
+    // A record id is not an item id: resuming from one would read again what a
+    // limit already answered.
+    expect(
+      isValid(TranscriptItemsReadRequest, {
+        request_id: "8",
+        op: "transcript_items_read",
+        sid: SID,
+        since_id: "f10b6d43",
+      }),
+    ).toBe(false);
+  });
+
+  test("a read that answered the whole range names nothing to come next", () => {
+    expect(
+      isValid(TranscriptItemsReadResponse, { ok: true, request_id: "8", items: TRANSCRIPT_ITEMS }),
+    ).toBe(true);
+    // An empty answer is an empty list, not a missing field.
+    expect(isValid(TranscriptItemsReadResponse, { ok: true, request_id: "8", items: [] })).toBe(
+      true,
+    );
+    expect(isValid(TranscriptItemsReadResponse, { ok: true, request_id: "8" })).toBe(false);
+  });
+
+  test("the typed topic carries items where the raw one carries bytes", () => {
+    const frame = {
+      ev: "topic",
+      topic: `transcript_items:${SID}`,
+      instance: INSTANCE,
+      data: { sid: SID, items: TRANSCRIPT_ITEMS },
+    };
+    expect(isValid(TranscriptItemsFrame, frame)).toBe(true);
+    // The opening frame is the same shape as the ones after it: the tail of the
+    // list, appended to like any later batch.
+    expect(isValid(TranscriptItemsFrame, { ...frame, snapshot: true })).toBe(true);
+    // Bytes are the other topic's; this one only ever carries items.
+    expect(
+      isValid(TranscriptItemsFrame, {
+        ...frame,
+        data: { sid: SID, lines: ['{"type":"assistant"}'], start: 0, end: 21, size: 21 },
       }),
     ).toBe(false);
   });

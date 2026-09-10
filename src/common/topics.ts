@@ -15,7 +15,7 @@ export const PLAIN_TOPICS = [
 ] as const;
 
 /** Topics naming one session, written `<topic>:<sid>`. */
-export const SESSION_SCOPED_TOPICS = ["session_status", "transcript"] as const;
+export const SESSION_SCOPED_TOPICS = ["session_status", "transcript", "transcript_items"] as const;
 
 /** Topics naming one namespace, written `<topic>:<ns>`. The parameter is a name
  * its users choose rather than an identifier this contract issues, so it is
@@ -102,6 +102,10 @@ export const TOPIC_ATTRIBUTES = {
   // half to leave alone: the frame is simply the whole of it.
   session_status: { roles: ["user"], granularity: "whole" },
   transcript: { roles: ["user"], granularity: "append" },
+  // The same appending, in items rather than in bytes. Both are offered because
+  // they answer different needs: one draws the conversation, the other shows a
+  // record as it was written.
+  transcript_items: { roles: ["user"], granularity: "append" },
   kv: { roles: ["user"], granularity: "element" },
   // The only topic no person may subscribe to: its elements are the secrets
   // that authenticate them. A relay carries it as the instance it is, not on a

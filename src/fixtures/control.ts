@@ -67,7 +67,12 @@ import type {
   SessionSearchRequest,
   SessionSearchResponse,
 } from "../control/session.ts";
-import type { TranscriptReadRequest, TranscriptReadResponse } from "../control/transcript.ts";
+import type {
+  TranscriptItemsReadRequest,
+  TranscriptItemsReadResponse,
+  TranscriptReadRequest,
+  TranscriptReadResponse,
+} from "../control/transcript.ts";
 import type { TranslateRunRequest, TranslateRunResponse } from "../control/translate.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
@@ -217,48 +222,66 @@ export const DUMP_PRESETS_READ_RESPONSE: Static<typeof DumpPresetsReadResponse> 
  *
  * A call and its result appear as the two items they are, linked both ways, so
  * an implementation can check that it draws the pair without assuming they are
- * adjacent. */
+ * adjacent. The thinking and the call after it were read out of one record and
+ * carry the one address it sits at, which is the case an id exists for. */
 export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
+    id: "3f9a21c4:0",
     uuid: "3f9a21c4",
+    source: { offset: 180_000, bytes: 420 },
     type: "message:user:in",
     at: FIXTURE_NOW - 3_600_000,
     turn: 1,
     text: "dump のアイテム型を整理して",
   },
-  { uuid: "f10b6d43", type: "thinking", at: FIXTURE_NOW - 3_500_000, text: "台帳として分ける" },
   {
-    uuid: "07c5e1b8",
+    id: "f10b6d43:0",
+    uuid: "f10b6d43",
+    source: { offset: 180_420, bytes: 980 },
+    type: "thinking",
+    at: FIXTURE_NOW - 3_500_000,
+    text: "台帳として分ける",
+  },
+  {
+    id: "f10b6d43:1",
+    uuid: "f10b6d43",
+    source: { offset: 180_420, bytes: 980 },
     type: "tool:Bash",
     at: FIXTURE_NOW - 3_400_000,
     role: "use",
     tool_use_id: "toolu_01Ne9BDS",
-    result_item: "18d6f2c9",
+    result_item: "18d6f2c9:0",
     command: "jq -r '.type' session.jsonl | sort | uniq -c",
     description: "count the record types",
   },
   {
+    id: "18d6f2c9:0",
     uuid: "18d6f2c9",
+    source: { offset: 181_400, bytes: 260 },
     type: "tool:Bash",
     at: FIXTURE_NOW - 3_399_000,
     role: "result",
     tool_use_id: "toolu_01Ne9BDS",
-    parent_item: "07c5e1b8",
+    parent_item: "f10b6d43:1",
     stdout: "1174 assistant\n753 user\n",
     interrupted: false,
   },
   {
+    id: "b7e41d09:0",
     uuid: "b7e41d09",
+    source: { offset: 181_660, bytes: 640 },
     type: "message:sub:out",
     at: FIXTURE_NOW - 3_300_000,
     role: "use",
-    result_item: "c2d80f16",
+    result_item: "c2d80f16:0",
     prompt: "docs/design/dump-kinds.md を書き直す",
     agent_id: "a471372f2",
     subagent_type: "opus5-worker-high",
   },
   {
+    id: "92e6d4f5:0",
     uuid: "92e6d4f5",
+    source: { offset: 182_300, bytes: 310 },
     type: "hook:PreToolUse",
     at: FIXTURE_NOW - 3_200_000,
     hook_name: "PreToolUse:Bash",
@@ -267,7 +290,9 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     tool_use_id: "toolu_01Ne9BDS",
   },
   {
+    id: "81d5c3e4:0",
     uuid: "81d5c3e4",
+    source: { offset: 182_610, bytes: 190 },
     type: "system:attachment:queued_command",
     at: FIXTURE_NOW - 3_100_000,
     attachment: { type: "queued_command", command: "/pre-clear" },
@@ -290,6 +315,25 @@ export const TRANSCRIPT_READ_RESPONSE: Static<typeof TranscriptReadResponse> = {
   start: 182_300,
   end: 182_400,
   size: 182_400,
+};
+
+export const TRANSCRIPT_ITEMS_READ_REQUEST: Static<typeof TranscriptItemsReadRequest> = {
+  request_id,
+  op: "transcript_items_read",
+  sid,
+  since_at: FIXTURE_NOW - 3_600_000,
+  types: ["message", "thinking", "tool:Bash"],
+  limit: 200,
+};
+
+/** The answer stops where the limit did and names what comes next, so the
+ * caller asks for the rest with `since_id` and reads nothing twice. */
+export const TRANSCRIPT_ITEMS_READ_RESPONSE: Static<typeof TranscriptItemsReadResponse> = {
+  ok: true,
+  request_id,
+  items: TRANSCRIPT_ITEMS,
+  next: "c2d80f16:0",
+  ids: [{ kind: "agent", id: "a471372f2", label: "dump-kinds-design", status: "running" }],
 };
 
 export const SESSION_FORK_ORIGIN_REQUEST: Static<typeof SessionForkOriginRequest> = {

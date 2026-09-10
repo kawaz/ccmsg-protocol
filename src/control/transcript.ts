@@ -1,6 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response, topicFrame } from "../envelope.ts";
-import { Sid } from "../identifiers.ts";
+import { Sid, Timestamp } from "../identifiers.ts";
+import { DumpIds, TranscriptItem, TranscriptItemId, TranscriptItemSelector } from "./dump.ts";
 
 /** Reads a slice of a session's transcript.
  *
@@ -49,6 +50,79 @@ export type TranscriptReadResult = Static<typeof TranscriptReadResult>;
 
 export const TranscriptReadRequest = request("transcript_read", TranscriptReadArgs);
 export const TranscriptReadResponse = response("transcript_read", TranscriptReadResult);
+
+/** Reads a slice of a transcript as the items it was read into.
+ *
+ * The read above answers with the file's own lines, which leaves whoever asked
+ * holding a harness's private format; this answers with what those lines were
+ * classified as, so a client draws items and never learns how a record is
+ * shaped. Both stay: the typed read is what a client works in, and the raw one
+ * is how it fetches the record behind an item it wants to see verbatim, by the
+ * `source` that item carries.
+ *
+ * The range is cut the way a dump's is — an instant or a record on either side
+ * — and `since_id` resumes a read that stopped at a limit. The role decides how
+ * much is visible, as it does for the raw read. */
+export const TranscriptItemsReadArgs = Type.Object({
+  sid: Sid,
+  /** Read one agent below the session instead of the session itself. */
+  agent_id: Type.Optional(Type.String()),
+  /** Inclusive lower bound in time. */
+  since_at: Type.Optional(Timestamp),
+  /** Inclusive lower bound as a transcript record id, which cuts at that
+   * record's position rather than at its clock. Give one lower bound only. */
+  since_uuid: Type.Optional(Type.String()),
+  /** Resume at this item, the one a previous reply named as `next`. Finer than
+   * `since_uuid`, which would start again at the first item of a record whose
+   * later items were already read. */
+  since_id: Type.Optional(TranscriptItemId),
+  until_at: Type.Optional(Timestamp),
+  until_uuid: Type.Optional(Type.String()),
+  /** Which item types to keep, applied left to right. Absent keeps everything
+   * but the attachments, as a dump's absent selection does. */
+  types: Type.Optional(Type.Array(TranscriptItemSelector)),
+  /** How many items to answer with; the instance narrows this to its own
+   * limit. */
+  limit: Type.Optional(Type.Integer({ minimum: 1 })),
+});
+export type TranscriptItemsReadArgs = Static<typeof TranscriptItemsReadArgs>;
+
+export const TranscriptItemsReadResult = Type.Object({
+  /** Oldest first, as the transcript had them. */
+  items: Type.Array(TranscriptItem),
+  /** The first item left out, when a limit cut the answer short. Absent means
+   * the range was answered whole. */
+  next: Type.Optional(TranscriptItemId),
+  /** The ids the answered items carried, gathered as a dump gathers them.
+   * Absent when the caller did not ask the instance to collect them. */
+  ids: Type.Optional(DumpIds),
+});
+export type TranscriptItemsReadResult = Static<typeof TranscriptItemsReadResult>;
+
+export const TranscriptItemsReadRequest = request("transcript_items_read", TranscriptItemsReadArgs);
+export const TranscriptItemsReadResponse = response(
+  "transcript_items_read",
+  TranscriptItemsReadResult,
+);
+
+/** The `transcript_items:<sid>` topic.
+ *
+ * What `transcript:<sid>` carries as appended bytes, carried as the items those
+ * bytes were read as. A subscriber holds a list it only ever appends to, so the
+ * opening frame is the tail of it — the last items the instance kept, in a
+ * count it decides — and every frame after carries what has since been
+ * classified. A client that wants further back asks for it by range rather than
+ * waiting for a snapshot to grow.
+ *
+ * A record still being written is not classified until its line ends, which is
+ * the same rule the raw topic sends whole lines under. */
+export const TranscriptItemsFrame = topicFrame(
+  "transcript_items",
+  Type.Object({
+    sid: Sid,
+    items: Type.Array(TranscriptItem),
+  }),
+);
 
 /** The `transcript:<sid>` topic.
  *

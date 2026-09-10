@@ -117,7 +117,7 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 | `whole` | 値の全体 | 手元を丸ごと置換 | 有 | `session_status:<sid>` |
 | `per_instance_whole` | その `instance` が知る全体 | その instance の分だけ置換し、他 instance の行は残す (手元の値は instance 横断の和) | 有 | `peers` `agents` `session_errors` `llm_requests` `llm_status` |
 | `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `inbox` `kv:<ns>` `auth_records` |
-| `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` |
+| `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` `transcript_items:<sid>` |
 | `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
 
 `event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の
@@ -186,13 +186,19 @@ CLI がその代理になる。
 
 ## transcript のアイテム型
 
-transcript は harness が自分の都合で書くファイルで、ccmsg の合意なく形が変わる。契約が持つのは**その行を何と読んだか (アイテム型) の語彙だけ**で、行を型に落とす分類そのものは持たない。ファイルを読む側 (daemon) が分類を持てば、harness が形式を変えても、別 harness (codex の rollout) を読むようになっても、契約は動かない。分類コードの置き場は未裁定で、daemon 側に置く案が推し。
+transcript は harness が自分の都合で書くファイルで、ccmsg の合意なく形が変わる。契約が持つのは**その行を何と読んだか (アイテム型) の語彙だけ**で、行を型に落とす分類そのものは持たない。分類はファイルを読む daemon にだけ置き、wire には型付きアイテムが流れる。harness が形式を変えても、別 harness (codex の rollout) を読むようになっても、契約も client も動かない。
 
 型名は `:` 区切りの階層で、prefix がその配下すべてを指す (`tool` は全ツール、`message:user` は in と out の両方)。`tool:<Name>` / `system:attachment:<kind>` / `hook:<Event>` の 3 家系だけ末尾が開いている — 末尾を名付けるのは harness であって契約ではなく、閉じた列挙にすると知らない名前が来た瞬間に `unknown` へ落ちて何が来たか分からなくなる。`TRANSCRIPT_ITEM_TYPES` に並ぶのは閉じている分だけで、そこに無い名前は誤りではなく新顔。2 段目以降が snake_case でないのは、そこが harness の綴りだから (`tool:Bash` / `hook:PreToolUse`)。
 
 `in` / `out` は**主語から見た向き**。主語は既定でセッション、`agent_id` を渡せばその配下の agent 1 体になり、型の定義は変えずに指す先だけが移る。agent を主語にした dump の `message:user:in` は親から渡された指示書になる。同じ preset が親でも子でも孫でも通るのはこのため。
 
-呼び出しと結果は **2 アイテム**で、`result_item` / `parent_item` の uuid で互いを指す。agent や monitor の結果は何 turn も後に来るので、1 つに畳むと「どちらの時刻に置くか」を分類が決めることになる。畳むのは描く側の判断。`result_item` の無い `use` は「まだ返っていない呼び出し」で、範囲の切り方で結果が dump の外に落ちた場合を含む。位置ではなく uuid で指すのは、選択と範囲によってどのアイテムが存在するかが変わるため。
+アイテムの identity は `id` (= `<uuid>:<index>`、record 内の位置) で、`uuid` は**そのアイテムが出てきた record** として横に残る。assistant の 1 record が thinking と text と各ツール呼び出しに割れるので、record id だけではその全部を同時に名指すことになり、リンクが一意に解けない。
+
+呼び出しと結果は **2 アイテム**で、`result_item` / `parent_item` の id で互いを指す。agent や monitor の結果は何 turn も後に来るので、1 つに畳むと「どちらの時刻に置くか」を分類が決めることになる。畳むのは描く側の判断。リンクは slice ではなく transcript 全体から張られるので、**指す先が今回の範囲に入っていないのは正常** — 読み手はその id で改めて取りに行ける。`result_item` の無い `use` は「まだ返っていない呼び出し」。位置ではなく id で指すのは、選択と範囲によってどのアイテムが存在するかが変わるため。
+
+各アイテムは `source` (`offset` / `bytes`) で**元 record のファイル内の位置**も持つ。分類は誤りうるもので、それが答えられない唯一の問いが「その行は実際に何と書いてあったか」になる。`transcript_read` を `offset + bytes` で終わるよう指定すればその record 自体が返るので、client は普段は型付きアイテムを描き、怪しいものだけ生の record を取り寄せられる。1 record から複数アイテムが出た場合は同じ番地を共有し、取り寄せは record 単位になる。
+
+型付きの読み取り経路は 2 つ。`transcript_items_read` は dump と同じ範囲指定 (`since_at` / `since_uuid` / `until_*`) と `types` 選択でアイテムを返し、`limit` で切れたら `next` が次のアイテム id を名乗る (`since_id` で続きを読む)。`transcript_items:<sid>` topic は `transcript:<sid>` の型付き版で、snapshot が末尾側のアイテム (件数は instance が決める)、以降の frame が新しく分類されたアイテムを運ぶ。生の `transcript_read` と `transcript:<sid>` はそのまま残る — 型付きが普段の経路で、生は `source` で record を取り寄せる経路になる。
 
 選択 (`types`) の要素は型名・prefix・`-` 付きの除外・`@<preset 名>` で、左から順に適用する。preset は契約に焼かず instance の config が持つ (`dump_presets_read` で引く)。preset が名付けるのは「調査のノウハウ」「引き継ぎ」といった**関心の切り方**であって wire の性質ではない。型名は行の実体と 1 対 1 に保ち、束ね方は operator が名付ける側に置く。展開の再帰と、循環・未定義名の拒否は config を検証する場所の責務。
 
@@ -346,8 +352,8 @@ credential record と token family は topic `auth_records` (`roles: ["instance"
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 45 | common 13 / messaging 4 / control 28 / mesh 0 |
-| topic | 11 | messaging 2 (`inbox` / `notify`)、control 8、common 1 (`auth_records`) |
+| op | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
+| topic | 12 | messaging 2 (`inbox` / `notify`)、control 9、common 1 (`auth_records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 20 | 閉じた union |
 

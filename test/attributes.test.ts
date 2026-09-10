@@ -76,10 +76,10 @@ describe("op attribute table", () => {
   test("the planes hold the op counts the contract states", () => {
     expect(opsOfPlane("common")).toHaveLength(13);
     expect(opsOfPlane("messaging")).toHaveLength(4);
-    expect(opsOfPlane("control")).toHaveLength(28);
+    expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(45);
-    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(11);
+    expect(OP_NAMES).toHaveLength(46);
+    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(12);
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
@@ -108,6 +108,11 @@ describe("topic attribute table", () => {
   test("a parameterized name folds like the kind behind it", () => {
     expect(topicGranularity("session_status:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("whole");
     expect(topicGranularity("transcript:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("append");
+    // The kind is the whole head of the name: a longer topic that begins with a
+    // shorter one is its own kind and not that one parameterized.
+    expect(topicGranularity("transcript_items:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe(
+      "append",
+    );
     expect(topicGranularity("kv:launcher")).toBe("element");
   });
 

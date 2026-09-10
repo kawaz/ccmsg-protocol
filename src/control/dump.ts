@@ -65,14 +65,47 @@ export const TranscriptItemSelector = Type.String({
 });
 export type TranscriptItemSelector = Static<typeof TranscriptItemSelector>;
 
+/** Where in the transcript the record an item was read from begins, and how far
+ * it runs.
+ *
+ * An item is what a reader made of a record, and a reader is fallible: the one
+ * question it cannot answer is what the record actually said. These two numbers
+ * are that answer's address — `transcript_read` bounded to end at `offset +
+ * bytes` and to carry `bytes` returns the record itself — which is what lets a
+ * client show items and still let a person open the line behind one. Several
+ * items read out of a single record share the address, so what comes back is
+ * the record and not a slice of it. */
+export const TranscriptItemSource = Type.Object(
+  {
+    offset: Type.Integer({ minimum: 0 }),
+    bytes: Type.Integer({ minimum: 1 }),
+  },
+  { $id: "TranscriptItemSource" },
+);
+export type TranscriptItemSource = Static<typeof TranscriptItemSource>;
+
+/** An item's own identity, `<uuid>:<index>` — the record it was read from and
+ * where in that record it stood.
+ *
+ * The record's id alone does not identify an item: one assistant record becomes
+ * the thinking, the text and each call it held, and a link that pointed by
+ * `uuid` would name all of them at once. */
+export const TranscriptItemId = Type.String({
+  pattern: "^[^\\s:]+:(?:0|[1-9][0-9]*)$",
+  $id: "TranscriptItemId",
+});
+export type TranscriptItemId = Static<typeof TranscriptItemId>;
+
 /** What every item carries, whatever its type.
  *
- * `uuid` is the record's own id in the transcript, which is what makes an item
- * addressable: a reader that wants more than the dump kept can go back to the
- * file with it, and the links below point with it rather than with a position,
- * since a selection or a range decides which items exist in a given dump. */
+ * `id` is what the links below point with — never a position in the array,
+ * since a selection or a range decides which items exist in a given read — and
+ * `uuid` stays beside it as the record the item came out of, which is what a
+ * reader groups by when it wants the whole of one line. */
 const BASE_FIELDS = {
+  id: TranscriptItemId,
   uuid: Type.String({ minLength: 1 }),
+  source: TranscriptItemSource,
   /** The item's own instant. A call and its result each keep their own. */
   at: Timestamp,
   /** Which turn of the session the item fell in, when the reader could place
@@ -86,22 +119,25 @@ const BASE_FIELDS = {
  * Some results arrive many turns later — an agent runs, a monitor waits — with
  * other items in between, so folding them into a single item would make the
  * reader decide which of the two instants the fold happens at. Two items each
- * keep their own, linked by uuid, and folding is left to whoever draws them. A
- * `use` without a `result_item` is a call that has not come back, including one
- * whose result falls outside the range asked for. */
+ * keep their own, linked by id, and folding is left to whoever draws them.
+ *
+ * A link is written from the whole transcript and not from the slice it travels
+ * in, so a `result_item` naming an item outside the range asked for is the
+ * ordinary case rather than a broken pointer: the reader knows the id and can
+ * ask for it. A `use` without one is a call that has not come back. */
 const USE_FIELDS = {
   role: Type.Literal("use"),
-  /** The result's uuid, once there is one. */
-  result_item: Type.Optional(Type.String({ minLength: 1 })),
+  /** The result's id, once there is one. */
+  result_item: Type.Optional(TranscriptItemId),
 };
 
 const RESULT_FIELDS = {
   role: Type.Literal("result"),
   /** The call this answers. Always known: a result exists because a call did. */
-  parent_item: Type.String({ minLength: 1 }),
+  parent_item: TranscriptItemId,
 };
 
-function item(type: TSchema, fields: Record<string, TSchema> = {}): TSchema {
+function item<T extends TSchema, F extends Record<string, TSchema>>(type: T, fields: F) {
   return Type.Object({ ...BASE_FIELDS, type, ...fields });
 }
 
@@ -220,16 +256,16 @@ const Hook = item(Type.String({ pattern: "^hook:[A-Za-z0-9_.-]+$" }), {
 
 const ToolType = Type.String({ pattern: "^tool:[A-Za-z0-9_.-]+$" });
 
-function toolUse(name: string, fields: Record<string, TSchema>): TSchema {
-  return item(Type.Literal(`tool:${name}`), {
+function toolUse<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
+  return item(Type.Literal(`tool:${name}` as const), {
     ...USE_FIELDS,
     tool_use_id: Type.String(),
     ...fields,
   });
 }
 
-function toolResult(name: string, fields: Record<string, TSchema>): TSchema {
-  return item(Type.Literal(`tool:${name}`), {
+function toolResult<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
+  return item(Type.Literal(`tool:${name}` as const), {
     ...RESULT_FIELDS,
     tool_use_id: Type.String(),
     ...fields,
@@ -253,7 +289,7 @@ const ToolResultGeneric = item(ToolType, {
   result: Type.Record(Type.String(), Type.Unknown()),
 });
 
-const TOOL_ITEMS: TSchema[] = [
+const TOOL_ITEMS = [
   /** No exit code: what the harness records of a shell call is its output and
    * whether it was interrupted, so that is what a reader has to judge by. */
   toolUse("Bash", { command: Type.String(), description: OptText }),

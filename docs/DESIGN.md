@@ -124,7 +124,7 @@ local table of it.
 | `whole` | the whole value | replaces everything held | yes | `session_status:<sid>` |
 | `per_instance_whole` | the whole of what its `instance` knows | replaces that instance's entries and leaves every other instance's alone (what is held is the union across instances) | yes | `peers`, `agents`, `session_errors`, `llm_requests`, `llm_status` |
 | `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `inbox`, `kv:<ns>`, `auth_records` |
-| `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>` |
+| `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>`, `transcript_items:<sid>` |
 | `event` | an occurrence rather than a value | holds nothing | no | `notify` |
 
 Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence
@@ -204,13 +204,19 @@ recipient can still be handed.
 
 ## Transcript item types
 
-A transcript is a file the harness writes for its own reasons, and its shape changes without ccmsg agreeing to it. What the contract holds is **the vocabulary a line was read into — the item types — and nothing that reads a line**. With the classifying left to whoever opens the file (the daemon), the contract stays still when the harness changes its format, and when a second harness (codex's rollout) is read at all. Where the classifying code lives is not settled; the daemon is the favoured home.
+A transcript is a file the harness writes for its own reasons, and its shape changes without ccmsg agreeing to it. What the contract holds is **the vocabulary a line was read into — the item types — and nothing that reads a line**. The classifying lives in the daemon, which is what opens the file, and what travels is the typed items it made. Neither the contract nor a client moves when the harness changes its format, or when a second harness (codex's rollout) is read at all.
 
 A type name is `:`-separated, and a prefix names everything below it: `tool` is every tool, `message:user` both directions of what a person and a session said. Three families stay open at their last segment — `tool:<Name>`, `system:attachment:<kind>`, `hook:<Event>` — because the harness coins that segment, and a closed list would turn every newcomer into `unknown` with nothing left to say what arrived. `TRANSCRIPT_ITEM_TYPES` spells out the closed part alone; a name outside it is a newcomer rather than an error. Segments after the first are not snake_case because they are the harness's spelling (`tool:Bash`, `hook:PreToolUse`).
 
 `in` and `out` are read **from wherever the subject stands**. The subject is the session by default and one agent below it when `agent_id` names one; the type definitions do not change, only what they point at. A dump of an agent reads `message:user:in` as the brief its parent handed it, which is what lets one preset be carried down a chain of agents.
 
-A call and its result are **two items**, pointing at each other by uuid through `result_item` and `parent_item`. An agent's or a monitor's result arrives many turns later, so folding the pair into one item would make the classifying decide which of the two instants it happens at; folding belongs to whoever draws them. A `use` with no `result_item` is a call that has not come back, including one whose result fell outside the range asked for. The links point by uuid and not by position, since the selection and the range decide which items exist at all.
+An item is identified by its `id` (`<uuid>:<index>` — the record it was read from and where in it the item stood), and `uuid` stays beside it as **the record the item came out of**. One assistant record becomes the thinking, the text and each call it held, so a record id alone names all of them at once and leaves a link with nothing single to resolve to.
+
+A call and its result are **two items**, pointing at each other by id through `result_item` and `parent_item`. An agent's or a monitor's result arrives many turns later, so folding the pair into one item would make the classifying decide which of the two instants it happens at; folding belongs to whoever draws them. A link is written from the whole transcript rather than from the slice it travels in, so **a link out of the range asked for is ordinary** — the reader has the id and can ask for it. A `use` with no `result_item` is a call that has not come back. The links point by id and not by position, since the selection and the range decide which items exist at all.
+
+Every item also carries `source` (`offset` and `bytes`), **where in the file the record it was read from begins and how far it runs**. Classifying is fallible, and the one question it cannot answer is what the line actually said: a `transcript_read` bounded to end at `offset + bytes` returns that record, so a client draws typed items and fetches the raw record only for the ones it doubts. Several items out of one record share the address, which makes the fetch a record and never a slice of one.
+
+There are two typed ways in. `transcript_items_read` answers with items over the range a dump is cut by (`since_at` / `since_uuid` / `until_*`) and the same `types` selection; when a `limit` cuts it short, `next` names the first item left out and `since_id` resumes there. The `transcript_items:<sid>` topic is the typed form of `transcript:<sid>`: its snapshot is the tail of the list, in a count the instance decides, and every frame after carries what has since been classified. The raw `transcript_read` and `transcript:<sid>` both stay — the typed pair is what a client works in, the raw pair is how it fetches a record by an item's `source`.
 
 An element of `types` is a type name, a prefix, either negated with `-`, or `@<preset>`, applied left to right. Presets are not fixed here: an instance's config holds them and `dump_presets_read` reads them. What a preset names is an **interest** — how the work was done, what to hand over — and an interest is not a property of the wire. Type names stay one to one with what a record is, and the groupings people reach for are named by whoever configures them. Expanding a reference, and refusing a cycle or an unconfigured name, belong where the config is validated.
 
@@ -383,8 +389,8 @@ absence in a list of changes says nothing.
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 45 | common 13 / messaging 4 / control 28 / mesh 0 |
-| topics | 11 | messaging 2 (`inbox` / `notify`), control 8, common 1 (`auth_records`) |
+| ops | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
+| topics | 12 | messaging 2 (`inbox` / `notify`), control 9, common 1 (`auth_records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 20 | one closed union |
 

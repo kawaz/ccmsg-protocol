@@ -6,7 +6,8 @@ import type { LlmRequestsFrame, LlmStatusFrame } from "../control/llm.ts";
 import type { PeersFrame } from "../control/peers.ts";
 import type { SessionErrorsFrame } from "../control/session-errors.ts";
 import type { SessionStatusFrame } from "../control/session-status.ts";
-import type { TranscriptFrame } from "../control/transcript.ts";
+import type { TranscriptFrame, TranscriptItemsFrame } from "../control/transcript.ts";
+import { TRANSCRIPT_ITEMS } from "./control.ts";
 import type { InboxFrame } from "../messaging/message.ts";
 import type { NotifyFrame } from "../messaging/notify.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
@@ -263,6 +264,24 @@ export const TRANSCRIPT_SIZE_FRAME = {
   instance,
   data: { sid, size: 182_400 },
 } satisfies Static<typeof TranscriptFrame>;
+
+/** The typed topic, whose frames carry items rather than bytes. */
+export const TRANSCRIPT_ITEMS_FRAME = {
+  ev: "topic",
+  topic: `transcript_items:${sid}`,
+  instance,
+  data: { sid, items: TRANSCRIPT_ITEMS.slice(-2) },
+} satisfies Static<typeof TranscriptItemsFrame>;
+
+/** Its opening frame, which is the tail the instance kept — the same shape as
+ * every frame after it, so a subscriber appends both the same way. */
+export const TRANSCRIPT_ITEMS_SNAPSHOT_FRAME = {
+  ev: "topic",
+  topic: `transcript_items:${sid}`,
+  snapshot: true,
+  instance,
+  data: { sid, items: TRANSCRIPT_ITEMS },
+} satisfies Static<typeof TranscriptItemsFrame>;
 
 export const SESSION_ERRORS_FRAME: Static<typeof SessionErrorsFrame> = {
   ev: "topic",

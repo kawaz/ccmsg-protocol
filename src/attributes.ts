@@ -196,7 +196,7 @@ export const OP_ATTRIBUTES = {
     errors: [],
   },
 
-  // --- control: session observation and operation (9) ---
+  // --- control: session observation and operation (10) ---
   session_kill: {
     plane: "control",
     roles: USER_ONLY,
@@ -241,6 +241,14 @@ export const OP_ATTRIBUTES = {
     errors: [],
   },
   transcript_read: {
+    plane: "control",
+    roles: AGENT_AND_USER,
+    needs_hello: true,
+    locality: "instance-local",
+    scope: "role",
+    errors: ["not_found"],
+  },
+  transcript_items_read: {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,

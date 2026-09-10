@@ -104,6 +104,9 @@ import {
 } from "./control/session.ts";
 import {
   TranscriptFrame,
+  TranscriptItemsFrame,
+  TranscriptItemsReadRequest,
+  TranscriptItemsReadResponse,
   TranscriptReadRequest,
   TranscriptReadResponse,
 } from "./control/transcript.ts";
@@ -153,6 +156,10 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   session_dump_write: { request: SessionDumpWriteRequest, response: SessionDumpWriteResponse },
   dump_presets_read: { request: DumpPresetsReadRequest, response: DumpPresetsReadResponse },
   transcript_read: { request: TranscriptReadRequest, response: TranscriptReadResponse },
+  transcript_items_read: {
+    request: TranscriptItemsReadRequest,
+    response: TranscriptItemsReadResponse,
+  },
   session_fork_origin: { request: SessionForkOriginRequest, response: SessionForkOriginResponse },
   session_last_live_remove: {
     request: SessionLastLiveRemoveRequest,
@@ -197,6 +204,7 @@ export const TOPIC_SCHEMAS = {
   agents: AgentsFrame,
   session_status: SessionStatusFrame,
   transcript: TranscriptFrame,
+  transcript_items: TranscriptItemsFrame,
   session_errors: SessionErrorsFrame,
   llm_requests: LlmRequestsFrame,
   llm_status: LlmStatusFrame,

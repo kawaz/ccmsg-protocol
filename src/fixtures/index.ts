@@ -100,6 +100,10 @@ export const OP_FIXTURES = {
     request: control.TRANSCRIPT_READ_REQUEST,
     response: control.TRANSCRIPT_READ_RESPONSE,
   },
+  transcript_items_read: {
+    request: control.TRANSCRIPT_ITEMS_READ_REQUEST,
+    response: control.TRANSCRIPT_ITEMS_READ_RESPONSE,
+  },
   session_fork_origin: {
     request: control.SESSION_FORK_ORIGIN_REQUEST,
     response: control.SESSION_FORK_ORIGIN_RESPONSE,
@@ -162,6 +166,7 @@ export const TOPIC_FIXTURES = {
   agents: topics.AGENTS_FRAME,
   session_status: topics.SESSION_STATUS_FRAME,
   transcript: topics.TRANSCRIPT_FRAME,
+  transcript_items: topics.TRANSCRIPT_ITEMS_FRAME,
   session_errors: topics.SESSION_ERRORS_FRAME,
   llm_requests: topics.LLM_REQUESTS_FRAME,
   llm_status: topics.LLM_STATUS_FRAME,
