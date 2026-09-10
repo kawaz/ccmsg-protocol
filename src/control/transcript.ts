@@ -62,10 +62,13 @@ export const TranscriptReadResponse = response("transcript_read", TranscriptRead
  *
  * The range is cut the way a dump's is — an instant or a record on either side
  * — and which end of it a limit keeps follows from which bound was given. A
- * lower bound reads forward from it and `next` names the continuation; an upper
- * bound alone reads the range's last items and `prev` names the continuation
- * backwards, which is how a client that draws the newest items first walks back
- * through a transcript it never has to read whole. The role decides how much is
+ * lower bound reads forward from it and `next` names the continuation;
+ * otherwise the read answers the range's last items and `prev` names the
+ * continuation backwards, which is how a client that draws the newest items
+ * first walks back through a transcript it never has to read whole. Asking
+ * with no bound at all is the ordinary first read, and it answers the tail, as
+ * the raw read with no `before` does; a client that wants the transcript from
+ * its beginning says so with `since_at: 0`. The role decides how much is
  * visible, as it does for the raw read. */
 export const TranscriptItemsReadArgs = Type.Object({
   sid: Sid,
@@ -90,8 +93,8 @@ export const TranscriptItemsReadArgs = Type.Object({
    * but the attachments, as a dump's absent selection does. */
   types: Type.Optional(Type.Array(TranscriptItemSelector)),
   /** How many items to answer with, taken from the range's start when a lower
-   * bound was given and from its end when only an upper one was; the instance
-   * narrows this to its own limit. */
+   * bound was given and from its end otherwise; the instance narrows this to
+   * its own limit. */
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 export type TranscriptItemsReadArgs = Static<typeof TranscriptItemsReadArgs>;
