@@ -213,7 +213,9 @@ export const DUMP_PRESETS_READ_RESPONSE: Static<typeof DumpPresetsReadResponse> 
     {
       name: "howto",
       description: "how the work was done: what was thought, run, read and written",
-      opts: { types: ["thinking", "message:user", "message:sub", "tool:Bash", "@file"] },
+      opts: {
+        types: ["thinking", "message:user", "message:parent", "message:sub", "tool:Bash", "@file"],
+      },
     },
   ],
 };
@@ -297,6 +299,80 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     type: "system:attachment:queued_command",
     at: FIXTURE_NOW - 3_100_000,
     attachment: { type: "queued_command", command: "/pre-clear" },
+  },
+  {
+    id: "c8a2f371:0",
+    uuid: "c8a2f371",
+    source: { offset: 182_800, bytes: 520 },
+    type: "message:team:out",
+    at: FIXTURE_NOW - 3_000_000,
+    role: "use",
+    result_item: "d4c1a0b2:0",
+    tool_use_id: "toolu_01Tm5XYp",
+    text: "契約に message:parent と message:team を足して",
+    to: "contract-dump-items",
+    agent_id: "b83e0f114",
+    subagent_type: "opus5-worker-high",
+  },
+  {
+    id: "e5b70c93:0",
+    uuid: "e5b70c93",
+    source: { offset: 183_320, bytes: 300 },
+    type: "message:team:in",
+    at: FIXTURE_NOW - 2_900_000,
+    text: "fixtures まで通ったので ci を回す",
+    from: "contract-dump-items",
+  },
+  {
+    id: "d4c1a0b2:0",
+    uuid: "d4c1a0b2",
+    source: { offset: 183_620, bytes: 410 },
+    type: "message:team:in",
+    at: FIXTURE_NOW - 2_800_000,
+    role: "result",
+    parent_item: "c8a2f371:0",
+    parent_tool_use_id: "toolu_01Tm5XYp",
+    text: "4 型を足して 1.17.0 を切った",
+    agent_id: "b83e0f114",
+    status: "ok",
+    duration_ms: 240_000,
+  },
+];
+
+/** The same vocabulary read with an agent as the subject.
+ *
+ * Nothing here is a new type: the brief an agent opens with and the answer it
+ * closes with are what `message:parent` names from wherever it is read, and the
+ * answer comes as prose with no call behind it. */
+export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
+  {
+    id: "a9f30d15:0",
+    uuid: "a9f30d15",
+    source: { offset: 0, bytes: 1_240 },
+    type: "message:parent:in",
+    at: FIXTURE_NOW - 3_290_000,
+    turn: 1,
+    text: "docs/design/dump-kinds.md を書き直す",
+  },
+  {
+    id: "b0e41c26:0",
+    uuid: "b0e41c26",
+    source: { offset: 1_240, bytes: 380 },
+    type: "message:parent:out",
+    at: FIXTURE_NOW - 3_260_000,
+    role: "use",
+    tool_use_id: "toolu_01Qz8Vbn",
+    text: "型一覧は 4 群に分けた。preset の例まで直してよいか",
+    to: "main",
+    summary: "型一覧の分け方を確認",
+  },
+  {
+    id: "c1f52d37:0",
+    uuid: "c1f52d37",
+    source: { offset: 1_620, bytes: 690 },
+    type: "message:parent:out",
+    at: FIXTURE_NOW - 3_200_000,
+    text: "型一覧を 4 群に整理し、preset の例も揃えた",
   },
 ];
 

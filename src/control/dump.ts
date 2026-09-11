@@ -38,8 +38,12 @@ export type TranscriptItemType = Static<typeof TranscriptItemType>;
 export const TRANSCRIPT_ITEM_TYPES = [
   "message:user:in",
   "message:user:out",
+  "message:parent:in",
+  "message:parent:out",
   "message:sub:in",
   "message:sub:out",
+  "message:team:in",
+  "message:team:out",
   "message:session:in",
   "message:session:out",
   "thinking",
@@ -156,11 +160,94 @@ const Text = Type.String();
 
 /** The subject is a session by default, or one agent below it when the dump
  * names an agent, and `in` / `out` are read from wherever the subject stands.
- * A dump of an agent therefore reads `message:user:in` as the brief its parent
- * gave it, on the same type names a dump of the session uses — which is what
- * lets one preset be carried down a chain of agents. */
+ * What moves when the subject moves is who the counterpart is, not the names:
+ * the same preset reads a session's talk with a person and an agent's talk with
+ * whoever started it, which is what lets one be carried down a chain of agents.
+ *
+ * The counterpart is named by the kind of party it is — a person, the one above,
+ * the throwaway agents below, a teammate that stays, another session — because a
+ * dump is read to find out who was talking, and a subject's own position is the
+ * one thing it cannot ask about itself. Hence `parent` rather than `user` for
+ * the one above: an agent's parent is a session or another agent, and calling it
+ * `user` would have a reader take a machine for a person.
+ *
+ * `message:user` is a person and nobody else. Both directions occur under a
+ * session and under a teammate, which someone can type at directly; under a
+ * throwaway agent neither does. A combination a subject is not expected to show
+ * — `team` below an agent, say — is not refused: an unexpected line is still a
+ * line, and it is emitted under the name it fits. */
 const MessageUserIn = item(Type.Literal("message:user:in"), { text: Text });
 const MessageUserOut = item(Type.Literal("message:user:out"), { text: Text });
+
+/** What the one above said, and what was said back to it.
+ *
+ * An agent's first line is the brief it was started with, and its last is the
+ * answer that brief is discharged by; in between it may hand its parent
+ * something mid-flight. The answer is plain prose the harness collects, with no
+ * call behind it, so `parent:out` is prose-or-call and not a call alone:
+ * addressed to the parent is what the two forms have in common, and requiring a
+ * `tool_use_id` would leave the one message an agent is certain to send
+ * unnameable. */
+const MessageParentIn = item(Type.Literal("message:parent:in"), {
+  text: Text,
+  /** The parent as the harness named it where this arrived — `main`, a lead's
+   * name, the agent above. Left out when the record says only that it came from
+   * above, which is the case for the brief an agent opens with. */
+  from: Type.Optional(Type.String()),
+  msg_id: Type.Optional(Type.String()),
+});
+
+/** Sent to the parent through a call, which the parent's own transcript has the
+ * other half of. */
+const MessageParentOutSent = item(Type.Literal("message:parent:out"), {
+  ...USE_FIELDS,
+  text: Text,
+  /** The parent as the subject addressed it, in the harness's spelling. */
+  to: Type.Optional(Type.String()),
+  summary: Type.Optional(Type.String()),
+});
+
+/** Answered to the parent as prose — the agent's reply, final or interim. */
+const MessageParentOutSaid = item(Type.Literal("message:parent:out"), { text: Text });
+
+/** A teammate is an agent that was given a name and goes on standing, so what
+ * passes between the subject and one is a correspondence rather than an errand:
+ * a reply comes back as its own message, addressed and arriving whenever it is
+ * written, and not as the answer to the call that sent it.
+ *
+ * That is the whole of what separates `team` from `sub`. A throwaway agent is
+ * started, answers once and is done, which is why `sub:in` is the result of the
+ * `sub:out` that started it. Here the two halves of a round trip are two
+ * messages, and only the start of a teammate has a result to pair with. */
+const MessageTeamOut = item(Type.Literal("message:team:out"), {
+  ...USE_FIELDS,
+  text: Text,
+  /** The teammate addressed, by the name it stands under. */
+  to: Type.Optional(Type.String()),
+  summary: Type.Optional(Type.String()),
+  agent_id: Type.Optional(Type.String()),
+  /** Present on the call that started the teammate, absent on the ones that
+   * write to it afterwards. */
+  subagent_type: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+});
+
+/** A teammate writing to the subject, arriving under its own name whenever it
+ * was written. */
+const MessageTeamInSaid = item(Type.Literal("message:team:in"), {
+  text: Text,
+  from: Type.Optional(Type.String()),
+  msg_id: Type.Optional(Type.String()),
+});
+
+/** A teammate's run ending, which answers the call that started it. */
+const MessageTeamInDone = item(Type.Literal("message:team:in"), {
+  ...RESULT_FIELDS,
+  text: Text,
+  agent_id: Type.Optional(Type.String()),
+  status: Type.Optional(Type.String()),
+  duration_ms: Type.Optional(Type.Integer({ minimum: 0 })),
+});
 
 const MessageSubOut = item(Type.Literal("message:sub:out"), {
   ...USE_FIELDS,
@@ -373,8 +460,14 @@ export const TranscriptItem = Type.Union(
   [
     MessageUserIn,
     MessageUserOut,
+    MessageParentIn,
+    MessageParentOutSent,
+    MessageParentOutSaid,
     MessageSubOut,
     MessageSubIn,
+    MessageTeamOut,
+    MessageTeamInSaid,
+    MessageTeamInDone,
     MessageSessionOut,
     MessageSessionIn,
     Thinking,

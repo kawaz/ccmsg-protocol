@@ -213,7 +213,21 @@ A transcript is a file the harness writes for its own reasons, and its shape cha
 
 A type name is `:`-separated, and a prefix names everything below it: `tool` is every tool, `message:user` both directions of what a person and a session said. Three families stay open at their last segment — `tool:<Name>`, `system:attachment:<kind>`, `hook:<Event>` — because the harness coins that segment, and a closed list would turn every newcomer into `unknown` with nothing left to say what arrived. `TRANSCRIPT_ITEM_TYPES` spells out the closed part alone; a name outside it is a newcomer rather than an error. Segments after the first are not snake_case because they are the harness's spelling (`tool:Bash`, `hook:PreToolUse`).
 
-`in` and `out` are read **from wherever the subject stands**. The subject is the session by default and one agent below it when `agent_id` names one; the type definitions do not change, only what they point at. A dump of an agent reads `message:user:in` as the brief its parent handed it, which is what lets one preset be carried down a chain of agents.
+`in` and `out` are read **from wherever the subject stands**. The subject is the session by default and one agent below it when `agent_id` names one; the type definitions do not change, only what they point at, which is what lets one preset be carried down a chain of agents.
+
+The second segment of a `message:*` names **what kind of party the counterpart was**, never the subject's own standing — a dump is read to find out who was talking, and a subject's position is the one thing it cannot ask about itself. `user` is kept for a person alone: an agent's parent is a session or another agent, and calling it `user` would have a reader take a machine for a person. There are five counterparts — a person (`user`), the one above (`parent`), the throwaway agents below (`sub`), a teammate that is named and stays (`team`), and another session (`session`).
+
+| type | subject = session | subject = agent (throwaway) | subject = teammate |
+|---|---|---|---|
+| `message:user:in/out` | with a person | (does not occur) | occurs: a person types at it directly |
+| `message:parent:in/out` | (does not occur) | the brief, and the answer to it | the lead's instructions and the replies to them |
+| `message:sub:out/in` | the agents it started and their answers | agents below it | agents below it |
+| `message:team:out/in` | what it wrote to a teammate and heard back | (does not occur) | with the other teammates |
+| `message:session:out/in` | another session over ccmsg | only if the agent ran ccmsg | the same |
+
+"Does not occur" is **not a refusal**. A line that arrives anyway is still a line and is emitted under the name it fits — vanishing silently is the same failure an unknown type would be.
+
+`sub` and `team` are apart because **a round trip folds differently**. A throwaway agent is started, answers once and is done, so `message:sub:in` is the result of the `message:sub:out` that started it. A teammate is named and goes on standing: its reply is not the answer to the call that sent something, it is a message of its own, arriving addressed and whenever it was written. Only the call that starts a teammate has a result to pair with; everything after is two independent messages. `message:parent:out` is prose-or-call for the same reason — an agent's answer is plain text the harness collects, with no call behind it, and requiring a `tool_use_id` would leave the one message an agent is certain to send unnameable.
 
 An item is identified by its `id` (`<uuid>:<index>` — the record it was read from and where in it the item stood), and `uuid` stays beside it as **the record the item came out of**. One assistant record becomes the thinking, the text and each call it held, so a record id alone names all of them at once and leaves a link with nothing single to resolve to.
 

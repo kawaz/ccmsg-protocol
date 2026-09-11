@@ -194,7 +194,21 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 型名は `:` 区切りの階層で、prefix がその配下すべてを指す (`tool` は全ツール、`message:user` は in と out の両方)。`tool:<Name>` / `system:attachment:<kind>` / `hook:<Event>` の 3 家系だけ末尾が開いている — 末尾を名付けるのは harness であって契約ではなく、閉じた列挙にすると知らない名前が来た瞬間に `unknown` へ落ちて何が来たか分からなくなる。`TRANSCRIPT_ITEM_TYPES` に並ぶのは閉じている分だけで、そこに無い名前は誤りではなく新顔。2 段目以降が snake_case でないのは、そこが harness の綴りだから (`tool:Bash` / `hook:PreToolUse`)。
 
-`in` / `out` は**主語から見た向き**。主語は既定でセッション、`agent_id` を渡せばその配下の agent 1 体になり、型の定義は変えずに指す先だけが移る。agent を主語にした dump の `message:user:in` は親から渡された指示書になる。同じ preset が親でも子でも孫でも通るのはこのため。
+`in` / `out` は**主語から見た向き**。主語は既定でセッション、`agent_id` を渡せばその配下の agent 1 体になり、型の定義は変えずに指す先だけが移る。同じ preset が親でも子でも孫でも通るのはこのため。
+
+`message:*` の 2 段目が名指すのは**相手が何者か**で、主語自身の立ち位置ではない。dump は「誰と話していたか」を読むためのもので、主語は自分の位置だけは問えないため。`user` は人だけに残す — agent にとっての親はセッションか別の agent で、そこを `user` と呼ぶと読み手が機械を人と取り違える。相手の種別は 5 つ: 人 (`user`)、上 (`parent`)、使い捨ての下 (`sub`)、名前を持って居続ける仲間 (`team`)、別セッション (`session`)。
+
+| 型 | 主語 = セッション | 主語 = agent (使い捨て) | 主語 = teammate |
+|---|---|---|---|
+| `message:user:in/out` | 人との往復 | (出ない) | 人が直接打てるので出る |
+| `message:parent:in/out` | (出ない) | 親の指示書と、親への回答 | lead からの指示と、lead への返信 |
+| `message:sub:out/in` | 起動した agent とその答え | 孫 agent | 孫 agent |
+| `message:team:out/in` | teammate への送信と受信 | (出ない) | 他の teammate との往復 |
+| `message:session:out/in` | ccmsg 経由の別セッション | agent が ccmsg を叩いた場合のみ | 同左 |
+
+「出ない」は**禁止ではない**。来たら拾う — 想定外の行も行であって、名前の合う型で出す。黙って消えるのが dump にとって最も困る壊れ方になるのは、未知の型と同じ。
+
+`sub` と `team` を分けるのは **往復の畳み方が違う**から。使い捨ての agent は起動されて 1 度答えて終わるので、`message:sub:in` は自分を起動した `message:sub:out` の結果として対になる。teammate は名前を持って居続け、返信は呼び出しの答えではなく**それ自体が 1 通の message** として届く。対を持つのは teammate を起動した呼び出しだけで、以降の往復は互いに独立した message になる。`message:parent:out` が呼び出しとは限らないのも同じ理由で、agent の回答は harness が拾う素のテキスト (呼び出しが無い) なので、`tool_use_id` を必須にすると agent が必ず送る唯一の message が名乗れなくなる。
 
 アイテムの identity は `id` (= `<uuid>:<index>`、record 内の位置) で、`uuid` は**そのアイテムが出てきた record** として横に残る。assistant の 1 record が thinking と text と各ツール呼び出しに割れるので、record id だけではその全部を同時に名指すことになり、リンクが一意に解けない。
 

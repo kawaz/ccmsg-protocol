@@ -23,6 +23,7 @@ import {
   SessionDumpFile,
   TranscriptItem,
   TranscriptItemSelector,
+  TRANSCRIPT_ITEM_TYPES,
 } from "../src/control/dump.ts";
 import {
   LauncherConfigReadResponse,
@@ -71,7 +72,11 @@ import {
   TranscriptReadRequest,
 } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
-import { SESSION_DUMP_FILE, TRANSCRIPT_ITEMS } from "../src/fixtures/control.ts";
+import {
+  SESSION_DUMP_FILE,
+  TRANSCRIPT_ITEMS,
+  TRANSCRIPT_ITEMS_AGENT_SUBJECT,
+} from "../src/fixtures/control.ts";
 import { isValid } from "../src/schemas.ts";
 
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
@@ -276,6 +281,58 @@ describe("session ops", () => {
 describe("transcript items", () => {
   test("every item a reader emits passes", () => {
     for (const item of TRANSCRIPT_ITEMS) expect(isValid(TranscriptItem, item)).toBe(true);
+    for (const item of TRANSCRIPT_ITEMS_AGENT_SUBJECT)
+      expect(isValid(TranscriptItem, item)).toBe(true);
+  });
+
+  test("every spelled-out type name is a shape an item can take", () => {
+    // The list and the union are two statements of the same vocabulary: a name
+    // in one and not the other is a type a reader may emit and no client can
+    // read, or the reverse.
+    const spelled = new Set<string>();
+    for (const variant of TranscriptItem.anyOf) {
+      const type = (variant as { properties: { type: { const?: string } } }).properties.type;
+      if (type.const !== undefined) spelled.add(type.const);
+    }
+    const closed: string[] = [...TRANSCRIPT_ITEM_TYPES];
+    for (const name of closed) expect(spelled.has(name)).toBe(true);
+    // A `tool:<Name>` written out is fields sharpening how one tool reads, not
+    // a closing of the family, so it is spelled without being listed.
+    for (const name of spelled) if (!name.startsWith("tool:")) expect(closed).toContain(name);
+  });
+
+  test("who the counterpart was is the type, and the subject decides which types occur", () => {
+    // Read from an agent, the brief it opened with is what `message:parent:in`
+    // names; the session that started it reads the same exchange as
+    // `message:sub:*`. Neither side calls the other `user`, which is reserved
+    // for a person.
+    const types = TRANSCRIPT_ITEMS_AGENT_SUBJECT.map((item) => item.type);
+    expect(types).toContain("message:parent:in");
+    expect(types).not.toContain("message:user:in");
+  });
+
+  test("an agent's answer is prose, so `message:parent:out` needs no call behind it", () => {
+    const [said] = TRANSCRIPT_ITEMS_AGENT_SUBJECT.filter(
+      (item) => item.type === "message:parent:out" && !("tool_use_id" in item),
+    ) as Record<string, unknown>[];
+    expect(isValid(TranscriptItem, said)).toBe(true);
+    expect(said?.["role"]).toBeUndefined();
+  });
+
+  test("a teammate writes back as its own message, and only its start has a result", () => {
+    // What separates `team` from `sub`: a throwaway agent answers the call that
+    // made it, a teammate stays and its replies arrive addressed and unpaired.
+    const incoming = TRANSCRIPT_ITEMS.filter((item) => item.type === "message:team:in") as Record<
+      string,
+      unknown
+    >[];
+    const [said, done] = [
+      incoming.find((item) => item["role"] === undefined),
+      incoming.find((item) => item["role"] === "result"),
+    ];
+    expect(said?.["from"]).toBe("contract-dump-items");
+    expect(said?.["parent_tool_use_id"]).toBeUndefined();
+    expect(done?.["parent_item"]).toBe("c8a2f371:0");
   });
 
   test("a tool nobody wrote fields for still arrives, with what it was called with", () => {
