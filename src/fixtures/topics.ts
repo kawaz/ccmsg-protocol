@@ -1,6 +1,7 @@
 import type { Static } from "@sinclair/typebox";
 import type { AuthRecordsFrame } from "../common/auth.ts";
 import type { AgentsFrame } from "../control/agents.ts";
+import type { InstancesFrame } from "../control/instances.ts";
 import type { KvFrame } from "../control/kv.ts";
 import type { LlmRequestsFrame, LlmStatusFrame } from "../control/llm.ts";
 import type { PeersFrame } from "../control/peers.ts";
@@ -94,16 +95,6 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
         repo: "ccmsg",
         ws: "daemon-v2",
         cwd: "/repos/kawaz/ccmsg/daemon-v2",
-        state: "live_unmanaged",
-      },
-    ],
-    last_live: [
-      {
-        sid: other_sid,
-        instance,
-        repo: "ccmsg",
-        ws: "daemon-v2",
-        cwd: "/repos/kawaz/ccmsg/daemon-v2",
         state: "paused",
         last_seen_at: FIXTURE_NOW - 1_200_000,
         stopped_at: FIXTURE_NOW - 1_000_000,
@@ -111,6 +102,28 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
         effort: "high",
       },
     ],
+  },
+};
+
+/** A later frame: one row moved on, and one the instance forgot. */
+export const PEERS_CHANGE_FRAME: Static<typeof PeersFrame> = {
+  ev: "topic",
+  topic: "peers",
+  instance,
+  data: {
+    peers: [
+      { ...PEER, state: "live", gateway_active_at: FIXTURE_NOW + 1_000 },
+      { sid: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f", instance, removed: true },
+    ],
+  },
+};
+
+export const INSTANCES_FRAME: Static<typeof InstancesFrame> = {
+  ev: "topic",
+  topic: "instances",
+  snapshot: true,
+  instance,
+  data: {
     instances: [
       { id: instance, endpoint, host: "mba", reachable: true },
       { id: other_instance, endpoint: other_endpoint, host: "nuc", reachable: false },
@@ -142,6 +155,14 @@ export const AGENTS_FRAME: Static<typeof AgentsFrame> = {
     ],
     polled_at: FIXTURE_NOW,
   },
+};
+
+/** A later frame: the harness no longer reports one of the rows above. */
+export const AGENTS_CHANGE_FRAME: Static<typeof AgentsFrame> = {
+  ev: "topic",
+  topic: "agents",
+  instance,
+  data: { agents: [{ sid: other_sid, instance, removed: true }], polled_at: FIXTURE_NOW + 5_000 },
 };
 
 export const SESSION_STATUS_FRAME: Static<typeof SessionStatusFrame> = {

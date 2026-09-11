@@ -163,6 +163,7 @@ export const TOPIC_FIXTURES = {
   inbox: topics.INBOX_FRAME,
   notify: topics.NOTIFY_FRAME,
   peers: topics.PEERS_FRAME,
+  instances: topics.INSTANCES_FRAME,
   agents: topics.AGENTS_FRAME,
   session_status: topics.SESSION_STATUS_FRAME,
   transcript: topics.TRANSCRIPT_FRAME,

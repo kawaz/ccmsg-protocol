@@ -86,7 +86,7 @@ describe("op attribute table", () => {
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
     expect(OP_NAMES).toHaveLength(46);
-    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(12);
+    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(13);
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
@@ -134,16 +134,24 @@ describe("topic attribute table", () => {
     expect(events).toEqual(["notify"]);
   });
 
-  test("a topic several instances write folds per instance", () => {
+  test("a whole value several instances write folds per instance", () => {
     // A whole-value frame from one instance must not erase another's entries,
-    // so every instance-wide list is `per_instance_whole`; `session_status` is
+    // so every instance-wide value is `per_instance_whole`; `session_status` is
     // whole because one session lives on one instance.
-    for (const topic of ["peers", "agents", "session_errors", "llm_requests", "llm_status"]) {
+    for (const topic of ["instances", "session_errors", "llm_requests", "llm_status"]) {
       expect(TOPIC_ATTRIBUTES[topic as keyof typeof TOPIC_ATTRIBUTES].granularity).toBe(
         "per_instance_whole",
       );
     }
     expect(TOPIC_ATTRIBUTES.session_status.granularity).toBe("whole");
+  });
+
+  test("a topic of rows that change on their own folds by element", () => {
+    // The question the granularity answers: is there a reason to restate one
+    // element when another changed? For a list of sessions there is none.
+    for (const topic of ["peers", "agents", "inbox", "kv", "auth_records"]) {
+      expect(TOPIC_ATTRIBUTES[topic as keyof typeof TOPIC_ATTRIBUTES].granularity).toBe("element");
+    }
   });
 
   test("the records that authenticate a person are the one topic no person may read", () => {

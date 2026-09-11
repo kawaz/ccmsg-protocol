@@ -15,7 +15,8 @@ import { HelloRequest, HelloResponse } from "../src/common/hello.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
-import { LAST_LIVE_RETENTION_MS, PeersFrame } from "../src/control/peers.ts";
+import { InstancesFrame } from "../src/control/instances.ts";
+import { LAST_LIVE_RETENTION_MS, type PeerInfo, PeersFrame } from "../src/control/peers.ts";
 import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
 import {
   AUTH_RECORDS_FAMILY_FRAME,
@@ -29,6 +30,7 @@ import {
   MESSAGE_SEND_FORWARDED_REQUEST,
   MESSAGE_SEND_HELD_RESPONSE,
   OP_FIXTURES,
+  PEERS_CHANGE_FRAME,
   TOPIC_FIXTURES,
   TOPIC_SUBSCRIBE_SESSION_REQUEST,
   TRANSCRIPT_SIZE_FRAME,
@@ -252,32 +254,48 @@ describe("message_send", () => {
 
 describe("the peers topic", () => {
   const peersFrame = TOPIC_FIXTURES.peers;
-  const [peer] = peersFrame.data.peers;
-  const [lastLive] = peersFrame.data.last_live;
+  const rows = peersFrame.data.peers.filter((row): row is PeerInfo => !("removed" in row));
+  const [peer] = rows;
+  const lost = rows[rows.length - 1];
 
   test("a session gone without a word carries no stopped_at", () => {
-    const { stopped_at: _dropped, ...rest } = lastLive;
+    const { stopped_at: _dropped, ...rest } = lost;
+    expect(
+      isValid(PeersFrame, { ...peersFrame, data: { peers: [{ ...rest, state: "disappeared" }] } }),
+    ).toBe(true);
+  });
+
+  test("a lost session is a row of the same list, matched by the same pair", () => {
+    // What moves it there is its own field, so a client that already holds the
+    // row updates it rather than moving it between two lists.
+    expect(lost.state).toBe("paused");
+    expect(typeof lost.last_seen_at).toBe("number");
+    expect(lost.sid).not.toBe(peer.sid);
+  });
+
+  test("a removal names the pair it is matched by and nothing else", () => {
+    const [, removal] = PEERS_CHANGE_FRAME.data.peers;
+    expect(removal).toEqual({ sid: removal.sid, instance: removal.instance, removed: true });
+    passes(PeersFrame, PEERS_CHANGE_FRAME);
+  });
+
+  test("a removal that is not marked is refused — an absence would say nothing", () => {
     expect(
       isValid(PeersFrame, {
         ...peersFrame,
-        data: { peers: [], last_live: [{ ...rest, state: "disappeared" }] },
+        data: { peers: [{ sid: peer.sid, instance: peer.instance }] },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("an entry that states no classification passes", () => {
     const { state: _dropped, ...rest } = peer;
-    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest], last_live: [] } })).toBe(
-      true,
-    );
+    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest] } })).toBe(true);
   });
 
   test("a classification outside the list is refused", () => {
     expect(
-      isValid(PeersFrame, {
-        ...peersFrame,
-        data: { peers: [{ ...peer, state: "busy" }], last_live: [] },
-      }),
+      isValid(PeersFrame, { ...peersFrame, data: { peers: [{ ...peer, state: "busy" }] } }),
     ).toBe(false);
   });
 
@@ -293,20 +311,7 @@ describe("the peers topic", () => {
     expect(
       isValid(PeersFrame, {
         ...peersFrame,
-        data: { peers: [{ ...peer, gateway_active_at: true }], last_live: [] },
-      }),
-    ).toBe(false);
-  });
-
-  test("an instance entry without its reachability is refused", () => {
-    expect(
-      isValid(PeersFrame, {
-        ...peersFrame,
-        data: {
-          peers: [],
-          last_live: [],
-          instances: [{ id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba" }],
-        },
+        data: { peers: [{ ...peer, gateway_active_at: true }] },
       }),
     ).toBe(false);
   });
@@ -315,12 +320,26 @@ describe("the peers topic", () => {
     expect(
       isValid(PeersFrame, {
         ...peersFrame,
-        data: {
-          peers: [],
-          last_live: [{ ...lastLive, stopped_at: "2026-09-08T00:00:00Z" }],
-        },
+        data: { peers: [{ ...lost, stopped_at: "2026-09-08T00:00:00Z" }] },
       }),
     ).toBe(false);
+  });
+});
+
+describe("the instances topic", () => {
+  const frame = TOPIC_FIXTURES.instances;
+
+  test("an instance entry without its reachability is refused", () => {
+    expect(
+      isValid(InstancesFrame, {
+        ...frame,
+        data: { instances: [{ id: INSTANCE, endpoint: INSTANCE_ENDPOINT, host: "mba" }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("a sender states its own whole view, itself included", () => {
+    expect(frame.data.instances.map((entry) => entry.id)).toContain(INSTANCE);
   });
 });
 

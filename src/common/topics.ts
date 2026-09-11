@@ -7,6 +7,7 @@ export const PLAIN_TOPICS = [
   "inbox",
   "notify",
   "peers",
+  "instances",
   "agents",
   "session_errors",
   "llm_requests",
@@ -89,8 +90,17 @@ export interface TopicAttributes {
 export const TOPIC_ATTRIBUTES = {
   inbox: { roles: ["session", "user"], granularity: "element" },
   notify: { roles: ["session", "user"], granularity: "event" },
-  peers: { roles: ["session", "user"], granularity: "per_instance_whole" },
-  agents: { roles: ["user"], granularity: "per_instance_whole" },
+  // A row here changes on its own — one session becomes busy while the rest
+  // stand still — so a frame carries the rows that changed rather than every
+  // row the instance knows.
+  peers: { roles: ["session", "user"], granularity: "element" },
+  // One instance's whole reading of its links, taken together, which is why it
+  // is apart from the rows of `peers`.
+  instances: { roles: ["session", "user"], granularity: "per_instance_whole" },
+  agents: { roles: ["user"], granularity: "element" },
+  // A set the instance derives whole, by folding one error pattern over its
+  // sessions: it learns which sessions are stopped, not that one of them
+  // changed, so each frame is that reading entire.
   session_errors: { roles: ["user"], granularity: "per_instance_whole" },
   llm_requests: {
     roles: ["user"],

@@ -1127,7 +1127,7 @@ describe("session observation topics", () => {
     protocol_version: 3,
   };
 
-  test("both lists travel together, because a session moves between them", () => {
+  test("a connected row and a lost one are the same element space", () => {
     expect(
       isValid(PeersFrame, {
         ev: "topic",
@@ -1135,19 +1135,31 @@ describe("session observation topics", () => {
         snapshot: true,
         instance: INSTANCE,
         data: {
-          peers: [peer],
-          last_live: [
+          peers: [
+            peer,
             {
               sid: OTHER_SID,
               instance: INSTANCE,
               repo: "kawaz/ccmsg",
               ws: "main",
               cwd: "/Users/x/src/ccmsg/main",
+              state: "paused",
               last_seen_at: NOW - 3_600_000,
               model: "claude-opus-5[1m]",
             },
           ],
         },
+      }),
+    ).toBe(true);
+  });
+
+  test("a frame carries only what changed, down to a single row", () => {
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [{ ...peer, gateway_active_at: NOW }] },
       }),
     ).toBe(true);
   });
@@ -1159,21 +1171,34 @@ describe("session observation topics", () => {
         ev: "topic",
         topic: "peers",
         instance: INSTANCE,
-        data: {
-          peers: [{ ...unannounced, state: "live_unmanaged" }],
-          last_live: [],
-        },
+        data: { peers: [{ ...unannounced, state: "live_unmanaged" }] },
       }),
     ).toBe(true);
   });
 
-  test("an empty list is stated, not omitted", () => {
+  test("the list of changed rows is stated, not omitted", () => {
+    expect(isValid(PeersFrame, { ev: "topic", topic: "peers", instance: INSTANCE, data: {} })).toBe(
+      false,
+    );
+  });
+
+  test("a removal carries no row to describe", () => {
     expect(
       isValid(PeersFrame, {
         ev: "topic",
         topic: "peers",
         instance: INSTANCE,
-        data: { peers: [peer] },
+        data: { peers: [{ sid: SID, instance: INSTANCE, removed: true }] },
+      }),
+    ).toBe(true);
+    // `removed: false` is not a way to say the row is there: the mark is
+    // present or absent, like `snapshot`.
+    expect(
+      isValid(PeersFrame, {
+        ev: "topic",
+        topic: "peers",
+        instance: INSTANCE,
+        data: { peers: [{ sid: SID, instance: INSTANCE, removed: false }] },
       }),
     ).toBe(false);
   });
@@ -1202,6 +1227,17 @@ describe("session observation topics", () => {
           ],
           polled_at: NOW,
         },
+      }),
+    ).toBe(true);
+  });
+
+  test("a session the harness no longer reports leaves as a marked row", () => {
+    expect(
+      isValid(AgentsFrame, {
+        ev: "topic",
+        topic: "agents",
+        instance: INSTANCE,
+        data: { agents: [{ sid: SID, instance: INSTANCE, removed: true }], polled_at: NOW },
       }),
     ).toBe(true);
   });

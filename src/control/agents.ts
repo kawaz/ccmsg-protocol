@@ -50,15 +50,34 @@ export const AgentInfo = Type.Object(
 );
 export type AgentInfo = Static<typeof AgentInfo>;
 
-/** The `agents` topic. Whole-value per instance, like `peers`.
+/** A row that is gone: the harness no longer reports this session, or the
+ * instance that polled it stopped. Marked rather than absent, since a frame
+ * carries only what changed. */
+export const AgentRemoved = Type.Object(
+  {
+    sid: Sid,
+    instance: InstanceId,
+    removed: Type.Literal(true),
+  },
+  { $id: "AgentRemoved" },
+);
+export type AgentRemoved = Static<typeof AgentRemoved>;
+
+export const AgentElement = Type.Union([AgentInfo, AgentRemoved], { $id: "AgentElement" });
+export type AgentElement = Static<typeof AgentElement>;
+
+/** The `agents` topic. Elements, like `peers`: the rows that changed since the
+ * last frame, matched by their `instance` and `sid`.
  *
  * The instance polls the harness only while somebody is listening here, so the
- * list is as fresh as the subscription is old. */
+ * list is as fresh as the subscription is old — and a poll that finds one
+ * session's status changed says that, rather than restating every row it read.
+ */
 export const AgentsFrame = topicFrame(
   "agents",
   Type.Object({
-    agents: Type.Array(AgentInfo),
-    /** When the poll behind this list ran. Absent before the first one. */
+    agents: Type.Array(AgentElement),
+    /** When the poll behind these rows ran. Absent before the first one. */
     polled_at: Type.Optional(Timestamp),
   }),
 );

@@ -77,6 +77,7 @@ import {
   LlmUsageReadRequest,
   LlmUsageReadResponse,
 } from "./control/llm.ts";
+import { InstancesFrame } from "./control/instances.ts";
 import { PeersFrame } from "./control/peers.ts";
 import {
   SandboxGrantRequest,
@@ -201,6 +202,7 @@ export const TOPIC_SCHEMAS = {
   inbox: InboxFrame,
   notify: NotifyFrame,
   peers: PeersFrame,
+  instances: InstancesFrame,
   agents: AgentsFrame,
   session_status: SessionStatusFrame,
   transcript: TranscriptFrame,
