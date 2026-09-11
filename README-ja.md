@@ -2,11 +2,11 @@
 
 > 🇬🇧 [README.md](./README.md)
 
-ccmsg の daemon と web UI が共有する**契約の正本**。op・イベント・エラーコード・識別子の
-形を schema として持ち、両側が同じ schema で検証する。
+ccmsg の daemon と web UI が共有する**契約の正本**。op・イベント・エラーコード・識別子の形を schema として持ち、両側が同じ schema で検証する。
 
-契約はここで決まり、daemon と webui はそれに従う (規約ファースト)。片側がもう片側の内部構造を
-知る経路は、この契約を通さずには作らない。
+契約はここで決まり、daemon と webui はそれに従う (規約ファースト)。片側がもう片側の内部構造を知る経路は、この契約を通さずには作らない。
+
+中身は 4 面 (common / messaging / control / mesh) にまたがる 48 op、snapshot + 変化の流れとして購読する 13 topic、21 コードの閉じた ErrorCode union、そして認可・能力判定・転送がすべて引く op 属性表。
 
 ## インストール
 
@@ -24,9 +24,11 @@ OP_ATTRIBUTES["message.send"].roles; // 認可は表を引く (分岐を書か�
 opErrors("session.rename"); // その op が返しうるコード
 ```
 
+`@ccmsg/protocol/fixtures` はもう 1 つの入口で、全 request / response / topic frame について実 wire の代表 JSON を持つ。実装側のテストは期待値を書き写さずここから読む。
+
 ## ドキュメント
 
-- [DESIGN-ja.md](./docs/DESIGN-ja.md) — 契約の層・面・op 属性表・表記規約
+- [DESIGN-ja.md](./docs/DESIGN-ja.md) — 契約の層、4 つの面、op 属性表、topic の畳み方、transcript のアイテム型、instance と mesh、人の認証、表記規約
 
 ## ライセンス
 

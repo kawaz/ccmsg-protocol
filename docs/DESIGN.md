@@ -4,12 +4,9 @@
 
 ## Domain
 
-This repository holds **one thing: the wire contract**. It writes down, as schemas, who may
-call what, what comes back, and the shape of every frame that gets pushed — and both the
-daemon and the web UI validate against it.
+This repository holds **one thing: the wire contract**. It writes down, as schemas, who may call what, what comes back, and the shape of every frame that gets pushed — and both the daemon and the web UI validate against it.
 
-The contract has to be executable, not merely typed. A types-only contract leaves the
-checking to each implementation's hand-written tests, and the two drift.
+The contract has to be executable, not merely typed. A types-only contract leaves the checking to each implementation's hand-written tests, and the two drift.
 
 ## Layers
 
@@ -33,61 +30,27 @@ checking to each implementation's hand-written tests, and the two drift.
 | control | the web UI and the CLI's admin commands (user role) | session observation and operation, files, launcher, sandbox, llm, diagnostics |
 | mesh | instances among themselves | no ops of its own — a peer is greeted with `hello.instance`, and everything after crosses by the envelope's `to_instance` / `from_instance` / `hops` |
 
-The four share one type system, one envelope and one error vocabulary. A plane is a column
-of the op attribute table, not a separate schema.
+The four share one type system, one envelope and one error vocabulary. A plane is a column of the op attribute table, not a separate schema.
 
-Messaging has no rooms. A message is addressed to one sid, and the record of a conversation
-is the session's own transcript. The route back is not carried as text either: answering
-means sending to the delivery frame's `from`, and that structure is all the contract states.
+Messaging has no rooms. A message is addressed to one sid, and the record of a conversation is the session's own transcript. The route back is not carried as text either: answering means sending to the delivery frame's `from`, and that structure is all the contract states.
 
-A message is addressed to a sid, but **its sender need not be one**. Both the session and
-the user role may call `message.send`, and a person at the web UI has no sid. So `from` is
-`Sender`, which is `Sid | "user"`; the literal is spelled out rather than left as an absent
-field so that "a person sent this" reads apart from "a session sent this and the id was
-lost". Every sid remains a valid sender. Nothing can be sent back to `user`, so how an
-answer reaches a person is the instance's to arrange.
+A message is addressed to a sid, but **its sender need not be one**. Both the session and the user role may call `message.send`, and a person at the web UI has no sid. So `from` is `Sender`, which is `Sid | "user"`; the literal is spelled out rather than left as an absent field so that "a person sent this" reads apart from "a session sent this and the id was lost". Every sid remains a valid sender. Nothing can be sent back to `user`, so how an answer reaches a person is the instance's to arrange.
 
-A message that was not handed over right away has not failed. The reply says it went to the
-inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh,
-out of inbox room, or not taking anything at the moment), so the sender can choose between
-waiting and addressing another session.
+A message that was not handed over right away has not failed. The reply says it went to the inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh, out of inbox room, or not taking anything at the moment), so the sender can choose between waiting and addressing another session.
 
 ## Wording a message handed over directly
 
-One recipient cannot read the delivery frame. It is the route that writes into the harness's
-own messaging socket: there the recipient is the model rather than a client, and what arrives
-is one block of text. With no frame to look at, **a message without `mid` and `from` in its
-body cannot be answered** — the recipient knows something came and not what to answer or how.
-So this one wording belongs to the contract (`renderDirectDelivery` / `parseDirectDelivery`).
+One recipient cannot read the delivery frame. It is the route that writes into the harness's own messaging socket: there the recipient is the model rather than a client, and what arrives is one block of text. With no frame to look at, **a message without `mid` and `from` in its body cannot be answered** — the recipient knows something came and not what to answer or how. So this one wording belongs to the contract (`renderDirectDelivery` / `parseDirectDelivery`).
 
-The shape is the harness's own sender convention: `<cross-session-message>` embedded in the
-body, where `from` / `from-name` / `from-mode` are the origin the receiving harness reads and
-`ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. In the body
-`from` is always `ccmsg` and holds neither a sid nor a `uds:` path — those are addresses the
-harness actually dials, and dialing one that has gone ends the recipient's turn in failure.
-The `from` of the frame it is written in is a separate address, where the instance may name a
-`uds:` socket of its own to receive delivery status on. Those receipts are negative only —
-`refused`, `denied`, `dropped`, `expired`, `held` — so silence within the window is delivery.
-The way back is one line at the end of
-the body (`Reply with: ccmsg reply <mid> --to <sid> <text>`), which the recipient runs itself.
-The sid is spelled out because a `mid` does not name its sender; making it resolvable instead
-would take an op for it, and that op a sent-message index the daemon does not otherwise need.
+The shape is the harness's own sender convention: `<cross-session-message>` embedded in the body, where `from` / `from-name` / `from-mode` are the origin the receiving harness reads and `ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` are this contract's identifiers. In the body `from` is always `ccmsg` and holds neither a sid nor a `uds:` path — those are addresses the harness actually dials, and dialing one that has gone ends the recipient's turn in failure. The `from` of the frame it is written in is a separate address, where the instance may name a `uds:` socket of its own to receive delivery status on. Those receipts are negative only — `refused`, `denied`, `dropped`, `expired`, `held` — so silence within the window is delivery. The way back is one line at the end of the body (`Reply with: ccmsg reply <mid> --to <sid> <text>`), which the recipient runs itself. The sid is spelled out because a `mid` does not name its sender; making it resolvable instead would take an op for it, and that op a sent-message index the daemon does not otherwise need.
 
-Only when the sender is a person (`from` is `user`) does `--to` drop, leaving
-`Reply with: ccmsg reply <mid> <text>`. `user` is not a sid, so `--to user` would be an
-address nothing reaches. What such an answer becomes — a notification back to the web UI,
-say — is the instance's to decide, and the recipient only has to run the line.
+Only when the sender is a person (`from` is `user`) does `--to` drop, leaving `Reply with: ccmsg reply <mid> <text>`. `user` is not a sid, so `--to user` would be an address nothing reaches. What such an answer becomes — a notification back to the web UI, say — is the instance's to decide, and the recipient only has to run the line.
 
-`text` travels untouched. What the model reads is those characters, so replacing them with
-entities would hand it a corrupted message to answer. A body containing the closing tag is
-delivered rather than refused (one substring must not lose a message), and the closing tag is
-found from the end. Only attribute values are escaped — `&` `<` `>` `"` — so a value cannot
-leave its quotes.
+`text` travels untouched. What the model reads is those characters, so replacing them with entities would hand it a corrupted message to answer. A body containing the closing tag is delivered rather than refused (one substring must not lose a message), and the closing tag is found from the end. Only attribute values are escaped — `&` `<` `>` `"` — so a value cannot leave its quotes.
 
 ## The op attribute table
 
-`OP_ATTRIBUTES` declares the following for every op. Authorization, capability gating and
-forwarding all read this table instead of each keeping their own copy of the same branch.
+`OP_ATTRIBUTES` declares the following for every op. Authorization, capability gating and forwarding all read this table instead of each keeping their own copy of the same branch.
 
 | Attribute | Purpose |
 |---|---|
@@ -100,24 +63,15 @@ forwarding all read this table instead of each keeping their own copy of the sam
 | `carrier` | present on an op carried over HTTP rather than as a frame on the WebSocket; who may call it is not the carrier's to decide (below) |
 | `errors` | the codes specific to this op |
 
-The codes that follow from those attributes (`invalid_args`, `hello_required`, `forbidden`,
-`capability_unavailable`, `instance_unreachable`) are derived by `opErrors()` rather than
-listed per op, so adding a capability to an op cannot leave its error list stale.
+The codes that follow from those attributes (`invalid_args`, `hello_required`, `forbidden`, `capability_unavailable`, `instance_unreachable`) are derived by `opErrors()` rather than listed per op, so adding a capability to an op cannot leave its error list stale.
 
 ## Observation is snapshot plus delta, in one shape
 
-Anything observable is a topic you subscribe to. Right after `topic.subscribe` the current
-value arrives once as a frame marked `snapshot: true`, and every later frame carries a change
-in the same payload type. There are no one-shot read ops: subscribing and unsubscribing
-immediately yields the same value.
+Anything observable is a topic you subscribe to. Right after `topic.subscribe` the current value arrives once as a frame marked `snapshot: true`, and every later frame carries a change in the same payload type. There are no one-shot read ops: subscribing and unsubscribing immediately yields the same value.
 
-Every frame names the `instance` it came from. Topics whose meaning is whole-value
-replacement replace per instance, so several instances' values never collide.
+Every frame names the `instance` it came from. Topics whose meaning is whole-value replacement replace per instance, so several instances' values never collide.
 
-Sharing one payload type leaves exactly one question the shape cannot answer: what a later
-frame does to the value already held. The contract holds that as `granularity` in
-`TOPIC_ATTRIBUTES`, so the daemon and the web UI fold the same way instead of each keeping a
-local table of it.
+Sharing one payload type leaves exactly one question the shape cannot answer: what a later frame does to the value already held. The contract holds that as `granularity` in `TOPIC_ATTRIBUTES`, so the daemon and the web UI fold the same way instead of each keeping a local table of it.
 
 | granularity | What a frame carries | How a subscriber folds it | snapshot | Topics |
 |---|---|---|---|---|
@@ -127,114 +81,31 @@ local table of it.
 | `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>`, `transcript.items:<sid>` |
 | `event` | an occurrence rather than a value | holds nothing | no | `notify` |
 
-Which one a topic takes follows from what its value is. Elements that change independently —
-rows that come, go and are updated at separate moments — take `element`. A value that means
-something only entire, where no part of it is ever updated alone, takes `whole`, or
-`per_instance_whole` when several instances each hold a part. A value that only ever grows takes
-`append`, and something that is an occurrence rather than a value takes `event`. The question
-that settles a doubtful case: is there a reason to restate one element because another changed?
-`peers` and `agents` are rows of sessions, each moving on its own, so a frame carries the rows
-that changed. `instances` is one instance's reading of all its links, taken together, which is
-why it is a topic of its own rather than a row of `peers`. `session.errors` is a set the
-instance derives whole by folding one error pattern over its sessions, and `llm.status` is one
-report document — neither has a part that is ever known to have changed by itself.
+Which one a topic takes follows from what its value is. Elements that change independently — rows that come, go and are updated at separate moments — take `element`. A value that means something only entire, where no part of it is ever updated alone, takes `whole`, or `per_instance_whole` when several instances each hold a part. A value that only ever grows takes `append`, and something that is an occurrence rather than a value takes `event`. The question that settles a doubtful case: is there a reason to restate one element because another changed? `peers` and `agents` are rows of sessions, each moving on its own, so a frame carries the rows that changed. `instances` is one instance's reading of all its links, taken together, which is why it is a topic of its own rather than a row of `peers`. `session.errors` is a set the instance derives whole by folding one error pattern over its sessions, and `llm.status` is one report document — neither has a part that is ever known to have changed by itself.
 
-Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence
-rather than a current state. `session.status` is whole rather than per instance because one
-session lives on one instance, leaving no other instance's half to preserve.
-
-## Conventions (machine-checked)
-
-- Times are Unix milliseconds as integers and are named `*_at`; durations carry their unit
-  (`*_ms` / `*_secs`)
-- Names are a `.`-separated hierarchy read left to right, so a prefix names everything
-  below it. An op is `<subject hierarchy>.<verb>` and ends in the verb (`file.read`,
-  `session.env.read`); a topic and an item type end in a noun (`llm.status`,
-  `message.user.in`); a field stays snake_case
-- A `:` carries a parameter — the id of the subject named before it — and appears **once, at
-  the end of the whole name**: `transcript.items:<sid>`, never `transcript:<sid>.items`
-- `_` joins the parts of one word and never two words. `stat_batch` is two words and is spelled
-  `file.stat`; a segment that reads as one word has to be written down as such in
-  `test/conventions.test.ts`, whose list is empty
-- The last segment of the three open item families (`tool.<Name>`, `system.attachment.<kind>`,
-  `hook.<Event>`) is the harness's own spelling and is outside these rules. It is
-  `[A-Za-z0-9_-]+` with no `.` of its own — a harness name carrying one is written with `_` by
-  whoever coins the type — so a reader may split any type name on `.` and get the hierarchy
-- A name sits at the root only when it belongs to no particular subject: the greetings, and
-  the topics that are a set of the whole (`peers`, `agents`, `instances`, `inbox`, `notify`).
-  Those topics are plural because each is a collection, against the singular `instance.*` ops,
-  which address the one instance the caller reached
-- "Unknown" is omitted; "none" is an empty array
-- Identifiers: `sid` is a globally unique uuid, `instance` is the opaque random value an
-  instance issues for itself (16 bytes as hex), `endpoint` is the URL it is dialed at,
-  compared whole including its path, `mid` is `<instance>/<counter>`
-
-The shapes above are checked by `test/conventions.test.ts`, which walks every schema, and the `_` rule is checked against the same list of names — the shape alone cannot tell one word from two, so a two-word segment fails there until someone states that it reads as one.
+Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence rather than a current state. `session.status` is whole rather than per instance because one session lives on one instance, leaving no other instance's half to preserve.
 
 ## The shared key-value store
 
-The control plane carries a small store under named namespaces (`kv.read` / `kv.write` /
-`kv.delete`). All the contract promises is that **a key is unique within its namespace**: a
-value is any JSON, and what it means belongs to whoever writes and reads it.
+The control plane carries a small store under named namespaces (`kv.read` / `kv.write` / `kv.delete`). All the contract promises is that **a key is unique within its namespace**: a value is any JSON, and what it means belongs to whoever writes and reads it.
 
-The store's ops are the only control ops that are `locality: cluster`. A value is held by the
-cluster rather than by one instance, so whichever instance is asked can answer. Mirroring
-between instances is the daemon's job, and two instances that disagree settle it on the later
-`updated_at`. That is why a write may state its own: a value written while an instance was
-unreachable can join later without pretending to be newer than it is.
+The store's ops are the only control ops that are `locality: cluster`. A value is held by the cluster rather than by one instance, so whichever instance is asked can answer. Mirroring between instances is the daemon's job, and two instances that disagree settle it on the later `updated_at`. That is why a write may state its own: a value written while an instance was unreachable can join later without pretending to be newer than it is.
 
-The topic `kv:<ns>` shows one client's save to the others as it happens. The snapshot is every
-entry in the namespace and each later frame is the entries that changed, with **a removal
-carried as an entry marked `deleted: true`** — an absence in a list of changes would say
-nothing. Because the namespace becomes part of a topic name it is kept to an identifier, while
-a key may hold what a person typed and is bounded only in length and by rejecting control
-characters.
+The topic `kv:<ns>` shows one client's save to the others as it happens. The snapshot is every entry in the namespace and each later frame is the entries that changed, with **a removal carried as an entry marked `deleted: true`** — an absence in a list of changes would say nothing. Because the namespace becomes part of a topic name it is kept to an identifier, while a key may hold what a person typed and is bounded only in length and by rejecting control characters.
 
 ## Session classification and retention
 
-Where a session lives and what it runs as (`repo`, `ws`, `cwd`, `repo_root`, `branch`,
-`transcript_path`, `title`, `model`, `effort`) is what the session itself states in
-`hello.session`
-and what the instance repeats on each `peers` row. The names and types are stated in one
-place (`src/session-meta.ts`), so the side that says them and the side that returns them
-cannot spell them differently. What is not stated is omitted, and what an instance can
-derive it derives. A greeting is taken field by field: leaving a field out does not withdraw
-it (one session reaches the instance as a run of short-lived processes, none of which
-knows every field).
+Where a session lives and what it runs as (`repo`, `ws`, `cwd`, `repo_root`, `branch`, `transcript_path`, `title`, `model`, `effort`) is what the session itself states in `hello.session` and what the instance repeats on each `peers` row. The names and types are stated in one place (`src/session-meta.ts`), so the side that says them and the side that returns them cannot spell them differently. What is not stated is omitted, and what an instance can derive it derives. A greeting is taken field by field: leaving a field out does not withdraw it (one session reaches the instance as a run of short-lived processes, none of which knows every field).
 
-The classification (`state`) is **derived by the instance and carried on the row**. Handing
-back the raw inputs for a client to assemble would let each instance's reading drift. The
-vocabulary is three for a connected session (`waiting`, `live`, `live_unmanaged`) and two
-for one that was lost (`paused`, `disappeared`), which the presence of `stopped_at` alone
-separates. Being pinned is a mark a person put there rather than a classification, so it
-travels beside it as `pinned`.
+The classification (`state`) is **derived by the instance and carried on the row**. Handing back the raw inputs for a client to assemble would let each instance's reading drift. The vocabulary is three for a connected session (`waiting`, `live`, `live_unmanaged`) and two for one that was lost (`paused`, `disappeared`), which the presence of `stopped_at` alone separates. Connected and lost are not two lists but one kind of row, so a session appearing or being lost reaches a client as an update to the row it already holds, with its identity intact. Being pinned is a mark a person put there rather than a classification, so it travels beside it as `pinned`.
 
-`protocol_version` on a `peers` row is the generation the row's own connection announced,
-so it is absent for a `live_unmanaged` row: such a row exists because an instance's state
-file names a session live with no connection at all, not because a client greeted it and
-was refused.
+`protocol_version` on a `peers` row is the generation the row's own connection announced, so it is absent for a `live_unmanaged` row: such a row exists because an instance's state file names a session live with no connection at all, not because a client greeted it and was refused.
 
-There is one way in to `stopped_at`: `session.stopping`, by which a session states that it
-is about to stop, with the instance holding that declaration until the disconnection
-arrives so that the two are one event in that order. A session that goes without saying so
-is `disappeared` — what separates stopping on purpose from being lost is the declaration,
-not an observation. The session itself calls it (the role is `session` alone), with the
-harness's end-of-session hook or the `ccmsg` CLI standing in for it.
+There is one way in to `stopped_at`: `session.stopping`, by which a session states that it is about to stop, with the instance holding that declaration until the disconnection arrives so that the two are one event in that order. A session that goes without saying so is `disappeared` — what separates stopping on purpose from being lost is the declaration, not an observation. The session itself calls it (the role is `session` alone), with the harness's end-of-session hook or the `ccmsg` CLI standing in for it.
 
-**How busy a session is is an attribute of the row too**, carried as `gateway_active_at`:
-when inference last ran for it. A session can be busy in any of the connected
-classifications, so folding it into `state` would lose one of the two. It is an instant
-rather than a flag because nothing observes the moment a request stops being in flight — a
-client reads recency against its own threshold. It is absent on an instance with no gateway
-configured, which means there is nothing observing inference, never that the session is
-quiet.
+**How busy a session is is an attribute of the row too**, carried as `gateway_active_at`: when inference last ran for it. A session can be busy in any of the connected classifications, so folding it into `state` would lose one of the two. It is an instant rather than a flag because nothing observes the moment a request stops being in flight — a client reads recency against its own threshold. It is absent on an instance with no gateway configured, which means there is nothing observing inference, never that the session is quiet.
 
-The retention windows for undelivered messages and for the rows of lost sessions are values the
-contract holds (`INBOX_RETENTION_MS` and `LAST_LIVE_RETENTION_MS` of 7 days,
-`INBOX_MAX_PER_SID` of 256). What a person comes back to is one thing — the session and
-what was said to it — so the two cannot expire at different times. The count is matched to
-what a recipient will hold for one session, keeping what the contract accepts to what the
-recipient can still be handed.
+The retention windows for undelivered messages and for the rows of lost sessions are values the contract holds (`INBOX_RETENTION_MS` and `LAST_LIVE_RETENTION_MS` of 7 days, `INBOX_MAX_PER_SID` of 256). What a person comes back to is one thing — the session and what was said to it — so the two cannot expire at different times. The count is matched to what a recipient will hold for one session, keeping what the contract accepts to what the recipient can still be handed.
 
 ## Transcript item types
 
@@ -268,7 +139,7 @@ A call and its result are **two items**, pointing at each other by id through `r
 
 Every item also carries `source` (`offset` and `bytes`), **where in the file the record it was read from begins and how far it runs**. Classifying is fallible, and the one question it cannot answer is what the line actually said: a `transcript.read` bounded to end at `offset + bytes` returns that record, so a client draws typed items and fetches the raw record only for the ones it doubts. Several items out of one record share the address, which makes the fetch a record and never a slice of one.
 
-There are two typed ways in. `transcript.items.read` answers with items over the range a dump is cut by (`since_at` / `since_uuid` / `until_*`) and the same `types` selection; which end a `limit` keeps follows from the bound given: a lower bound (`since_at` / `since_uuid` / `since_id`) reads from the range's start and `next` names the first item left out, and anything else — an upper bound alone (`until_at` / `until_uuid` / `until_id`), or no bound at all — reads the range's last items, with `prev` naming the first one answered, which `until_id` takes to read further back. **A first read therefore asks with no bound and is answered the tail**, the way `transcript.read` with no `before` is, and a reader that wants the transcript from its beginning says so with `since_at: 0` — the typed counterpart of paging `transcript.read` backwards by byte, so a client drawing the newest items first walks back without reading the transcript whole. The `transcript.items:<sid>` topic is the typed form of `transcript:<sid>`: its snapshot is the tail of the list, in a count the instance decides, and every frame after carries what has since been classified. The raw `transcript.read` and `transcript:<sid>` both stay — the typed pair is what a client works in, the raw pair is how it fetches a record by an item's `source`.
+There are two typed ways in. `transcript.items.read` answers with items over the range a dump is cut by (`since_at` / `since_uuid` / `until_*`) and the same `types` selection; which end a `limit` keeps follows from the bound given: a lower bound (`since_at` / `since_uuid` / `since_id`) reads from the range's start and `next` names the first item left out, and anything else — an upper bound alone (`until_at` / `until_uuid` / `until_id`), or no bound at all — reads the range's last items, with `prev` naming the first one answered, which `until_id` takes to read further back. **A first read therefore asks with no bound and is answered the tail**, the way `transcript.read` with no `before` is, and a reader that wants the transcript from its beginning says so with `since_at: 0` — the typed counterpart of paging `transcript.read` backwards by byte, so a client drawing the newest items first walks back without reading the transcript whole. The `transcript.items:<sid>` topic is the typed form of `transcript:<sid>`: its snapshot is the tail of the list, in a count the instance decides, and every frame after carries what has since been classified. The raw `transcript.read` and `transcript:<sid>` are kept alongside — the typed pair is what a client works in, the raw pair is how it fetches a record by an item's `source`.
 
 An element of `types` is a type name, a prefix, either negated with `-`, or `@<preset>`, applied left to right. Presets are not fixed here: an instance's config holds them and `dump.presets.read` reads them. What a preset names is an **interest** — how the work was done, what to hand over — and an interest is not a property of the wire. Type names stay one to one with what a record is, and the groupings people reach for are named by whoever configures them. Expanding a reference, and refusing a cycle or an unconfigured name, belong where the config is validated.
 
@@ -276,175 +147,75 @@ An element of `types` is a type name, a prefix, either negated with `-`, or `@<p
 
 A dump's reply names a path and carries no items, so **the file is where the items actually travel**. Its shape is therefore the contract's too (`SessionDumpFile`: `sid`, `agent_id?`, `written_at`, the selection as applied, `items`, `ids`, as JSON) — otherwise a successor session handed the path, or a client fetching it, would be reading a format nothing states. The file repeats what was asked for because it outlives the request: it has to say on its own what it is a dump of and what was left out.
 
-
 ## Limits the sender keeps to
 
-A limit only the sender can keep to is a value the contract holds. A limit only the receiver
-knows is one the sender cannot read its own refusal against.
+A limit only the sender can keep to is a value the contract holds. A limit only the receiver knows is one the sender cannot read its own refusal against.
 
-`MAX_FRAME_BYTES` of 1 MiB is the ceiling on a single frame — one newline-delimited line, be
-it a request, a reply or a topic frame. A frame over it is answered `bad_request` and the
-connection stays up. What to do with a body above it — split it, write it as a file and send
-the reference — is the caller's decision, so the contract states the limit and not a remedy.
+`MAX_FRAME_BYTES` of 1 MiB is the ceiling on a single frame — one newline-delimited line, be it a request, a reply or a topic frame. A frame over it is answered `bad_request` and the connection stays up. What to do with a body above it — split it, write it as a file and send the reference — is the caller's decision, so the contract states the limit and not a remedy.
 
-A limit the receiver keeps has one thing the sender can read: `rate_limited`, the answer an op gives when
-what it would queue for a reader has filled up. It is apart from `internal_error` because nothing failed and
-the arguments are not what to look at again — the same call sent once the reader has caught up is the one
-that goes through. Only an op that queues for a reader (`notify.send`, `say.post`) declares it; a message
-held for a session that is not reading needs no refusal, since the inbox is where it waits.
+A limit the receiver keeps has one thing the sender can read: `rate_limited`, the answer an op gives when what it would queue for a reader has filled up. It is apart from `internal_error` because nothing failed and the arguments are not what to look at again — the same call sent once the reader has caught up is the one that goes through. Only an op that queues for a reader (`notify.send`, `say.post`) declares it; a message held for a session that is not reading needs no refusal, since the inbox is where it waits.
 
-`TITLE_MAX_CHARS` of 200 is the ceiling on `session.rename`'s `title`, and the schema's
-`maxLength` is the same value. A title is typed into a terminal and becomes a session's first
-line, so it stops at a readable length rather than at whatever the terminal would accept.
+`TITLE_MAX_CHARS` of 200 is the ceiling on `session.rename`'s `title`, and the schema's `maxLength` is the same value. A title is typed into a terminal and becomes a session's first line, so it stops at a readable length rather than at whatever the terminal would accept.
 
 ## Versions and compatibility
 
-`PROTOCOL_VERSION` is an integer naming a generation. Within a generation only optional
-fields and whole new ops may be added; removals and changes of meaning raise it. Peers
-announcing another generation are refused, on client connections and mesh links alike.
-There is no compatibility path.
+`PROTOCOL_VERSION` is an integer naming a generation. Within a generation only optional fields and whole new ops may be added; removals and changes of meaning raise it. Peers announcing another generation are refused, on client connections and mesh links alike. There is no compatibility path.
 
 ## Instances and mesh
 
-**Identity is the `instance` id; what is dialed and what TLS is checked against is the
-`endpoint` URL**, and the two are separate types. The id is an opaque random value an
-instance issues for itself once and keeps through a move. The endpoint is the instance's
-published base URL (`http(s)://<host>[/<prefix>]/`, trailing slash required, no query or
-fragment); several instances may share one origin, so the comparison is the whole URL rather
-than the origin, and the trailing slash is required so `/ccmsg` and `/ccmsg/` are not two
-spellings of one instance.
+**Identity is the `instance` id; what is dialed and what TLS is checked against is the `endpoint` URL**, and the two are separate types. The id is an opaque random value an instance issues for itself once and keeps through a move. The endpoint is the instance's published base URL (`http(s)://<host>[/<prefix>]/`, trailing slash required, no query or fragment); several instances may share one origin, so the comparison is the whole URL rather than the origin, and the trailing slash is required so `/ccmsg` and `/ccmsg/` are not two spellings of one instance.
 
-The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for the WebSocket,
-`<endpoint>mesh/*`, `<endpoint>auth/*`, `<endpoint>webhook/*`. Each keeps the endpoint's own
-scheme and none is rewritten to `ws(s)://` — a WebSocket begins as an HTTP request that
-upgrades, so one spelling of the URL is enough. Cut that way, the value that says where an
-instance lives does not change when a transport moves off `/ws`. Everything keyed by the id — `mid`, the store's keys, the issuer of a
-record or a token — survives the endpoint changing. A greeting answers with the answering
-instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a
-reachability). An entry's `id` is optional, because it is unknown until the handshake with
-that peer has settled — a configured endpoint is known before anything answers there, and a
-peer whose link is down is the last one to drop from the list. `endpoint` is optional on every
-line and on the answering instance's own: an instance that joins no mesh has no URL to give a
-peer. The reply also carries `terminal_gateway` where one stands in front of the machine the
-instance's sessions run on — the base URL a person opens a session's terminal under, as
-`<terminal_gateway>/sessions/<terminal_id>` with the handle the `agents` topic names. It is
-absent where the instance cannot reach its sessions' terminals, the same condition that leaves
-`terminal` out of `capabilities`.
+The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for the WebSocket, `<endpoint>mesh/*`, `<endpoint>auth/*`, `<endpoint>webhook/*`. Each keeps the endpoint's own scheme and none is rewritten to `ws(s)://` — a WebSocket begins as an HTTP request that upgrades, so one spelling of the URL is enough. Cut that way, the value that says where an instance lives does not change when a transport moves off `/ws`. Everything keyed by the id — `mid`, the store's keys, the issuer of a record or a token — survives the endpoint changing. A greeting answers with the answering instance's id and endpoint, and with the instances it can see (each an id, an endpoint and a reachability). An entry's `id` is optional, because it is unknown until the handshake with that peer has settled — a configured endpoint is known before anything answers there, and a peer whose link is down is the last one to drop from the list. `endpoint` is optional on every line and on the answering instance's own: an instance that joins no mesh has no URL to give a peer. The reply also carries `terminal_gateway` where one stands in front of the machine the instance's sessions run on — the base URL a person opens a session's terminal under, as `<terminal_gateway>/sessions/<terminal_id>` with the handle the `agents` topic names. It is absent where the instance cannot reach its sessions' terminals, the same condition that leaves `terminal` out of `capabilities`.
 
-Authentication between instances happens once, at connection time, and a `role: "instance"`
-`hello.instance` starts it (its `mesh` field is the claim and the location of a single-use
-key). The mesh has no op of its own: that greeting is its whole entrance, and every op
-that crosses afterwards is the same op carrying the envelope's mesh fields. The
-`iss` / `aud` compared there are endpoints — trust is rooted in the URL and nowhere else. The
-id the peer names travels in the same hello, and the proof landing is what makes everything
-that hello said trusted, so the receiver keeps an authenticated endpoint-to-id mapping. That
-mapping is what a later `to_instance` id is dialed through. One id binds to one link: a hello
-naming an id already bound to another endpoint is the one closed, and the standing binding
-stays. The procedure of record is mesh-peer-auth in the main ccmsg repository.
+Authentication between instances happens once, at connection time, and a `role: "instance"` `hello.instance` starts it (its `mesh` field is the claim and the location of a single-use key). The mesh has no op of its own: that greeting is its whole entrance, and every op that crosses afterwards is the same op carrying the envelope's mesh fields. The `iss` / `aud` compared there are endpoints — trust is rooted in the URL and nowhere else. The id the peer names travels in the same hello, and the proof landing is what makes everything that hello said trusted, so the receiver keeps an authenticated endpoint-to-id mapping. That mapping is what a later `to_instance` id is dialed through. One id binds to one link: a hello naming an id already bound to another endpoint is the one closed, and the standing binding stays. The procedure of record is the mesh peer authentication decision in the daemon repository.
 
-A forwarded request is authorized again in full at its destination. The envelope's `caller`
-(a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the
-forwarder's own verdict is not carried over. What is taken on trust is the claim itself — the
-forwarder is an authenticated peer, so its word on who called is believed, an assumption that
-holds inside one deployment and nowhere else. A forwarded request naming no caller is
-dispatched as the role of the connection it arrived on (`instance`), which the attribute table
-answers with `forbidden` for every instance-local op. A request that would pass through the
-same instance twice is dropped on the envelope's `hops` rather than looped.
+A forwarded request is authorized again in full at its destination. The envelope's `caller` (a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the forwarder's own verdict is not carried over. What is taken on trust is the claim itself — the forwarder is an authenticated peer, so its word on who called is believed, an assumption that holds inside one deployment and nowhere else. A forwarded request naming no caller is dispatched as the role of the connection it arrived on (`instance`), which the attribute table answers with `forbidden` for every instance-local op. A request that would pass through the same instance twice is dropped on the envelope's `hops` rather than looped.
 
-A broken link is visible from a subscription too. The `instances` topic carries the sending
-instance's view of the mesh, each entry with `reachable`, so learning that a link went down
-does not mean greeting again to find out. Reachability is stated from the sender's position, so
-two instances legitimately disagreeing about one is not a fault.
+A broken link is visible from a subscription too. The `instances` topic carries the sending instance's view of the mesh, each entry with `reachable`, so learning that a link went down does not mean greeting again to find out. Reachability is stated from the sender's position, so two instances legitimately disagreeing about one is not a fault.
 
 ## Authenticating a person
 
-What the contract holds is **the shape on the wire, and nothing else**. The procedure —
-registering and verifying a passkey, the cookie, replicating the records, where a challenge
-is forwarded — is DR-0001 in the main ccmsg repository, and is not copied here.
+What the contract holds is **the shape on the wire, and nothing else**. The procedure — registering and verifying a passkey, the cookie, replicating the records, where a challenge is forwarded — is a decision in the daemon repository, and is not copied here.
 
-The four ops that settle a person's identity (`auth.challenge`, `auth.register`,
-`auth.assert`, `auth.token.refresh`) are **carried over HTTP**: reading and setting a cookie,
-and answering before a connection exists, are things a frame on the WebSocket cannot do. They
-are in the attribute table all the same, because **authorization is not decided outside that
-table** — what a carrier decides is what an op can do, never who may call it. All four are
-`needs_hello: false` and reachable from a connection with no identity yet, as the greetings
-are; the
-`request_id` is composed by the HTTP carrier. They are served at `<endpoint>auth/*`, and
-`RegisterClaims.endpoint` names that same base URL.
+The four ops that settle a person's identity (`auth.challenge`, `auth.register`, `auth.assert`, `auth.token.refresh`) are **carried over HTTP**: reading and setting a cookie, and answering before a connection exists, are things a frame on the WebSocket cannot do. They are in the attribute table all the same, because **authorization is not decided outside that table** — what a carrier decides is what an op can do, never who may call it. All four are `needs_hello: false` and reachable from a connection with no identity yet, as the greetings are; the `request_id` is composed by the HTTP carrier. They are served at `<endpoint>auth/*`, and `RegisterClaims.endpoint` names that same base URL.
 
-Besides the registration URL's token, `auth.register` takes the six digits the command line
-showed when that URL was made. They are not in the URL: the two halves reaching the browser by
-different routes is exactly what makes holding the URL insufficient, and the contract states
-that by taking the code as a required argument. A wrong code and a spent URL are both answered
-with the existing `auth_invalid` / `auth_expired`, which do not say which half failed.
+Besides the registration URL's token, `auth.register` takes the six digits the command line showed when that URL was made. They are not in the URL: the two halves reaching the browser by different routes is exactly what makes holding the URL insufficient, and the contract states that by taking the code as a required argument. A wrong code and a spent URL are both answered with the existing `auth_invalid` / `auth_expired`, which do not say which half failed.
 
-A registration carries its challenge with an issuer beside it, as an assertion does. The value
-is inside `client_data_json` as well, but who may spend it is not, and behind a load balancer
-the instance that issued the challenge, the one that made the registration URL and the one
-receiving this may all be different. The field being optional means a receiver may be left
-with a value and no issuer, in which case it can only honour a challenge it holds itself and
-refuses the rest rather than guessing.
+A registration carries its challenge with an issuer beside it, as an assertion does. The value is inside `client_data_json` as well, but who may spend it is not, and behind a load balancer the instance that issued the challenge, the one that made the registration URL and the one receiving this may all be different. The field being optional means a receiver may be left with a value and no issuer, in which case it can only honour a challenge it holds itself and refuses the rest rather than guessing.
 
-The code is judged by the issuer alone. A receiving instance forwards it beside the token on
-`auth.resolve`'s `register` and decides nothing: the issuer is what counts the attempts, and a
-receiver ruling on the code itself would let an attacker spread guesses across instances with
-none of them counted anywhere.
+The code is judged by the issuer alone. A receiving instance forwards it beside the token on `auth.resolve`'s `register` and decides nothing: the issuer is what counts the attempts, and a receiver ruling on the code itself would let an attacker spread guesses across instances with none of them counted anywhere.
 
-A registration URL's claims carry a `user_id`, sixteen random bytes the issuing instance
-settles on once per subject. The page creates the credential against it as `user.id`, the
-instance keeps it as `CredentialRecord.user_handle`, and an assertion naming a handle is held
-to it. It is not left to the page because the authenticator keeps it beyond the instance's
-reach — two values for one person would be two accounts on their device.
+A registration URL's claims carry a `user_id`, sixteen random bytes the issuing instance settles on once per subject. The page creates the credential against it as `user.id`, the instance keeps it as `CredentialRecord.user_handle`, and an assertion naming a handle is held to it. It is not left to the page because the authenticator keeps it beyond the instance's reach — two values for one person would be two accounts on their device.
 
-A credential record keeps the `endpoint` it was registered for, and an assertion is accepted
-only there: the origin has to match and the request's path has to fall under that base URL.
-`https://h/` and `https://h/personal/` are two endpoints and take two registrations, on one
-host and one RP ID alike — an RP ID says which domain an authenticator answers for, which is
-coarser than which instance a person has been admitted to. Binding to the base URL rather than
-the origin is what stops one instance's credential from being a way into its neighbour.
+A credential record keeps the `endpoint` it was registered for, and an assertion is accepted only there: the origin has to match and the request's path has to fall under that base URL. `https://h/` and `https://h/personal/` are two endpoints and take two registrations, on one host and one RP ID alike — an RP ID says which domain an authenticator answers for, which is coarser than which instance a person has been admitted to. Binding to the base URL rather than the origin is what stops one instance's credential from being a way into its neighbour.
 
-A credential record keeps the `rp_id` it was registered under. A passkey answers only for the
-domain it was created against, so an assertion's `rpIdHash` is checked against that and not
-against the host of whatever endpoint was reached.
+A credential record keeps the `rp_id` it was registered under. A passkey answers only for the domain it was created against, so an assertion's `rpIdHash` is checked against that and not against the host of whatever endpoint was reached.
 
-Two names travel with a registration. `RegisterClaims.issued_label` is what the administrator
-wrote about who the URL was for; `auth.register`'s `device_label` is what the person wrote
-about which device they are on. The credential record keeps both, along with the address and
-user agent at registration and at last use. None of it authenticates anything and nothing is
-decided by it — an address is chosen freely by whoever makes the request. It is there as
-**something to recognise**: the one person reading their own list places a line as theirs
-because the address is their home provider's and the browser is the one they use, or fails to,
-and removes it.
+Two names travel with a registration. `RegisterClaims.issued_label` is what the administrator wrote about who the URL was for; `auth.register`'s `device_label` is what the person wrote about which device they are on. The credential record keeps both, along with the address and user agent at registration and at last use. None of it authenticates anything and nothing is decided by it — an address is chosen freely by whoever makes the request. It is there as **something to recognise**: the one person reading their own list places a line as theirs because the address is their home provider's and the browser is the one they use, or fails to, and removes it.
 
-A credential record also keeps the BE and BS flags of the authenticator data it was
-registered with (`backup_eligible`, `backup_state`), and a token family keeps its most recent
-rotation (`last_refresh`: when, from where, and the `reason` the client stated). Both are
-hints of the same order as the addresses above — **nothing is admitted or refused by either**.
-BE and BS say whether a passkey is one synced across a person's devices or one bound to the
-device it was made on, which is what removing a line costs them; `reason` is the caller's
-unchecked word, and a refresh that states none is as valid as any.
+A credential record also keeps the BE and BS flags of the authenticator data it was registered with (`backup_eligible`, `backup_state`), and a token family keeps its most recent rotation (`last_refresh`: when, from where, and the `reason` the client stated). Both are hints of the same order as the addresses above — **nothing is admitted or refused by either**. BE and BS say whether a passkey is one synced across a person's devices or one bound to the device it was made on, which is what removing a line costs them; `reason` is the caller's unchecked word, and a refresh that states none is as valid as any.
 
 The other three:
 
-- `auth.extend` is a WebSocket op. It moves a live connection's deadline (a greeting's
-  `auth_expires_at`) rather than closing it
-- `auth.resolve` and `auth.rotate` are between instances (`roles: ["instance"]`, `locality:
-  instance-local`). What only an issuer can answer — checking a registration URL, spending a
-  challenge, rotating a token family — is forwarded to it as `to_instance = iss`. A forwarded
-  rotation carries the `reason`, `ip` and `user_agent` the receiving instance observed, since
-  the person is at the other end of its connection and not the issuer's; the issuer writes
-  them to `last_refresh` unchecked, as it does the ones it observes itself
+- `auth.extend` is a WebSocket op. It moves a live connection's deadline (a greeting's `auth_expires_at`) rather than closing it
+- `auth.resolve` and `auth.rotate` are between instances (`roles: ["instance"]`, `locality: instance-local`). What only an issuer can answer — checking a registration URL, spending a challenge, rotating a token family — is forwarded to it as `to_instance = iss`. A forwarded rotation carries the `reason`, `ip` and `user_agent` the receiving instance observed, since the person is at the other end of its connection and not the issuer's; the issuer writes them to `last_refresh` unchecked, as it does the ones it observes itself
 
-A family remembers the refresh values it retired as digests in `retired`, kept until each
-value's own expiry — replicating the values themselves would be handing live secrets around,
-where recognising a replay only asks whether something presented now was once issued here and
-no longer stands.
+A family remembers the refresh values it retired as digests in `retired`, kept until each value's own expiry — replicating the values themselves would be handing live secrets around, where recognising a replay only asks whether something presented now was once issued here and no longer stands.
 
-Credential records and token families are replicated on the `auth.records` topic
-(`roles: ["instance"]`, element granularity). Not on the store, because the store is the
-person's to read and write: a token read out of it would be their session, and a credential
-written into it would be a new way in. A removal travels as a tombstone element, since an
-absence in a list of changes says nothing.
+Credential records and token families are replicated on the `auth.records` topic (`roles: ["instance"]`, element granularity). Not on the store, because the store is the person's to read and write: a token read out of it would be their session, and a credential written into it would be a new way in. A removal travels as a tombstone element, since an absence in a list of changes says nothing.
+
+## Conventions (machine-checked)
+
+- Times are Unix milliseconds as integers and are named `*_at`; durations carry their unit (`*_ms` / `*_secs`)
+- Names are a `.`-separated hierarchy read left to right, so a prefix names everything below it. An op is `<subject hierarchy>.<verb>` and ends in the verb (`file.read`, `session.env.read`); a topic and an item type end in a noun (`llm.status`, `message.user.in`); a field stays snake_case
+- A `:` carries a parameter — the id of the subject named before it — and appears **once, at the end of the whole name**: `transcript.items:<sid>`, never `transcript:<sid>.items`
+- `_` joins the parts of one word and never two words. `stat_batch` is two words and is spelled `file.stat`; a segment that reads as one word has to be written down as such in `test/conventions.test.ts`, whose list is empty
+- The last segment of the three open item families (`tool.<Name>`, `system.attachment.<kind>`, `hook.<Event>`) is the harness's own spelling and is outside these rules. It is `[A-Za-z0-9_-]+` with no `.` of its own — a harness name carrying one is written with `_` by whoever coins the type — so a reader may split any type name on `.` and get the hierarchy
+- A name sits at the root only when it belongs to no particular subject: the greetings, and the topics that are a set of the whole (`peers`, `agents`, `instances`, `inbox`, `notify`). Those topics are plural because each is a collection, against the singular `instance.*` ops, which address the one instance the caller reached
+- "Unknown" is omitted; "none" is an empty array
+- Identifiers: `sid` is a globally unique uuid, `instance` is the opaque random value an instance issues for itself (16 bytes as hex), `endpoint` is the URL it is dialed at, compared whole including its path, `mid` is `<instance>/<counter>`
+
+The shapes above are checked by `test/conventions.test.ts`, which walks every schema, and the `_` rule is checked against the same list of names — the shape alone cannot tell one word from two, so a two-word segment fails there until someone states that it reads as one.
 
 ## What the contract holds
 
@@ -455,16 +226,9 @@ absence in a list of changes says nothing.
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 21 | one closed union |
 
-Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in
-`TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the
-attribute table without writing its schema fails to typecheck; the topics are checked against
-the attribute table in both directions.
+Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in `TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the attribute table without writing its schema fails to typecheck; the topics are checked against the attribute table in both directions.
 
-Types whose vocabulary belongs to `claude` or to `llm-gateway` (`AgentInfo`,
-`LlmRequestInfo`, `LlmStatusReport` and their like) carry the mark `upstream()` makes. The
-mark says that an unfamiliar value is theirs to add — it does not exempt the type from the
-spelling above. Their documents are rewritten into snake_case and Unix milliseconds as the
-daemon takes them in, so what travels here is this contract's spelling.
+Types whose vocabulary belongs to `claude` or to `llm-gateway` (`AgentInfo`, `LlmRequestInfo`, `LlmStatusReport` and their like) carry the mark `upstream()` makes. The mark says that an unfamiliar value is theirs to add — it does not exempt the type from the spelling above. Their documents are rewritten into snake_case and Unix milliseconds as the daemon takes them in, so what travels here is this contract's spelling.
 
 ## The fixtures the contract holds
 

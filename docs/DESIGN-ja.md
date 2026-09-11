@@ -4,11 +4,9 @@
 
 ## ドメイン
 
-このリポジトリが持つのは **wire の契約 1 つ**。誰が何を呼べて、何が返り、どの形の
-frame が push されるかを schema として書き、daemon と webui の双方がそれで検証する。
+このリポジトリが持つのは **wire の契約 1 つ**。誰が何を呼べて、何が返り、どの形の frame が push されるかを schema として書き、daemon と webui の双方がそれで検証する。
 
-契約が実行可能であること (型だけでなく検証器を伴うこと) が要件。型だけの契約は、
-検査を各実装の手書きに委ね、実装ごとに解釈がずれる。
+契約が実行可能であること (型だけでなく検証器を伴うこと) が要件。型だけの契約は、検査を各実装の手書きに委ね、実装ごとに解釈がずれる。
 
 ## 契約の層
 
@@ -32,57 +30,27 @@ frame が push されるかを schema として書き、daemon と webui の双�
 | control | webui、CLI の管理コマンド (user role) | セッション観測・操作、ファイル、launcher、sandbox、llm、診断 |
 | mesh | instance 同士 | op を持たない。入口は `hello.instance` で、以降は封筒の `to_instance` / `from_instance` / `hops` が運ぶ |
 
-4 面は同じ型システム・同じ封筒・同じエラー体系を共有する。面は op 属性表の 1 列であって、
-別々のスキーマではない。
+4 面は同じ型システム・同じ封筒・同じエラー体系を共有する。面は op 属性表の 1 列であって、別々のスキーマではない。
 
-messaging は会話の器 (room) を持たない。宛先は sid ひとつで、会話ログの正本は
-セッションの transcript にある。返信経路も契約に文字列としては載らず、配送 frame の
-`from` に返せば返信になるという構造だけを置く。
+messaging は会話の器 (room) を持たない。宛先は sid ひとつで、会話ログの正本はセッションの transcript にある。返信経路も契約に文字列としては載らず、配送 frame の `from` に返せば返信になるという構造だけを置く。
 
-宛先は sid だが、**送信者は sid とは限らない**。`message.send` を呼べるのは session と
-user の両 role で、人 (webui) は sid を持たない。だから `from` は `Sender` = `Sid | "user"`
-で、リテラルを置くのは「人が送った」と「セッションが送って id が落ちた」を読み分けさせる
-ため (省略にすると区別できない)。既存の sid 値はそのまま通る。`user` 宛には送り返せない
-ので、人への返信をどう届けるかは instance の裁量に置く。
+宛先は sid だが、**送信者は sid とは限らない**。`message.send` を呼べるのは session と user の両 role で、人 (webui) は sid を持たない。だから `from` は `Sender` = `Sid | "user"` で、リテラルを置くのは「人が送った」と「セッションが送って id が落ちた」を読み分けさせるため (省略にすると区別できない)。既存の sid 値はそのまま通る。`user` 宛には送り返せないので、人への返信をどう届けるかは instance の裁量に置く。
 
-即時配送されなかった送信は失敗ではない。応答は inbox に積んだことと、その理由 (相手が
-準備中 / Paused / 消えている / instance に届かない / inbox が一杯 / 相手が今は受け取らない)
-を返し、送信側が待つか別セッションへ送り直すかを選べるようにする。
+即時配送されなかった送信は失敗ではない。応答は inbox に積んだことと、その理由 (相手が準備中 / Paused / 消えている / instance に届かない / inbox が一杯 / 相手が今は受け取らない) を返し、送信側が待つか別セッションへ送り直すかを選べるようにする。
 
 ## 直送時の本文表現
 
-配送 frame を読めない受け手が 1 つだけある。ハーネス自身の messaging socket へ直接
-書き込んで渡す経路で、そこでの受け手はクライアントではなくモデルであり、届くのは
-1 かたまりのテキストだけになる。frame を見られない以上、**`mid` と `from` が本文に
-無ければ返信できない** (何かが届いたことだけ分かって、何にどう返すかが分からない)。
-だから直送時の本文表現だけは契約が定める (`renderDirectDelivery` / `parseDirectDelivery`)。
+配送 frame を読めない受け手が 1 つだけある。ハーネス自身の messaging socket へ直接書き込んで渡す経路で、そこでの受け手はクライアントではなくモデルであり、届くのは 1 かたまりのテキストだけになる。frame を見られない以上、**`mid` と `from` が本文に無ければ返信できない** (何かが届いたことだけ分かって、何にどう返すかが分からない)。だから直送時の本文表現だけは契約が定める (`renderDirectDelivery` / `parseDirectDelivery`)。
 
-形はハーネス自身の送信側規約に乗せる。本文に `<cross-session-message>` を埋め、
-`from` / `from-name` / `from-mode` は受信ハーネスが読む origin、`ccmsg-mid` /
-`ccmsg-from` / `ccmsg-reply-to` は契約側の識別子を置く。本文の `from` は `ccmsg` 固定で、
-sid も `uds:` パスも書かない — それらはハーネスが実際にダイヤルする宛先で、消えた相手に
-ダイヤルすると受信側のターンが失敗で終わる。書き込む frame 側の `from` はこれとは別で、
-instance が送達ステータスを受ける `uds:` パスを名乗ってよい。その receipt は `refused` /
-`denied` / `dropped` / `expired` / `held` の否定応答だけで、肯定応答は無い (= 期限内の
-沈黙が配送成功)。返る道は本文末尾の 1 行
-(`Reply with: ccmsg reply <mid> --to <sid> <text>`) で、これは受け手自身が実行する。
-宛先 sid を書き下すのは `mid` が送信者を含まないため。引かせる形にすると mid → 送信者の
-op が要り、そのために daemon が送信済み索引を持つことになる。
+形はハーネス自身の送信側規約に乗せる。本文に `<cross-session-message>` を埋め、`from` / `from-name` / `from-mode` は受信ハーネスが読む origin、`ccmsg-mid` / `ccmsg-from` / `ccmsg-reply-to` は契約側の識別子を置く。本文の `from` は `ccmsg` 固定で、sid も `uds:` パスも書かない — それらはハーネスが実際にダイヤルする宛先で、消えた相手にダイヤルすると受信側のターンが失敗で終わる。書き込む frame 側の `from` はこれとは別で、instance が送達ステータスを受ける `uds:` パスを名乗ってよい。その receipt は `refused` / `denied` / `dropped` / `expired` / `held` の否定応答だけで、肯定応答は無い (= 期限内の沈黙が配送成功)。返る道は本文末尾の 1 行 (`Reply with: ccmsg reply <mid> --to <sid> <text>`) で、これは受け手自身が実行する。宛先 sid を書き下すのは `mid` が送信者を含まないため。引かせる形にすると mid → 送信者の op が要り、そのために daemon が送信済み索引を持つことになる。
 
-送信者が人 (`from` が `user`) の場合だけ `--to` が落ちて
-`Reply with: ccmsg reply <mid> <text>` になる。`user` は sid ではないので `--to user` は
-届かない宛先になる。その返信が何になるか (webui へ notify として流す等) は instance の
-裁量で、受け手はこの 1 行を実行するだけでよい。
+送信者が人 (`from` が `user`) の場合だけ `--to` が落ちて `Reply with: ccmsg reply <mid> <text>` になる。`user` は sid ではないので `--to user` は届かない宛先になる。その返信が何になるか (webui へ notify として流す等) は instance の裁量で、受け手はこの 1 行を実行するだけでよい。
 
-`text` は無加工で運ぶ。モデルが読むのはその文字そのものなので、実体参照に置き換えると
-壊れた本文を返信対象として渡すことになる。本文に閉じタグが含まれていても拒否せず
-(部分文字列 1 つでメッセージを失わせない)、閉じタグは末尾から探す。属性値だけは
-引用符の外へ出られないよう `&` `<` `>` `"` を実体参照にする。
+`text` は無加工で運ぶ。モデルが読むのはその文字そのものなので、実体参照に置き換えると壊れた本文を返信対象として渡すことになる。本文に閉じタグが含まれていても拒否せず (部分文字列 1 つでメッセージを失わせない)、閉じタグは末尾から探す。属性値だけは引用符の外へ出られないよう `&` `<` `>` `"` を実体参照にする。
 
 ## op 属性表
 
-`OP_ATTRIBUTES` が全 op について次を宣言する。認可・能力判定・転送はすべてこの表を引き、
-各所に同型の分岐を置かない。
+`OP_ATTRIBUTES` が全 op について次を宣言する。認可・能力判定・転送はすべてこの表を引き、各所に同型の分岐を置かない。
 
 | 属性 | 用途 |
 |---|---|
@@ -95,22 +63,15 @@ op が要り、そのために daemon が送信済み索引を持つことにな
 | `carrier` | WS の frame でなく HTTP で運ぶ op に付く。誰が呼べるかは carrier では決まらない (下記) |
 | `errors` | その op に固有のコード |
 
-属性から決まるコード (`invalid_args` / `hello_required` / `forbidden` /
-`capability_unavailable` / `instance_unreachable`) は表に書かず `opErrors()` が導く。
-op に capability を足した時に error 一覧が古びない。
+属性から決まるコード (`invalid_args` / `hello_required` / `forbidden` / `capability_unavailable` / `instance_unreachable`) は表に書かず `opErrors()` が導く。op に capability を足した時に error 一覧が古びない。
 
 ## 観測系は snapshot + delta の 1 形
 
-観測できるものは topic として購読する。`topic.subscribe` の直後に現在値が
-`snapshot: true` 付きの frame で 1 回届き、以後は同じ payload 型で変化が届く。
-one-shot の取得 op は置かない (購読して即解除すれば同じものが得られる)。
+観測できるものは topic として購読する。`topic.subscribe` の直後に現在値が `snapshot: true` 付きの frame で 1 回届き、以後は同じ payload 型で変化が届く。one-shot の取得 op は置かない (購読して即解除すれば同じものが得られる)。
 
-frame は発生元の `instance` を必ず伴う。全量置換の意味を持つ topic は
-instance ごとの全量置換になり、複数 instance の全量が衝突しない。
+frame は発生元の `instance` を必ず伴う。全量置換の意味を持つ topic は instance ごとの全量置換になり、複数 instance の全量が衝突しない。
 
-payload 型が同じであるぶん、「後続の frame が手元の値に対して何をするか」だけは形から
-読めない。それを `TOPIC_ATTRIBUTES` の `granularity` として契約が持ち、daemon と webui が
-同じ表で畳む (各実装がローカル表を持たない)。
+payload 型が同じであるぶん、「後続の frame が手元の値に対して何をするか」だけは形から読めない。それを `TOPIC_ATTRIBUTES` の `granularity` として契約が持ち、daemon と webui が同じ表で畳む (各実装がローカル表を持たない)。
 
 | granularity | frame が持つもの | 購読側の畳み方 | snapshot | topic |
 |---|---|---|---|---|
@@ -120,98 +81,31 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 | `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` `transcript.items:<sid>` |
 | `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
 
-どれを取るかは、その値が何であるかから決まる。要素が独立して変化する (行の出入り・更新が別々の
-時刻に起きる) なら `element`。値が 1 つの塊として意味を持ち、一部だけが単独で更新されることが
-無いなら `whole`、その塊を instance ごとに持つなら `per_instance_whole`。増える一方なら
-`append`、値でなく出来事なら `event`。迷ったら「1 つの要素の変化で他の要素を送り直す理由が
-あるか」を問う。`peers` と `agents` はセッションの行の集まりで各行が別々に動くので、frame は
-変化した行だけを運ぶ。`instances` は 1 つの instance が自分の全リンクをまとめて読んだ結果
-なので、`peers` の行ではなく独立した topic にする。`session.errors` は instance が 1 つの
-error パターンを全セッションに畳んで導く集合、`llm.status` は 1 つの報告文書で、どちらも
-「一部だけが変わった」と分かる作りになっていない。
+どれを取るかは、その値が何であるかから決まる。要素が独立して変化する (行の出入り・更新が別々の時刻に起きる) なら `element`。値が 1 つの塊として意味を持ち、一部だけが単独で更新されることが無いなら `whole`、その塊を instance ごとに持つなら `per_instance_whole`。増える一方なら `append`、値でなく出来事なら `event`。迷ったら「1 つの要素の変化で他の要素を送り直す理由があるか」を問う。`peers` と `agents` はセッションの行の集まりで各行が別々に動くので、frame は変化した行だけを運ぶ。`instances` は 1 つの instance が自分の全リンクをまとめて読んだ結果なので、`peers` の行ではなく独立した topic にする。`session.errors` は instance が 1 つの error パターンを全セッションに畳んで導く集合、`llm.status` は 1 つの報告文書で、どちらも「一部だけが変わった」と分かる作りになっていない。
 
-`event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の
-発生から届く。`session.status` が instance ごとでなく全体置換なのは、1 セッションが 1
-instance にしか居らず、他 instance の分を残す必要が無いため。
-
-## 表記規約 (機械検査あり)
-
-- 時刻は Unix ms の整数で、名前は `*_at`。長さは単位を名前に持つ (`*_ms` / `*_secs`)
-- 名前は `.` 区切りの階層で左から読み、prefix がその配下すべてを指す。op は
-  `<対象の階層>.<動詞>` で動詞に終わり (`file.read` / `session.env.read`)、topic と item 型は
-  名詞に終わる (`llm.status` / `message.user.in`)。フィールドは snake_case のまま
-- `:` はパラメータ (直前で名指した対象の id) を運び、**名前全体の末尾に 1 回だけ**付く。
-  `transcript.items:<sid>` であって `transcript:<sid>.items` ではない
-- `_` は 1 語の中の結合にだけ使い、2 語を繋がない。`stat_batch` は 2 語なので `file.stat` と
-  綴る。1 語として読む綴りは `test/conventions.test.ts` に書き出す必要があり、その一覧は今は空
-- 開いた 3 つの item 族 (`tool.<Name>` / `system.attachment.<kind>` / `hook.<Event>`) の
-  最終セグメントは harness の綴りで、この規約の外にある。文字集合は `[A-Za-z0-9_-]+` で `.` を
-  含まない (harness 名に `.` があれば型を coin する側が `_` へ写す) ので、読み手は型名を `.` で
-  分割して階層を得てよい
-- 根 (prefix 無し) に置けるのは特定の対象に属さない名前だけ = 挨拶と、全体の集合である topic
-  (`peers` / `agents` / `instances` / `inbox` / `notify`)。これらの topic が複数形なのは集合だから
-  で、単数の `instance.*` op (呼び手が到達した当の instance を指す) と対になる
-- 「不明」は省略、「無い」は空配列
-- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な
-  乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、
-  `mid` は `<instance>/<連番>`
-
-形の検査は `test/conventions.test.ts` が全 schema を走査して行い、`_` の規則は同じ名前の一覧に対して別に検査する — 形だけでは 1 語と 2 語を区別できないので、2 語のセグメントは「1 語として読む」と書き出すまで落ちる。
+`event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の発生から届く。`session.status` が instance ごとでなく全体置換なのは、1 セッションが 1 instance にしか居らず、他 instance の分を残す必要が無いため。
 
 ## 共有 kv
 
-control 面に namespace 付きの kv (`kv.read` / `kv.write` / `kv.delete`) がある。契約が約束するのは
-**ns 内で key が一意**なことだけで、`value` は任意の JSON、意味は書き手と読み手のものになる。
+control 面に namespace 付きの kv (`kv.read` / `kv.write` / `kv.delete`) がある。契約が約束するのは **ns 内で key が一意**なことだけで、`value` は任意の JSON、意味は書き手と読み手のものになる。
 
-kv だけは control 面で唯一 `locality: cluster`。値は特定の instance ではなくクラスタが持つので、
-どの instance に聞いても答えられる。instance 間のミラーは daemon の責務で、食い違った時は
-`updated_at` の新しい方が残る。だから書き込みは `updated_at` を明示でき、届かなかった間に
-書かれた値が後から実際の時刻のまま合流できる。
+kv だけは control 面で唯一 `locality: cluster`。値は特定の instance ではなくクラスタが持つので、どの instance に聞いても答えられる。instance 間のミラーは daemon の責務で、食い違った時は `updated_at` の新しい方が残る。だから書き込みは `updated_at` を明示でき、届かなかった間に書かれた値が後から実際の時刻のまま合流できる。
 
-topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapshot は ns の全 entry、以後の frame は
-変化した entry で、**削除は `deleted: true` を付けた entry として届く** (変化の一覧における不在は
-何も言わないため)。ns が topic 名の一部になるので、ns は識別子に限る (key は人が打った文字列を
-許し、長さと制御文字だけを縛る)。
+topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapshot は ns の全 entry、以後の frame は変化した entry で、**削除は `deleted: true` を付けた entry として届く** (変化の一覧における不在は何も言わないため)。ns が topic 名の一部になるので、ns は識別子に限る (key は人が打った文字列を許し、長さと制御文字だけを縛る)。
 
 ## セッションの分類と保持窓
 
-セッションの居場所と実行条件 (`repo` / `ws` / `cwd` / `repo_root` / `branch` /
-`transcript_path` / `title` / `model` / `effort`) はセッション自身が `hello.session` で名乗り、
-instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (`src/session-meta.ts`) に
-置き、名乗る側と返す側で綴りが分かれないようにする。名乗られなかったものは省略される
-(instance が導けるものは導く)。名乗りはフィールド単位で取り込まれ、名乗らないことは撤回では
-なく不変を意味する (1 セッションは短命プロセスの連なりとして届き、どのプロセスも全フィールドを
-知らない)。
+セッションの居場所と実行条件 (`repo` / `ws` / `cwd` / `repo_root` / `branch` / `transcript_path` / `title` / `model` / `effort`) はセッション自身が `hello.session` で名乗り、instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (`src/session-meta.ts`) に置き、名乗る側と返す側で綴りが分かれないようにする。名乗られなかったものは省略される (instance が導けるものは導く)。名乗りはフィールド単位で取り込まれ、名乗らないことは撤回ではなく不変を意味する (1 セッションは短命プロセスの連なりとして届き、どのプロセスも全フィールドを知らない)。
 
-一覧の分類 (`state`) は **instance が導いて行に載せる**。生の入力を返して client 側で
-組み立てると、instance ごとに解釈がずれる。語彙は接続中の 3 つ (`waiting` / `live` /
-`live_unmanaged`) と、失われた側の 2 つ (`paused` / `disappeared`) で、両者を分けるのは
-`stopped_at` の有無ひとつ。接続中と失われた側は 2 つの一覧ではなく同じ 1 種類の行で、
-セッションの登録や消失は同一性を保ったままの更新として、client が既に持つ行に届く。
-Pinned は人が付けた印であって分類ではないので、`pinned` として
-分類の隣に置く。
+一覧の分類 (`state`) は **instance が導いて行に載せる**。生の入力を返して client 側で組み立てると、instance ごとに解釈がずれる。語彙は接続中の 3 つ (`waiting` / `live` / `live_unmanaged`) と、失われた側の 2 つ (`paused` / `disappeared`) で、両者を分けるのは `stopped_at` の有無ひとつ。接続中と失われた側は 2 つの一覧ではなく同じ 1 種類の行で、セッションの登録や消失は同一性を保ったままの更新として、client が既に持つ行に届く。Pinned は人が付けた印であって分類ではないので、`pinned` として分類の隣に置く。
 
-`peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、
-`live_unmanaged` の行では欠ける。この行は client が greet して拒まれたのではなく、
-instance の状態ファイルがそのセッションを接続なしで生きていると名乗っているだけだからだ。
+`peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、`live_unmanaged` の行では欠ける。この行は client が greet して拒まれたのではなく、instance の状態ファイルがそのセッションを接続なしで生きていると名乗っているだけだからだ。
 
-`stopped_at` が付く入口は `session.stopping` ひとつ。セッションが自分で「これから止まる」と
-宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは
-`disappeared` になる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で
-決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の
-CLI がその代理になる。
+`stopped_at` が付く入口は `session.stopping` ひとつ。セッションが自分で「これから止まる」と宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは `disappeared` になる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の CLI がその代理になる。
 
-**忙しさも分類ではなく行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として
-載せる。接続中のどの分類であっても忙しくはなり得るので、`state` に畳むと片方が失われる。
-真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client
-が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、では
-なく観測手段が無い)。
+**忙しさも分類ではなく行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として載せる。接続中のどの分類であっても忙しくはなり得るので、`state` に畳むと片方が失われる。真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、ではなく観測手段が無い)。
 
-未配送メッセージと、失われたセッションの行の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` /
-`LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは
-「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。
-件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に
-渡しうるものに保つ。
+未配送メッセージと、失われたセッションの行の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` / `LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に渡しうるものに保つ。
 
 ## transcript のアイテム型
 
@@ -245,156 +139,83 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 各アイテムは `source` (`offset` / `bytes`) で**元 record のファイル内の位置**も持つ。分類は誤りうるもので、それが答えられない唯一の問いが「その行は実際に何と書いてあったか」になる。`transcript.read` を `offset + bytes` で終わるよう指定すればその record 自体が返るので、client は普段は型付きアイテムを描き、怪しいものだけ生の record を取り寄せられる。1 record から複数アイテムが出た場合は同じ番地を共有し、取り寄せは record 単位になる。
 
-型付きの読み取り経路は 2 つ。`transcript.items.read` は dump と同じ範囲指定 (`since_at` / `since_uuid` / `until_*`) と `types` 選択でアイテムを返し、`limit` がどちら端を残すかは与えた境界で決まる。下限 (`since_at` / `since_uuid` / `since_id`) があれば範囲の先頭から返し、切れたら `next` が次のアイテム id を名乗る (`since_id` で続きを読む)。それ以外 — 上限 (`until_at` / `until_uuid` / `until_id`) だけ、または境界を何も置かない場合 — は範囲の末尾から返し、`prev` が返した先頭のアイテム id を名乗る (`until_id` で手前を読む)。つまり **境界を置かない初回の読みには末尾が返る**。`transcript.read` が `before` 無指定で末尾を返すのと同じで、先頭から読みたい側は `since_at: 0` と言う — 新しい方から描く client が transcript 全体を読まずに遡れる経路で、`transcript.read` の byte 逆送りと同じ役割を型付き側で果たす。`transcript.items:<sid>` topic は `transcript:<sid>` の型付き版で、snapshot が末尾側のアイテム (件数は instance が決める)、以降の frame が新しく分類されたアイテムを運ぶ。生の `transcript.read` と `transcript:<sid>` はそのまま残る — 型付きが普段の経路で、生は `source` で record を取り寄せる経路になる。
+型付きの読み取り経路は 2 つ。`transcript.items.read` は dump と同じ範囲指定 (`since_at` / `since_uuid` / `until_*`) と `types` 選択でアイテムを返し、`limit` がどちら端を残すかは与えた境界で決まる。下限 (`since_at` / `since_uuid` / `since_id`) があれば範囲の先頭から返し、切れたら `next` が次のアイテム id を名乗る (`since_id` で続きを読む)。それ以外 — 上限 (`until_at` / `until_uuid` / `until_id`) だけ、または境界を何も置かない場合 — は範囲の末尾から返し、`prev` が返した先頭のアイテム id を名乗る (`until_id` で手前を読む)。つまり **境界を置かない初回の読みには末尾が返る**。`transcript.read` が `before` 無指定で末尾を返すのと同じで、先頭から読みたい側は `since_at: 0` と言う — 新しい方から描く client が transcript 全体を読まずに遡れる経路で、`transcript.read` の byte 逆送りと同じ役割を型付き側で果たす。`transcript.items:<sid>` topic は `transcript:<sid>` の型付き版で、snapshot が末尾側のアイテム (件数は instance が決める)、以降の frame が新しく分類されたアイテムを運ぶ。生の `transcript.read` と `transcript:<sid>` は型付きと並んで在る — 型付きが普段の経路で、生は `source` で record を取り寄せる経路になる。
 
 選択 (`types`) の要素は型名・prefix・`-` 付きの除外・`@<preset 名>` で、左から順に適用する。preset は契約に焼かず instance の config が持つ (`dump.presets.read` で引く)。preset が名付けるのは「調査のノウハウ」「引き継ぎ」といった**関心の切り方**であって wire の性質ではない。型名は行の実体と 1 対 1 に保ち、束ね方は operator が名付ける側に置く。展開の再帰と、循環・未定義名の拒否は config を検証する場所の責務。
 
-`session.dump.write` の結果の `entries` は総数から**型ごとの件数**になり、`ids` 台帳が加わった。総数だけでは、頼んだものが入った dump と選択がほとんど何にも当たらなかった dump を呼び手が区別できない。台帳はアイテムが持つ id を集めたもので、ここに出た agent を次の dump の主語にすれば、ファイルを開かずに掘り下げられる。id は「その行が何か」ではなく「その行をどう指すか」なので、型の並びには入れない。
+`session.dump.write` の結果の `entries` は総数ではなく**型ごとの件数**で、隣に `ids` 台帳が付く。総数だけでは、頼んだものが入った dump と選択がほとんど何にも当たらなかった dump を呼び手が区別できない。台帳はアイテムが持つ id を集めたもので、ここに出た agent を次の dump の主語にすれば、ファイルを開かずに掘り下げられる。id は「その行が何か」ではなく「その行をどう指すか」なので、型の並びには入れない。
 
 dump の返答は path を返すだけで item を運ばないので、**item が実際に travel するのは file の側**になる。だから file の形も契約が持つ (`SessionDumpFile`: `sid` / `agent_id?` / `written_at` / 適用後の `types` / `items` / `ids` の JSON)。path を渡された後継セッションや、それを取りに行く client が、どこにも書かれていない形式を読むことになるのを避けるため。file が依頼内容を繰り返し持つのは、file が依頼より長生きするから — 何の dump で何を落としたかを、file 自身が言えなければならない。
 
-
 ## 送る側が守る上限
 
-守れるのが送る側だけの上限は、契約が値として持つ。相手だけが知っている上限は、超えた時に
-「なぜ落ちたか」を送信側が読み取れないため。
+守れるのが送る側だけの上限は、契約が値として持つ。相手だけが知っている上限は、超えた時に「なぜ落ちたか」を送信側が読み取れないため。
 
-`MAX_FRAME_BYTES` = 1 MiB は 1 frame (改行区切りの 1 行、request / response / topic frame
-のいずれも) の上限。超えた frame は `bad_request` になるが接続は保たれる。1 MiB を超える
-本文をどう扱うか (分割する / ファイルに書いて参照を送る) は呼ぶ側の判断なので、契約は
-上限だけを置いて回避策は置かない。
+`MAX_FRAME_BYTES` = 1 MiB は 1 frame (改行区切りの 1 行、request / response / topic frame のいずれも) の上限。超えた frame は `bad_request` になるが接続は保たれる。1 MiB を超える本文をどう扱うか (分割する / ファイルに書いて参照を送る) は呼ぶ側の判断なので、契約は上限だけを置いて回避策は置かない。
 
 受け取る側が守る上限のうち、送る側が読み取れるものが 1 つある。`rate_limited` は「読み手に届けるために積む先が埋まっている」時の返答で、`internal_error` とは別に置く — 失敗したものは何も無く、引数を読み直す話でもないから。読み手が追いついてから同じ呼び出しを送れば通る。宣言するのは読み手向けに積む op (`notify.send` / `say.post`) だけで、読んでいないセッション宛の message は inbox で待てるので拒否自体が要らない。
 
-`TITLE_MAX_CHARS` = 200 は `session.rename` の `title` の上限で、schema の `maxLength` と
-同じ値。title は端末に打ち込まれてセッションの 1 行目になるので、端末が受け付けるかどうか
-とは別に読める長さで頭打ちにする。
+`TITLE_MAX_CHARS` = 200 は `session.rename` の `title` の上限で、schema の `maxLength` と同じ値。title は端末に打ち込まれてセッションの 1 行目になるので、端末が受け付けるかどうかとは別に読める長さで頭打ちにする。
 
 ## 版と互換
 
-`PROTOCOL_VERSION` は世代を表す整数。同一世代内で許すのは任意フィールドと op の追加だけで、
-削除と意味変更は世代を上げる。世代の違う相手とは話さない (client 接続も mesh も同じ)。
-互換経路は持たない。
+`PROTOCOL_VERSION` は世代を表す整数。同一世代内で許すのは任意フィールドと op の追加だけで、削除と意味変更は世代を上げる。世代の違う相手とは話さない (client 接続も mesh も同じ)。互換経路は持たない。
 
 ## instance と mesh
 
-**identity は `instance` (id)、dial 先と TLS の照合先は `endpoint` (URL)** で、2 つは別の型。
-id は instance が自分に 1 度だけ発行する不透明な乱数で、引っ越しても変わらない。endpoint は
-instance の公開 base URL (`http(s)://<host>[/<prefix>]/`、末尾 `/` 必須、query/fragment 無し)
-で、同一 origin に複数 instance が相乗りするため比較は origin ではなく URL 全体で行う
-(末尾 `/` を必須にするのは `/ccmsg` と `/ccmsg/` が同じ instance の 2 通りの綴りにならないため)。
+**identity は `instance` (id)、dial 先と TLS の照合先は `endpoint` (URL)** で、2 つは別の型。id は instance が自分に 1 度だけ発行する不透明な乱数で、引っ越しても変わらない。endpoint は instance の公開 base URL (`http(s)://<host>[/<prefix>]/`、末尾 `/` 必須、query/fragment 無し) で、同一 origin に複数 instance が相乗りするため比較は origin ではなく URL 全体で行う (末尾 `/` を必須にするのは `/ccmsg` と `/ccmsg/` が同じ instance の 2 通りの綴りにならないため)。
 
-route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws`、mesh は
-`<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は `<endpoint>webhook/*`。どれも
-endpoint の scheme のままで、`ws(s)://` への書き換えは無い (WS も HTTP request として始まり
-upgrade するので、URL の綴りは 1 つで足りる)。こう切っておくと、transport が `/ws` 以外に
-移っても「instance がどこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は
-endpoint が変わっても無効にならない。挨拶の応答は自 instance の id と endpoint、および
-mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は
-handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない
-段階から分かっており、link が落ちている相手こそ一覧から消してはならない。`endpoint` は一覧の
-各行でも自 instance の行でも任意で、mesh に参加しない instance は peer に渡す URL を持たない。
-自 instance のセッションが動く端末の前に gateway が居る場合は `terminal_gateway` も返る。人が
-セッションの端末を開く base URL で、開く先は `agents` topic が名乗る handle を使って
-`<terminal_gateway>/sessions/<terminal_id>`。端末に届かない instance では省かれ、それは
-`capabilities` から `terminal` が落ちるのと同じ条件。
+route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws`、mesh は `<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は `<endpoint>webhook/*`。どれも endpoint の scheme のままで、`ws(s)://` への書き換えは無い (WS も HTTP request として始まり upgrade するので、URL の綴りは 1 つで足りる)。こう切っておくと、transport が `/ws` 以外に移っても「instance がどこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は endpoint が変わっても無効にならない。挨拶の応答は自 instance の id と endpoint、および mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない段階から分かっており、link が落ちている相手こそ一覧から消してはならない。`endpoint` は一覧の各行でも自 instance の行でも任意で、mesh に参加しない instance は peer に渡す URL を持たない。自 instance のセッションが動く端末の前に gateway が居る場合は `terminal_gateway` も返る。人がセッションの端末を開く base URL で、開く先は `agents` topic が名乗る handle を使って `<terminal_gateway>/sessions/<terminal_id>`。端末に届かない instance では省かれ、それは `capabilities` から `terminal` が落ちるのと同じ条件。
 
-instance 間の認証は接続確立時 1 回で、`hello.instance` がその起点になる。mesh は自分の op を持たず、入口はこの挨拶ひとつで、以降 instance をまたぐのは封筒の mesh フィールドを載せた同じ op である
-(`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint —
-信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の
-内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance`
-の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に
-束縛済みの id を名乗る hello は新しく来た側を閉じる (既存の束縛を優先する)。手順の正本は ccmsg
-本体リポの mesh-peer-auth。
+instance 間の認証は接続確立時 1 回で、`hello.instance` がその起点になる。mesh は自分の op を持たず、入口はこの挨拶ひとつで、以降 instance をまたぐのは封筒の mesh フィールドを載せた同じ op である (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint — 信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance` の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に束縛済みの id を名乗る hello は新しく来た側を閉じる (既存の束縛を優先する)。手順の正本は daemon リポの decisions にある mesh peer 認証の項。
 
-転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら
-`sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の
-主張だけ — 転送元は認証済み peer なので「誰が呼んだか」の申告は信じる、という 1 deployment
-内でだけ成り立つ前提に立つ。`caller` の無い転送 request は接続そのものの role (`instance`)
-で扱われ、instance-local op は属性表どおり `forbidden` になる。同じ instance を 2 度通る
-request は封筒の `hops` で落とし、ループさせない。
+転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら `sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の主張だけ — 転送元は認証済み peer なので「誰が呼んだか」の申告は信じる、という 1 deployment 内でだけ成り立つ前提に立つ。`caller` の無い転送 request は接続そのものの role (`instance`) で扱われ、instance-local op は属性表どおり `forbidden` になる。同じ instance を 2 度通る request は封筒の `hops` で落とし、ループさせない。
 
-mesh の断絶は購読からも見える。`instances` topic が発生元 instance から見た mesh 一覧
-(`reachable` 付き) を運ぶので、断絶を知るために挨拶をやり直す必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは
-正常にあり得る。
+mesh の断絶は購読からも見える。`instances` topic が発生元 instance から見た mesh 一覧 (`reachable` 付き) を運ぶので、断絶を知るために挨拶をやり直す必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは正常にあり得る。
 
 ## 人の認証
 
-契約が持つのは **wire の形だけ**。手順 (passkey の登録・検証、cookie、record の複製、
-challenge の転送先) の正本は ccmsg 本体リポの DR-0001 で、ここに複製しない。
+契約が持つのは **wire の形だけ**。手順 (passkey の登録・検証、cookie、record の複製、challenge の転送先) の正本は daemon リポの decisions にあり、ここに複製しない。
 
-人の identity を確定させる 4 op (`auth.challenge` / `auth.register` / `auth.assert` /
-`auth.token.refresh`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答える
-ことが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に
-置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」
-ではない。この 4 つは `needs_hello: false` で、挨拶と同じく identity 未確定の接続から
-呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*` で、
-`RegisterClaims.endpoint` もこの base URL を指す。
+人の identity を確定させる 4 op (`auth.challenge` / `auth.register` / `auth.assert` / `auth.token.refresh`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答えることが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」ではない。この 4 つは `needs_hello: false` で、挨拶と同じく identity 未確定の接続から呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*` で、`RegisterClaims.endpoint` もこの base URL を指す。
 
-`auth.register` は登録 URL の token とは別に、URL を発行した CLI が表示した 6 桁のコードを
-受け取る。コードは URL に含めない — 2 つが別の経路でブラウザに届くことが「URL を持っている
-だけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを
-形にする。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、
-どちらの半分が失敗したかは名乗らない。
+`auth.register` は登録 URL の token とは別に、URL を発行した CLI が表示した 6 桁のコードを受け取る。コードは URL に含めない — 2 つが別の経路でブラウザに届くことが「URL を持っているだけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを形にする。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、どちらの半分が失敗したかは名乗らない。
 
-登録も assertion と同じく challenge を issuer 付きで運ぶ。値は `client_data_json` の中にも
-あるが「誰が使い切れるか」は入っておらず、LB の下では challenge の発行 instance・登録 URL を
-作った instance・この request を受けた instance が全部違い得るため。任意フィールドなので
-省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を
-持っている場合しか通せない (推測して通すことはしない)。
+登録も assertion と同じく challenge を issuer 付きで運ぶ。値は `client_data_json` の中にもあるが「誰が使い切れるか」は入っておらず、LB の下では challenge の発行 instance・登録 URL を作った instance・この request を受けた instance が全部違い得るため。任意フィールドなので省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を持っている場合しか通せない (推測して通すことはしない)。
 
-コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `register` に token と
-一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、
-受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。
+コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `register` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。
 
-登録 URL の claims は `user_id` (発行 instance が `sub` ごとに 1 度決める 16 byte 乱数) を
-持つ。ページは `navigator.credentials.create()` の `user.id` にこれを使い、instance は
-`CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せに
-しないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの
-値が付けば端末上では 2 つのアカウントになる。
+登録 URL の claims は `user_id` (発行 instance が `sub` ごとに 1 度決める 16 byte 乱数) を持つ。ページは `navigator.credentials.create()` の `user.id` にこれを使い、instance は `CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せにしないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの値が付けば端末上では 2 つのアカウントになる。
 
-credential record は登録時の `endpoint` を持ち、assertion はその endpoint (origin 一致 +
-パス prefix 一致) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で
-別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が
-答えるか」までで、「どの instance に入ってよいか」より粗いため。origin ではなく base URL 全体に
-束ねるのは、隣の instance への入口を兼ねさせないため。
+credential record は登録時の `endpoint` を持ち、assertion はその endpoint (origin 一致 + パス prefix 一致) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が答えるか」までで、「どの instance に入ってよいか」より粗いため。origin ではなく base URL 全体に束ねるのは、隣の instance への入口を兼ねさせないため。
 
-credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、
-assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
+credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
 
-登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いた
-もので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential
-record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく
-**記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ
-人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、
-という判断のためだけに置く。
+登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。
 
-credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` /
-`backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、
-client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、
-**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、
-作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。
-`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
+credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` / `backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
 
 残り 3 op:
 
-- `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、
-  切らずに延ばす
-- `auth.resolve` / `auth.rotate` は instance 間 (`roles: ["instance"]`、`locality:
-  instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、
-  token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は
-  受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた
-  instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず
-  `last_refresh` に書く (自分で観測した値と同じ扱い)
+- `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、切らずに延ばす
+- `auth.resolve` / `auth.rotate` は instance 間 (`roles: ["instance"]`、`locality: instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず `last_refresh` に書く (自分で観測した値と同じ扱い)
 
-family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す
-(値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつて
-ここで発行され、もう有効でない」かどうかだけ)。
+family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
 
-credential record と token family は topic `auth.records` (`roles: ["instance"]`、element 粒度)
-で複製する。kv に載せないのは、kv は user role が読み書きできるため — token が読めれば
-その人のセッションになり、credential が書ければ新しい入口になる。削除は tombstone という
-要素として届く (変化の一覧における不在は何も言わないので)。
+credential record と token family は topic `auth.records` (`roles: ["instance"]`、element 粒度) で複製する。kv に載せないのは、kv は user role が読み書きできるため — token が読めればその人のセッションになり、credential が書ければ新しい入口になる。削除は tombstone という要素として届く (変化の一覧における不在は何も言わないので)。
+
+## 表記規約 (機械検査あり)
+
+- 時刻は Unix ms の整数で、名前は `*_at`。長さは単位を名前に持つ (`*_ms` / `*_secs`)
+- 名前は `.` 区切りの階層で左から読み、prefix がその配下すべてを指す。op は `<対象の階層>.<動詞>` で動詞に終わり (`file.read` / `session.env.read`)、topic と item 型は名詞に終わる (`llm.status` / `message.user.in`)。フィールドは snake_case のまま
+- `:` はパラメータ (直前で名指した対象の id) を運び、**名前全体の末尾に 1 回だけ**付く。`transcript.items:<sid>` であって `transcript:<sid>.items` ではない
+- `_` は 1 語の中の結合にだけ使い、2 語を繋がない。`stat_batch` は 2 語なので `file.stat` と綴る。1 語として読む綴りは `test/conventions.test.ts` に書き出す必要があり、その一覧は今は空
+- 開いた 3 つの item 族 (`tool.<Name>` / `system.attachment.<kind>` / `hook.<Event>`) の最終セグメントは harness の綴りで、この規約の外にある。文字集合は `[A-Za-z0-9_-]+` で `.` を含まない (harness 名に `.` があれば型を coin する側が `_` へ写す) ので、読み手は型名を `.` で分割して階層を得てよい
+- 根 (prefix 無し) に置けるのは特定の対象に属さない名前だけ = 挨拶と、全体の集合である topic (`peers` / `agents` / `instances` / `inbox` / `notify`)。これらの topic が複数形なのは集合だからで、単数の `instance.*` op (呼び手が到達した当の instance を指す) と対になる
+- 「不明」は省略、「無い」は空配列
+- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`mid` は `<instance>/<連番>`
+
+形の検査は `test/conventions.test.ts` が全 schema を走査して行い、`_` の規則は同じ名前の一覧に対して別に検査する — 形だけでは 1 語と 2 語を区別できないので、2 語のセグメントは「1 語として読む」と書き出すまで落ちる。
 
 ## 契約が持つもの
 
@@ -405,14 +226,9 @@ credential record と token family は topic `auth.records` (`roles: ["instance"
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 21 | 閉じた union |
 
-全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を
-持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を
-書かなければ型検査で落ちる。topic 側も属性表と frame の対応を双方向に検査する。
+全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を書かなければ型検査で落ちる。topic 側も属性表と frame の対応を双方向に検査する。
 
-`claude` / `llm-gateway` が語彙を持つ型 (`AgentInfo` / `LlmRequestInfo` / `LlmStatusReport` 等)
-は `upstream()` の印を持つ。印が言うのは「知らない値が来たらそれは上流のもの」であって、
-表記規約の免除ではない。上流の文書は daemon が受け取った時点で snake_case と Unix ms に
-写され、wire にはこの契約の綴りで出る。
+`claude` / `llm-gateway` が語彙を持つ型 (`AgentInfo` / `LlmRequestInfo` / `LlmStatusReport` 等) は `upstream()` の印を持つ。印が言うのは「知らない値が来たらそれは上流のもの」であって、表記規約の免除ではない。上流の文書は daemon が受け取った時点で snake_case と Unix ms に写され、wire にはこの契約の綴りで出る。
 
 ## 契約が持つ fixture
 
