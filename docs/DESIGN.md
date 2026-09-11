@@ -219,7 +219,9 @@ The second segment of a `message:*` names **a relation read from the subject**: 
 
 A harness's own name for a party is never a type. `main` is the main, not a relation, so `message:main` would read as the main session's traffic being overheard wherever it happens — when what is meant is the party this subject answers to, which is what `parent` says. The literal names (`main`, a lead's, a teammate's) are kept in the item's `harness_name`.
 
-| type | subject = session | subject = agent (throwaway) | subject = teammate |
+Which of those standings the subject held is stated by the item itself, in `subject`: `main` is a session's own transcript, `sub` a throwaway worker's, `team` a teammate's — one that was named and goes on standing. The relation names (`parent`, `sub`, `team`, `session`) are read **from that standing**, so the same `message:parent:in` is an errand's brief under a `sub` and what a lead wrote under a `team`. Without it on the item, a client drawing several transcripts together can only place an item for as long as it remembers the request that fetched it. It is not `harness_name`: that is the other party's literal name and arrives only when one was given, while a subject always has a standing.
+
+| type | `subject: "main"` (session) | `subject: "sub"` (throwaway agent) | `subject: "team"` (teammate) |
 |---|---|---|---|
 | `message:user:in/out` | with a person | (does not occur) | occurs: a person types at it directly |
 | `message:parent:in/out` | (does not occur) | the brief, and the answer to it | the lead's instructions and the replies to them |

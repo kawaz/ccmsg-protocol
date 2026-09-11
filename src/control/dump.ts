@@ -79,6 +79,27 @@ export const TranscriptItemSelector = Type.String({
 });
 export type TranscriptItemSelector = Static<typeof TranscriptItemSelector>;
 
+/** Whose transcript an item was read from, said as a standing rather than a
+ * name: `main` is a session's own transcript, `sub` a throwaway agent's — one
+ * started to answer once — and `team` a teammate's, an agent that was named and
+ * goes on standing.
+ *
+ * It is what the relations are read from. `message:parent:in` under a `sub` is
+ * an errand's brief and under a `team` is what its lead wrote, and an item that
+ * does not say which of the two it stood in can only be placed by whoever
+ * remembers the request that fetched it. Carrying it on the item is what lets
+ * several transcripts be drawn as one, and what lets the table of relations be
+ * checked against items rather than against the request that asked for them.
+ *
+ * It is not `harness_name`: that is the other party's literal name, this is the
+ * subject's own standing, and a subject has one whether or not anything it
+ * talked to was named. */
+export const TranscriptSubject = Type.Union(
+  [Type.Literal("main"), Type.Literal("team"), Type.Literal("sub")],
+  { $id: "TranscriptSubject" },
+);
+export type TranscriptSubject = Static<typeof TranscriptSubject>;
+
 /** Where in the transcript the record an item was read from begins, and how far
  * it runs.
  *
@@ -115,10 +136,16 @@ export type TranscriptItemId = Static<typeof TranscriptItemId>;
  * `id` is what the links below point with — never a position in the array,
  * since a selection or a range decides which items exist in a given read — and
  * `uuid` stays beside it as the record the item came out of, which is what a
- * reader groups by when it wants the whole of one line. */
+ * reader groups by when it wants the whole of one line.
+ *
+ * `subject` is on every item because an item is read out of one transcript and
+ * ends up among items from others: a client draws a session beside the agents
+ * below it, and the standing it was read from is then the item's own to state
+ * and not something to be inferred from the call that fetched it. */
 const BASE_FIELDS = {
   id: TranscriptItemId,
   uuid: Type.String({ minLength: 1 }),
+  subject: TranscriptSubject,
   source: TranscriptItemSource,
   /** The item's own instant. A call and its result each keep their own. */
   at: Timestamp,

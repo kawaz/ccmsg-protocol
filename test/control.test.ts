@@ -76,6 +76,7 @@ import {
   SESSION_DUMP_FILE,
   TRANSCRIPT_ITEMS,
   TRANSCRIPT_ITEMS_AGENT_SUBJECT,
+  TRANSCRIPT_ITEMS_TEAM_SUBJECT,
 } from "../src/fixtures/control.ts";
 import { isValid } from "../src/schemas.ts";
 
@@ -283,6 +284,56 @@ describe("transcript items", () => {
     for (const item of TRANSCRIPT_ITEMS) expect(isValid(TranscriptItem, item)).toBe(true);
     for (const item of TRANSCRIPT_ITEMS_AGENT_SUBJECT)
       expect(isValid(TranscriptItem, item)).toBe(true);
+    for (const item of TRANSCRIPT_ITEMS_TEAM_SUBJECT)
+      expect(isValid(TranscriptItem, item)).toBe(true);
+  });
+
+  test("an item says which transcript it was read from, in one of three standings", () => {
+    // Items from several transcripts end up drawn together, so the standing is
+    // the item's own to state rather than something the request it arrived in
+    // has to be remembered for.
+    expect(new Set(TRANSCRIPT_ITEMS.map((item) => item.subject))).toEqual(new Set(["main"]));
+    expect(new Set(TRANSCRIPT_ITEMS_AGENT_SUBJECT.map((item) => item.subject))).toEqual(
+      new Set(["sub"]),
+    );
+    expect(new Set(TRANSCRIPT_ITEMS_TEAM_SUBJECT.map((item) => item.subject))).toEqual(
+      new Set(["team"]),
+    );
+    const [first] = TRANSCRIPT_ITEMS as Record<string, unknown>[];
+    const { subject: _dropped, ...unstated } = first as Record<string, unknown>;
+    expect(isValid(TranscriptItem, unstated)).toBe(false);
+    expect(isValid(TranscriptItem, { ...first, subject: "agent" })).toBe(false);
+  });
+
+  test("the standing an item was read from is not the name of who it talked to", () => {
+    // `harness_name` is the other party's literal name and is absent whenever
+    // the record does not give one; the subject's standing is always stated.
+    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message:team:out") as Record<
+      string,
+      unknown
+    >;
+    expect(written["harness_name"]).toBe("contract-dump-items");
+    expect(written["subject"]).toBe("main");
+    const brief = TRANSCRIPT_ITEMS_AGENT_SUBJECT[0] as Record<string, unknown>;
+    expect(brief["harness_name"]).toBeUndefined();
+    expect(brief["subject"]).toBe("sub");
+  });
+
+  test("which relations occur under a standing is the table, checked against items", () => {
+    // A person types at a session and at a teammate, never at an errand; an
+    // errand and a teammate both answer whoever is above them, a session does
+    // not. The table states this, and `subject` is what lets items say it.
+    const relations = (items: { type: string }[]) =>
+      new Set(items.filter((item) => item.type.startsWith("message:")).map((item) => item.type));
+    const session = relations(TRANSCRIPT_ITEMS);
+    const errand = relations(TRANSCRIPT_ITEMS_AGENT_SUBJECT);
+    const teammate = relations(TRANSCRIPT_ITEMS_TEAM_SUBJECT);
+    expect(session).toContain("message:user:in");
+    expect(session).not.toContain("message:parent:in");
+    expect(errand).toContain("message:parent:in");
+    expect(errand).not.toContain("message:user:in");
+    expect(teammate).toContain("message:parent:in");
+    expect(teammate).toContain("message:user:in");
   });
 
   test("every spelled-out type name is a shape an item can take", () => {
@@ -354,6 +405,7 @@ describe("transcript items", () => {
       isValid(TranscriptItem, {
         id: "aa11bb22:0",
         uuid: "aa11bb22",
+        subject: "main",
         source: { offset: 4_096, bytes: 310 },
         type: "tool:Workflow",
         at: 1_757_300_000_000,
@@ -369,6 +421,7 @@ describe("transcript items", () => {
       isValid(TranscriptItem, {
         id: "bb22cc33:0",
         uuid: "bb22cc33",
+        subject: "main",
         source: { offset: 4_406, bytes: 120 },
         type: "system:attachment:telemetry",
         at: 1_757_300_000_000,
@@ -383,6 +436,7 @@ describe("transcript items", () => {
     const hook = {
       id: "cc33dd44:0",
       uuid: "cc33dd44",
+      subject: "main",
       source: { offset: 4_526, bytes: 240 },
       type: "hook:PreToolUse",
       at: 1_757_300_000_000,

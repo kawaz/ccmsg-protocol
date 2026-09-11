@@ -200,7 +200,9 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 ハーネスの実名は型に置かない。`main` は the main であって関係ではないので、`message:main` と書くと「main の入出力がどこにいても常に漏れ聞こえる」と読めてしまう — 言いたいのは「この主語が答える相手」で、それを言う語が `parent` になる。実名 (`main` / `team-lead` / teammate 名) はアイテムの `harness_name` に残す。
 
-| 型 | 主語 = セッション | 主語 = agent (使い捨て) | 主語 = teammate |
+主語がどの立場だったかは、アイテム自身が `subject` で名乗る (`main` = セッション本体の transcript、`sub` = 使い捨ての worker、`team` = 名前を持って居続ける teammate)。関係名 (`parent` / `sub` / `team` / `session`) は**この立場から見た**もので、同じ `message:parent:in` が `sub` の下では依頼書、`team` の下では lead からの指示になる。立場をアイテムに載せておかないと、複数 transcript を混ぜて描く client は「どの request で取ってきたか」を覚えている間しかアイテムを置けない。`harness_name` (相手の実名) とは別物で、あちらは相手が名乗った時だけ入り、こちらは主語が必ず持つ。
+
+| 型 | `subject: "main"` (セッション) | `subject: "sub"` (使い捨て agent) | `subject: "team"` (teammate) |
 |---|---|---|---|
 | `message:user:in/out` | 人との往復 | (出ない) | 人が直接打てるので出る |
 | `message:parent:in/out` | (出ない) | 親の指示書と、親への回答 | lead からの指示と、lead への返信 |

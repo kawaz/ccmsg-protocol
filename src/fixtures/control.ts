@@ -230,6 +230,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "3f9a21c4:0",
     uuid: "3f9a21c4",
+    subject: "main",
     source: { offset: 180_000, bytes: 420 },
     type: "message:user:in",
     at: FIXTURE_NOW - 3_600_000,
@@ -239,6 +240,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "f10b6d43:0",
     uuid: "f10b6d43",
+    subject: "main",
     source: { offset: 180_420, bytes: 980 },
     type: "thinking",
     at: FIXTURE_NOW - 3_500_000,
@@ -247,6 +249,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "f10b6d43:1",
     uuid: "f10b6d43",
+    subject: "main",
     source: { offset: 180_420, bytes: 980 },
     type: "tool:Bash",
     at: FIXTURE_NOW - 3_400_000,
@@ -259,6 +262,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "18d6f2c9:0",
     uuid: "18d6f2c9",
+    subject: "main",
     source: { offset: 181_400, bytes: 260 },
     type: "tool:Bash",
     at: FIXTURE_NOW - 3_399_000,
@@ -271,6 +275,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "b7e41d09:0",
     uuid: "b7e41d09",
+    subject: "main",
     source: { offset: 181_660, bytes: 640 },
     type: "message:sub:out",
     at: FIXTURE_NOW - 3_300_000,
@@ -284,6 +289,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "92e6d4f5:0",
     uuid: "92e6d4f5",
+    subject: "main",
     source: { offset: 182_300, bytes: 310 },
     type: "hook:PreToolUse",
     at: FIXTURE_NOW - 3_200_000,
@@ -295,6 +301,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "81d5c3e4:0",
     uuid: "81d5c3e4",
+    subject: "main",
     source: { offset: 182_610, bytes: 190 },
     type: "system:attachment:queued_command",
     at: FIXTURE_NOW - 3_100_000,
@@ -303,6 +310,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "c8a2f371:0",
     uuid: "c8a2f371",
+    subject: "main",
     source: { offset: 182_800, bytes: 520 },
     type: "message:team:out",
     at: FIXTURE_NOW - 3_000_000,
@@ -317,6 +325,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "e5b70c93:0",
     uuid: "e5b70c93",
+    subject: "main",
     source: { offset: 183_320, bytes: 300 },
     type: "message:team:in",
     at: FIXTURE_NOW - 2_900_000,
@@ -326,6 +335,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   {
     id: "d4c1a0b2:0",
     uuid: "d4c1a0b2",
+    subject: "main",
     source: { offset: 183_620, bytes: 410 },
     type: "message:team:in",
     at: FIXTURE_NOW - 2_800_000,
@@ -339,15 +349,18 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
   },
 ];
 
-/** The same vocabulary read with an agent as the subject.
+/** The same vocabulary read with a throwaway agent as the subject.
  *
  * Nothing here is a new type: the brief an agent opens with and the answer it
  * closes with are what `message:parent` names from wherever it is read, and the
- * answer comes as prose with no call behind it. */
+ * answer comes as prose with no call behind it. What says these were read from
+ * an errand's transcript rather than a session's is `subject`, which every item
+ * carries. */
 export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
   {
     id: "a9f30d15:0",
     uuid: "a9f30d15",
+    subject: "sub",
     source: { offset: 0, bytes: 1_240 },
     type: "message:parent:in",
     at: FIXTURE_NOW - 3_290_000,
@@ -357,6 +370,7 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
   {
     id: "b0e41c26:0",
     uuid: "b0e41c26",
+    subject: "sub",
     source: { offset: 1_240, bytes: 380 },
     type: "message:parent:out",
     at: FIXTURE_NOW - 3_260_000,
@@ -369,10 +383,62 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
   {
     id: "c1f52d37:0",
     uuid: "c1f52d37",
+    subject: "sub",
     source: { offset: 1_620, bytes: 690 },
     type: "message:parent:out",
     at: FIXTURE_NOW - 3_200_000,
     text: "型一覧を 4 群に整理し、preset の例も揃えた",
+  },
+];
+
+/** The same vocabulary again, read with a teammate as the subject.
+ *
+ * A teammate stands where neither of the other two does: it answers a lead, as
+ * an errand does, and a person can also type at it directly, as a session's own
+ * transcript has. The relations are the ones already spelled out — what tells
+ * these apart from the errand's above is `subject`, and it is what makes the
+ * three columns of the table checkable against items. */
+export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
+  {
+    id: "d2a63e48:0",
+    uuid: "d2a63e48",
+    subject: "team",
+    source: { offset: 0, bytes: 1_480 },
+    type: "message:parent:in",
+    at: FIXTURE_NOW - 3_000_000,
+    turn: 1,
+    text: "契約に message:parent と message:team を足して",
+    harness_name: "main",
+  },
+  {
+    id: "e3b74f59:0",
+    uuid: "e3b74f59",
+    subject: "team",
+    source: { offset: 1_480, bytes: 260 },
+    type: "message:user:in",
+    at: FIXTURE_NOW - 2_950_000,
+    text: "fixtures も忘れずに",
+  },
+  {
+    id: "f4c8506a:0",
+    uuid: "f4c8506a",
+    subject: "team",
+    source: { offset: 1_740, bytes: 340 },
+    type: "message:team:out",
+    at: FIXTURE_NOW - 2_920_000,
+    role: "use",
+    tool_use_id: "toolu_01Wc7Zdq",
+    text: "daemon 側の分類はどこまで進んでいる",
+    harness_name: "daemon-dump-items",
+  },
+  {
+    id: "a5d9617b:0",
+    uuid: "a5d9617b",
+    subject: "team",
+    source: { offset: 2_080, bytes: 410 },
+    type: "message:parent:out",
+    at: FIXTURE_NOW - 2_800_000,
+    text: "4 型を足して 1.17.0 を切った",
   },
 ];
 
