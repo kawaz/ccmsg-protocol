@@ -7,7 +7,8 @@ import { SessionMetaFields } from "../session-meta.ts";
  *
  * It is not signed and proves nothing on its own: it names the peer and says
  * where its one-off key can be fetched. The proof that binds this connection to
- * `iss` follows on a separate exchange (mesh-peer-auth §5). */
+ * `iss` follows on a separate exchange (the daemon's mesh peer authentication
+ * decision). */
 export const MeshHello = Type.Object(
   {
     /** Generation of the mesh handshake format, apart from the protocol

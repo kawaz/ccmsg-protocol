@@ -134,7 +134,8 @@ describe("what the contract does and does not pin down", () => {
   test("a field this generation has not heard of is carried, not refused", () => {
     // Within one generation a peer may add optional fields, so an older peer
     // has to tolerate one it cannot read. Refusing here would make every such
-    // addition a breaking change and leave §8 with nothing to permit.
+    // addition a breaking change and leave the generation rule with nothing to
+    // permit.
     expect(
       isValid(HelloUserRequest, {
         request_id: "1",

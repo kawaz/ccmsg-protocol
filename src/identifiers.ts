@@ -55,7 +55,7 @@ export type InstanceId = Static<typeof InstanceId>;
  * identifies where an instance lives changing with it, and what lets the HTTP
  * routes be spelled without stripping a suffix off first.
  *
- * Compared as a whole string, path included (mesh-peer-auth §4.2 — one origin
+ * Compared as a whole string, path included (one origin
  * may host several instances, so an origin-level comparison would confuse
  * them). The trailing slash is required so that comparison is exact: `/ccmsg`
  * and `/ccmsg/` would otherwise be two spellings of one instance.

@@ -27,7 +27,7 @@ export const ERROR_CODES = [
    * in their `errors`, since only an op that queues for a reader has a queue to
    * fill. */
   "rate_limited",
-  // --- rule-derived (op attribute table §0) ---
+  // --- rule-derived (op attribute table) ---
   /** The connection's role is outside the op's `roles`. Argument problems stay
    * on `invalid_args` / `bad_request`. */
   "forbidden",
