@@ -310,7 +310,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     result_item: "d4c1a0b2:0",
     tool_use_id: "toolu_01Tm5XYp",
     text: "契約に message:parent と message:team を足して",
-    to: "contract-dump-items",
+    harness_name: "contract-dump-items",
     agent_id: "b83e0f114",
     subagent_type: "opus5-worker-high",
   },
@@ -321,7 +321,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     type: "message:team:in",
     at: FIXTURE_NOW - 2_900_000,
     text: "fixtures まで通ったので ci を回す",
-    from: "contract-dump-items",
+    harness_name: "contract-dump-items",
   },
   {
     id: "d4c1a0b2:0",
@@ -363,7 +363,7 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
     role: "use",
     tool_use_id: "toolu_01Qz8Vbn",
     text: "型一覧は 4 群に分けた。preset の例まで直してよいか",
-    to: "main",
+    harness_name: "main",
     summary: "型一覧の分け方を確認",
   },
   {

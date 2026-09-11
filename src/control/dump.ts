@@ -24,7 +24,17 @@ import { Sid, Timestamp } from "../identifiers.ts";
  * Segments after the first carry the spelling of whatever named them, which is
  * why they are not held to snake_case: `tool:Bash` and `hook:PreToolUse` are
  * the harness's words, and rewriting them would leave the reader unable to
- * match what it sees against what it ran. */
+ * match what it sees against what it ran.
+ *
+ * Under `message`, the second segment is **a relation read from the subject**:
+ * `parent` is whoever started this agent, `sub` a throwaway agent it started,
+ * `team` a named counterpart that goes on standing, `session` another session
+ * over ccmsg. The one exception is `user` — a person is not a relation to
+ * anyone, but the user, standing alone. A harness's own name for a party is
+ * never a type: `message:main` would read as the main session's traffic being
+ * overheard wherever it happens, when what is meant is the party this subject
+ * answers to — which is what `parent` says. The literal names (`main`, a
+ * lead's, a teammate's) are kept in `harness_name` on the item. */
 export const TranscriptItemType = Type.String({
   pattern: "^[a-z]+(?::[A-Za-z0-9_.-]+)*$",
   $id: "TranscriptItemType",
@@ -190,10 +200,10 @@ const MessageUserOut = item(Type.Literal("message:user:out"), { text: Text });
  * unnameable. */
 const MessageParentIn = item(Type.Literal("message:parent:in"), {
   text: Text,
-  /** The parent as the harness named it where this arrived — `main`, a lead's
-   * name, the agent above. Left out when the record says only that it came from
-   * above, which is the case for the brief an agent opens with. */
-  from: Type.Optional(Type.String()),
+  /** The harness's own name for the parent — `main`, a lead's name, the agent
+   * above. Left out when the record says only that it came from above, which is
+   * the case for the brief an agent opens with. */
+  harness_name: Type.Optional(Type.String()),
   msg_id: Type.Optional(Type.String()),
 });
 
@@ -202,8 +212,8 @@ const MessageParentIn = item(Type.Literal("message:parent:in"), {
 const MessageParentOutSent = item(Type.Literal("message:parent:out"), {
   ...USE_FIELDS,
   text: Text,
-  /** The parent as the subject addressed it, in the harness's spelling. */
-  to: Type.Optional(Type.String()),
+  /** The harness's own name for the parent, as the subject addressed it. */
+  harness_name: Type.Optional(Type.String()),
   summary: Type.Optional(Type.String()),
 });
 
@@ -223,7 +233,7 @@ const MessageTeamOut = item(Type.Literal("message:team:out"), {
   ...USE_FIELDS,
   text: Text,
   /** The teammate addressed, by the name it stands under. */
-  to: Type.Optional(Type.String()),
+  harness_name: Type.Optional(Type.String()),
   summary: Type.Optional(Type.String()),
   agent_id: Type.Optional(Type.String()),
   /** Present on the call that started the teammate, absent on the ones that
@@ -236,7 +246,8 @@ const MessageTeamOut = item(Type.Literal("message:team:out"), {
  * was written. */
 const MessageTeamInSaid = item(Type.Literal("message:team:in"), {
   text: Text,
-  from: Type.Optional(Type.String()),
+  /** The name the teammate stands under. */
+  harness_name: Type.Optional(Type.String()),
   msg_id: Type.Optional(Type.String()),
 });
 
@@ -244,6 +255,7 @@ const MessageTeamInSaid = item(Type.Literal("message:team:in"), {
 const MessageTeamInDone = item(Type.Literal("message:team:in"), {
   ...RESULT_FIELDS,
   text: Text,
+  harness_name: Type.Optional(Type.String()),
   agent_id: Type.Optional(Type.String()),
   status: Type.Optional(Type.String()),
   duration_ms: Type.Optional(Type.Integer({ minimum: 0 })),

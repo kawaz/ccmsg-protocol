@@ -301,6 +301,20 @@ describe("transcript items", () => {
     for (const name of spelled) if (!name.startsWith("tool:")) expect(closed).toContain(name);
   });
 
+  test("a message is typed by a relation, and a harness's name for a party is a field", () => {
+    // `message:main` would read as the main session's traffic being overheard
+    // wherever it happens; the relation meant is `parent`. `user` is the one
+    // exception, being not a relation but the user.
+    const relations = new Set(["user", "parent", "sub", "team", "session"]);
+    for (const name of TRANSCRIPT_ITEM_TYPES)
+      if (name.startsWith("message:")) expect(relations.has(name.split(":")[1] ?? "")).toBe(true);
+    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message:team:out") as Record<
+      string,
+      unknown
+    >;
+    expect(written["harness_name"]).toBe("contract-dump-items");
+  });
+
   test("who the counterpart was is the type, and the subject decides which types occur", () => {
     // Read from an agent, the brief it opened with is what `message:parent:in`
     // names; the session that started it reads the same exchange as
@@ -330,7 +344,7 @@ describe("transcript items", () => {
       incoming.find((item) => item["role"] === undefined),
       incoming.find((item) => item["role"] === "result"),
     ];
-    expect(said?.["from"]).toBe("contract-dump-items");
+    expect(said?.["harness_name"]).toBe("contract-dump-items");
     expect(said?.["parent_tool_use_id"]).toBeUndefined();
     expect(done?.["parent_item"]).toBe("c8a2f371:0");
   });

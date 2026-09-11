@@ -215,7 +215,9 @@ A type name is `:`-separated, and a prefix names everything below it: `tool` is 
 
 `in` and `out` are read **from wherever the subject stands**. The subject is the session by default and one agent below it when `agent_id` names one; the type definitions do not change, only what they point at, which is what lets one preset be carried down a chain of agents.
 
-The second segment of a `message:*` names **what kind of party the counterpart was**, never the subject's own standing — a dump is read to find out who was talking, and a subject's position is the one thing it cannot ask about itself. `user` is kept for a person alone: an agent's parent is a session or another agent, and calling it `user` would have a reader take a machine for a person. There are five counterparts — a person (`user`), the one above (`parent`), the throwaway agents below (`sub`), a teammate that is named and stays (`team`), and another session (`session`).
+The second segment of a `message:*` names **a relation read from the subject**: `parent` is whoever started this agent, `sub` a throwaway agent it started, `team` a named counterpart that goes on standing, `session` another session over ccmsg. The one exception is `user` — not a relation to anyone, but **the user**, standing alone. An agent's parent is a session or another agent, and calling that `user` would have a reader take a machine for a person.
+
+A harness's own name for a party is never a type. `main` is the main, not a relation, so `message:main` would read as the main session's traffic being overheard wherever it happens — when what is meant is the party this subject answers to, which is what `parent` says. The literal names (`main`, a lead's, a teammate's) are kept in the item's `harness_name`.
 
 | type | subject = session | subject = agent (throwaway) | subject = teammate |
 |---|---|---|---|
