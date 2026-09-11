@@ -159,8 +159,8 @@ export const LlmUsageReadResult = Type.Object({
 });
 export type LlmUsageReadResult = Static<typeof LlmUsageReadResult>;
 
-export const LlmUsageReadRequest = request("llm_usage_read", LlmUsageReadArgs);
-export const LlmUsageReadResponse = response("llm_usage_read", LlmUsageReadResult);
+export const LlmUsageReadRequest = request("llm.usage.read", LlmUsageReadArgs);
+export const LlmUsageReadResponse = response("llm.usage.read", LlmUsageReadResult);
 
 // ---------------------------------------------------------------------------
 // spend
@@ -214,8 +214,8 @@ export const LlmStatsReadResult = Type.Object({
 });
 export type LlmStatsReadResult = Static<typeof LlmStatsReadResult>;
 
-export const LlmStatsReadRequest = request("llm_stats_read", LlmStatsReadArgs);
-export const LlmStatsReadResponse = response("llm_stats_read", LlmStatsReadResult);
+export const LlmStatsReadRequest = request("llm.stats.read", LlmStatsReadArgs);
+export const LlmStatsReadResponse = response("llm.stats.read", LlmStatsReadResult);
 
 // ---------------------------------------------------------------------------
 // live requests
@@ -328,12 +328,12 @@ export function llmCacheWindowEndAt(info: {
   return info.received_at + LLM_PROMPT_CACHE_TTL_MS;
 }
 
-/** The `llm_requests` topic: the newest request per conversation series, always
+/** The `llm.requests` topic: the newest request per conversation series, always
  * the whole unexpired set rather than the one that just arrived. A client that
  * starts listening mid-window still needs the countdown that began before it
  * was there, and one shape serves both that and the live update. An empty set
  * is a legitimate "no session has a warm cache". */
-export const LlmRequestsFrame = topicFrame("llm_requests", Type.Array(LlmRequestInfo));
+export const LlmRequestsFrame = topicFrame("llm.requests", Type.Array(LlmRequestInfo));
 
 // ---------------------------------------------------------------------------
 // upstream health
@@ -503,5 +503,5 @@ export const LlmStatusReport = Type.Object(
 );
 export type LlmStatusReport = Static<typeof LlmStatusReport>;
 
-/** The `llm_status` topic. Whole-value: each frame replaces the last. */
-export const LlmStatusFrame = topicFrame("llm_status", LlmStatusReport);
+/** The `llm.status` topic. Whole-value: each frame replaces the last. */
+export const LlmStatusFrame = topicFrame("llm.status", LlmStatusReport);

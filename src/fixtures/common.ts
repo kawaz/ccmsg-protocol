@@ -4,10 +4,10 @@ import type {
   AuthAssertResponse,
   AuthChallengeRequest,
   AuthChallengeResponse,
-  AuthRefreshRequest,
-  AuthRefreshResponse,
-  AuthRefreshTokenRequest,
-  AuthRefreshTokenResponse,
+  AuthExtendRequest,
+  AuthExtendResponse,
+  AuthTokenRefreshRequest,
+  AuthTokenRefreshResponse,
   AuthRegisterRequest,
   AuthRegisterResponse,
   AuthResolveRequest,
@@ -15,7 +15,12 @@ import type {
   AuthRotateRequest,
   AuthRotateResponse,
 } from "../common/auth.ts";
-import type { HelloRequest, HelloResponse } from "../common/hello.ts";
+import type {
+  HelloInstanceRequest,
+  HelloSessionRequest,
+  HelloSessionResponse,
+  HelloUserRequest,
+} from "../common/hello.ts";
 import type { InstancePingRequest, InstancePingResponse } from "../common/ping.ts";
 import type {
   InstanceShutdownRequest,
@@ -33,10 +38,9 @@ import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
 const { sid, instance, other_instance, endpoint, other_endpoint, request_id } = FIXTURE_IDS;
 
-export const HELLO_REQUEST: Static<typeof HelloRequest> = {
+export const HELLO_SESSION_REQUEST: Static<typeof HelloSessionRequest> = {
   request_id,
-  op: "hello",
-  role: "session",
+  op: "hello.session",
   protocol_version: 3,
   sid,
   client_version: "0.1.0",
@@ -51,12 +55,19 @@ export const HELLO_REQUEST: Static<typeof HelloRequest> = {
   effort: "high",
 };
 
-/** The other side of `hello`: an instance greeting a peer, which carries the
- * mesh claim in place of a session's meta. */
-export const HELLO_MESH_REQUEST: Static<typeof HelloRequest> = {
+/** A person greeting, which names neither a session nor a mesh claim. */
+export const HELLO_USER_REQUEST: Static<typeof HelloUserRequest> = {
   request_id,
-  op: "hello",
-  role: "instance",
+  op: "hello.user",
+  protocol_version: 3,
+  client_version: "0.1.0",
+};
+
+/** An instance greeting a peer, which carries the mesh claim in place of a
+ * session's meta. */
+export const HELLO_INSTANCE_REQUEST: Static<typeof HelloInstanceRequest> = {
+  request_id,
+  op: "hello.instance",
   protocol_version: 3,
   mesh: {
     ver: 1,
@@ -67,7 +78,9 @@ export const HELLO_MESH_REQUEST: Static<typeof HelloRequest> = {
   },
 };
 
-export const HELLO_RESPONSE: Static<typeof HelloResponse> = {
+/** One reply for all three greetings: what an instance answers does not turn
+ * on which of them asked. */
+export const HELLO_RESPONSE: Static<typeof HelloSessionResponse> = {
   ok: true,
   request_id,
   protocol_version: 3,
@@ -86,7 +99,7 @@ export const HELLO_RESPONSE: Static<typeof HelloResponse> = {
 
 export const INSTANCE_PING_REQUEST: Static<typeof InstancePingRequest> = {
   request_id,
-  op: "instance_ping",
+  op: "instance.ping",
 };
 
 export const INSTANCE_PING_RESPONSE: Static<typeof InstancePingResponse> = {
@@ -103,7 +116,7 @@ export const INSTANCE_PING_RESPONSE: Static<typeof InstancePingResponse> = {
 
 export const INSTANCE_SHUTDOWN_REQUEST: Static<typeof InstanceShutdownRequest> = {
   request_id,
-  op: "instance_shutdown",
+  op: "instance.shutdown",
 };
 
 export const INSTANCE_SHUTDOWN_RESPONSE: Static<typeof InstanceShutdownResponse> = {
@@ -113,7 +126,7 @@ export const INSTANCE_SHUTDOWN_RESPONSE: Static<typeof InstanceShutdownResponse>
 
 export const SESSION_STOPPING_REQUEST: Static<typeof SessionStoppingRequest> = {
   request_id,
-  op: "session_stopping",
+  op: "session.stopping",
   reason: "prompt_input_exit",
 };
 
@@ -125,7 +138,7 @@ export const SESSION_STOPPING_RESPONSE: Static<typeof SessionStoppingResponse> =
 
 export const TOPIC_SUBSCRIBE_REQUEST: Static<typeof TopicSubscribeRequest> = {
   request_id,
-  op: "topic_subscribe",
+  op: "topic.subscribe",
   topic: "peers",
 };
 
@@ -139,13 +152,13 @@ export const TOPIC_SUBSCRIBE_RESPONSE: Static<typeof TopicSubscribeResponse> = {
  * are spelled. */
 export const TOPIC_SUBSCRIBE_SESSION_REQUEST: Static<typeof TopicSubscribeRequest> = {
   request_id,
-  op: "topic_subscribe",
+  op: "topic.subscribe",
   topic: `transcript:${sid}`,
 };
 
 export const TOPIC_UNSUBSCRIBE_REQUEST: Static<typeof TopicUnsubscribeRequest> = {
   request_id,
-  op: "topic_unsubscribe",
+  op: "topic.unsubscribe",
   topic: "peers",
 };
 
@@ -169,7 +182,7 @@ const SUBJECT = "personal-1";
 
 export const AUTH_CHALLENGE_REQUEST: Static<typeof AuthChallengeRequest> = {
   request_id,
-  op: "auth_challenge",
+  op: "auth.challenge",
 };
 
 export const AUTH_CHALLENGE_RESPONSE: Static<typeof AuthChallengeResponse> = {
@@ -180,7 +193,7 @@ export const AUTH_CHALLENGE_RESPONSE: Static<typeof AuthChallengeResponse> = {
 
 export const AUTH_REGISTER_REQUEST: Static<typeof AuthRegisterRequest> = {
   request_id,
-  op: "auth_register",
+  op: "auth.register",
   token: REGISTER_TOKEN,
   code: REGISTER_CODE,
   device_label: "work laptop",
@@ -202,7 +215,7 @@ export const AUTH_REGISTER_RESPONSE: Static<typeof AuthRegisterResponse> = {
 
 export const AUTH_ASSERT_REQUEST: Static<typeof AuthAssertRequest> = {
   request_id,
-  op: "auth_assert",
+  op: "auth.assert",
   challenge: CHALLENGE,
   credential: {
     raw_id: "Y3JlZC1pZA",
@@ -220,26 +233,26 @@ export const AUTH_ASSERT_RESPONSE: Static<typeof AuthAssertResponse> = {
   access: ACCESS,
 };
 
-export const AUTH_REFRESH_TOKEN_REQUEST: Static<typeof AuthRefreshTokenRequest> = {
+export const AUTH_TOKEN_REFRESH_REQUEST: Static<typeof AuthTokenRefreshRequest> = {
   request_id,
-  op: "auth_refresh_token",
+  op: "auth.token.refresh",
   reason: "reload",
 };
 
-export const AUTH_REFRESH_TOKEN_RESPONSE: Static<typeof AuthRefreshTokenResponse> = {
+export const AUTH_TOKEN_REFRESH_RESPONSE: Static<typeof AuthTokenRefreshResponse> = {
   ok: true,
   request_id,
   sub: SUBJECT,
   access: ACCESS,
 };
 
-export const AUTH_REFRESH_REQUEST: Static<typeof AuthRefreshRequest> = {
+export const AUTH_EXTEND_REQUEST: Static<typeof AuthExtendRequest> = {
   request_id,
-  op: "auth_refresh",
+  op: "auth.extend",
   access_token: ACCESS.value,
 };
 
-export const AUTH_REFRESH_RESPONSE: Static<typeof AuthRefreshResponse> = {
+export const AUTH_EXTEND_RESPONSE: Static<typeof AuthExtendResponse> = {
   ok: true,
   request_id,
   auth_expires_at: FIXTURE_NOW + 20_000_000,
@@ -247,7 +260,7 @@ export const AUTH_REFRESH_RESPONSE: Static<typeof AuthRefreshResponse> = {
 
 export const AUTH_RESOLVE_REQUEST = {
   request_id,
-  op: "auth_resolve",
+  op: "auth.resolve",
   to_instance: instance,
   kind: "register",
   token: REGISTER_TOKEN,
@@ -275,7 +288,7 @@ export const AUTH_RESOLVE_RESPONSE = {
  * nothing beyond having spent it. */
 export const AUTH_RESOLVE_CHALLENGE_REQUEST = {
   request_id,
-  op: "auth_resolve",
+  op: "auth.resolve",
   to_instance: instance,
   kind: "challenge",
   challenge: CHALLENGE.challenge,
@@ -289,7 +302,7 @@ export const AUTH_RESOLVE_CHALLENGE_RESPONSE = {
 
 export const AUTH_ROTATE_REQUEST: Static<typeof AuthRotateRequest> = {
   request_id,
-  op: "auth_rotate",
+  op: "auth.rotate",
   to_instance: instance,
   refresh_token: REFRESH.value,
   reason: "reconnect",

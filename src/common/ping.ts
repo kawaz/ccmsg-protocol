@@ -33,5 +33,5 @@ export const InstancePingResult = Type.Object({
 });
 export type InstancePingResult = Static<typeof InstancePingResult>;
 
-export const InstancePingRequest = request("instance_ping", InstancePingArgs);
-export const InstancePingResponse = response("instance_ping", InstancePingResult);
+export const InstancePingRequest = request("instance.ping", InstancePingArgs);
+export const InstancePingResponse = response("instance.ping", InstancePingResult);

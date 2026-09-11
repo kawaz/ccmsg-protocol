@@ -24,7 +24,7 @@ export const MAX_FRAME_BYTES = 1_048_576;
 export const CallerIdentity = Type.Object(
   {
     role: Role,
-    /** Present exactly when the role is `session`, as in `hello`. */
+    /** Present exactly when the role is `session`, as in `hello.session`. */
     sid: Type.Optional(Sid),
   },
   { $id: "CallerIdentity" },
@@ -102,7 +102,7 @@ export type ErrorResponse = Static<typeof ErrorResponse>;
 
 /** A frame pushed on a topic the connection subscribed to.
  *
- * Snapshot and delta share one shape: the first frame after `topic_subscribe`
+ * Snapshot and delta share one shape: the first frame after `topic.subscribe`
  * carries `snapshot: true` and the whole current value, and later frames carry
  * the same payload type as a change. `instance` names where the frame came
  * from, which is what keeps whole-value topics from several instances out of

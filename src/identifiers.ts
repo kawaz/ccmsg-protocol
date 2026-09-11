@@ -81,12 +81,14 @@ export const Mid = Type.String({
 });
 export type Mid = Static<typeof Mid>;
 
-/** Who a connection speaks as. Set once by `hello` and fixed for the
- * connection's life; the op attribute table's `roles` is checked against it.
+/** Who a connection speaks as. Settled once by the greeting that opened it —
+ * `hello.session`, `hello.user` or `hello.instance`, the op being what says
+ * which — and fixed for the connection's life; the op attribute table's
+ * `roles` is checked against it.
  *
- * Once by `hello` means once: a second `hello` on a connection whose identity
- * is already settled is refused with `bad_request`, whether it repeats the
- * role or names another. */
+ * Once means once: a second greeting on a connection whose identity is
+ * already settled is refused with `bad_request`, whether it is the same one
+ * again or another. */
 export const Role = Type.Union(
   [Type.Literal("session"), Type.Literal("user"), Type.Literal("instance")],
   { $id: "Role" },
@@ -100,7 +102,7 @@ export const Capability = Type.Union(
     Type.Literal("fork"),
     Type.Literal("launcher"),
     /** A gateway webhook source is configured, so request activity arrives to
-     * be pushed on the `llm_requests` topic. */
+     * be pushed on the `llm.requests` topic. */
     Type.Literal("llm_events"),
     Type.Literal("llm_stats"),
     Type.Literal("llm_status"),

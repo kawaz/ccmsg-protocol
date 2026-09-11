@@ -45,7 +45,7 @@ export type AuthChallengeArgs = Static<typeof AuthChallengeArgs>;
  * The issuer travels beside the value rather than inside it because the
  * instance that receives the answer is not necessarily the one that issued it:
  * behind a load balancer either may be reached, so the receiver reads the
- * issuer, asks it to consume the challenge (`auth_resolve`), and verifies the
+ * issuer, asks it to consume the challenge (`auth.resolve`), and verifies the
  * assertion itself. An issuer a caller made up names an instance that knows no
  * such challenge, which is a refusal and not a way in. */
 export const AuthChallenge = Type.Object(
@@ -63,14 +63,14 @@ export type AuthChallenge = Static<typeof AuthChallenge>;
 export const AuthChallengeResult = AuthChallenge;
 export type AuthChallengeResult = Static<typeof AuthChallengeResult>;
 
-export const AuthChallengeRequest = request("auth_challenge", AuthChallengeArgs);
-export const AuthChallengeResponse = response("auth_challenge", AuthChallengeResult);
+export const AuthChallengeRequest = request("auth.challenge", AuthChallengeArgs);
+export const AuthChallengeResponse = response("auth.challenge", AuthChallengeResult);
 
 // --- registration ----------------------------------------------------------
 
 /** What the registration URL carries, as the instance that issued it reads it
  * back. On the wire between a browser and an instance the whole of it is one
- * opaque string; this shape is what `auth_resolve` answers with, so the two
+ * opaque string; this shape is what `auth.resolve` answers with, so the two
  * instances involved agree on what was authorized.
  *
  * Its integrity rests on a secret made for this one registration and held only
@@ -175,8 +175,8 @@ export type AuthSession = Static<typeof AuthSession>;
 export const AuthRegisterResult = AuthSession;
 export type AuthRegisterResult = Static<typeof AuthRegisterResult>;
 
-export const AuthRegisterRequest = request("auth_register", AuthRegisterArgs);
-export const AuthRegisterResponse = response("auth_register", AuthRegisterResult);
+export const AuthRegisterRequest = request("auth.register", AuthRegisterArgs);
+export const AuthRegisterResponse = response("auth.register", AuthRegisterResult);
 
 // --- assertion -------------------------------------------------------------
 
@@ -207,8 +207,8 @@ export type AuthAssertArgs = Static<typeof AuthAssertArgs>;
 export const AuthAssertResult = AuthSession;
 export type AuthAssertResult = Static<typeof AuthAssertResult>;
 
-export const AuthAssertRequest = request("auth_assert", AuthAssertArgs);
-export const AuthAssertResponse = response("auth_assert", AuthAssertResult);
+export const AuthAssertRequest = request("auth.assert", AuthAssertArgs);
+export const AuthAssertResponse = response("auth.assert", AuthAssertResult);
 
 // --- refreshing a token pair ----------------------------------------------
 
@@ -224,7 +224,7 @@ export type AuthRefreshReason = Static<typeof AuthRefreshReason>;
 /** The refresh token is not among the arguments: it is a cookie the carrier
  * already holds, and a caller that could state it is a caller that could read
  * it. What is left is why the caller is asking, which nothing is decided by. */
-export const AuthRefreshTokenArgs = Type.Object({
+export const AuthTokenRefreshArgs = Type.Object({
   /** What prompted this refresh, as the client knows it: the page was loaded
    * again, the access token was about to expire, or a dropped connection is
    * being remade. A hint kept on the family (`last_refresh`) for a person
@@ -234,31 +234,31 @@ export const AuthRefreshTokenArgs = Type.Object({
    * refresh as any. */
   reason: Type.Optional(AuthRefreshReason),
 });
-export type AuthRefreshTokenArgs = Static<typeof AuthRefreshTokenArgs>;
+export type AuthTokenRefreshArgs = Static<typeof AuthTokenRefreshArgs>;
 
-export const AuthRefreshTokenResult = AuthSession;
-export type AuthRefreshTokenResult = Static<typeof AuthRefreshTokenResult>;
+export const AuthTokenRefreshResult = AuthSession;
+export type AuthTokenRefreshResult = Static<typeof AuthTokenRefreshResult>;
 
-export const AuthRefreshTokenRequest = request("auth_refresh_token", AuthRefreshTokenArgs);
-export const AuthRefreshTokenResponse = response("auth_refresh_token", AuthRefreshTokenResult);
+export const AuthTokenRefreshRequest = request("auth.token.refresh", AuthTokenRefreshArgs);
+export const AuthTokenRefreshResponse = response("auth.token.refresh", AuthTokenRefreshResult);
 
 // --- extending a live connection ------------------------------------------
 
-/** Carries a token got from `auth_refresh_token`, on the connection whose life
+/** Carries a token got from `auth.token.refresh`, on the connection whose life
  * it extends. Apart from that op because they answer different questions: one
  * mints, this one moves a live connection's deadline, and a client that had to
  * reconnect to use a fresh token would blink every few hours for no reason. */
-export const AuthRefreshArgs = Type.Object({ access_token: Base64Url });
-export type AuthRefreshArgs = Static<typeof AuthRefreshArgs>;
+export const AuthExtendArgs = Type.Object({ access_token: Base64Url });
+export type AuthExtendArgs = Static<typeof AuthExtendArgs>;
 
-export const AuthRefreshResult = Type.Object({
-  /** The connection's new deadline, as `hello` first stated it. */
+export const AuthExtendResult = Type.Object({
+  /** The connection's new deadline, as the greeting first stated it. */
   auth_expires_at: Timestamp,
 });
-export type AuthRefreshResult = Static<typeof AuthRefreshResult>;
+export type AuthExtendResult = Static<typeof AuthExtendResult>;
 
-export const AuthRefreshRequest = request("auth_refresh", AuthRefreshArgs);
-export const AuthRefreshResponse = response("auth_refresh", AuthRefreshResult);
+export const AuthExtendRequest = request("auth.extend", AuthExtendArgs);
+export const AuthExtendResponse = response("auth.extend", AuthExtendResult);
 
 // --- between instances -----------------------------------------------------
 
@@ -297,8 +297,8 @@ export const AuthResolveResult = Type.Union(
 );
 export type AuthResolveResult = Static<typeof AuthResolveResult>;
 
-export const AuthResolveRequest = request("auth_resolve", AuthResolveArgs);
-export const AuthResolveResponse = response("auth_resolve", AuthResolveResult);
+export const AuthResolveRequest = request("auth.resolve", AuthResolveArgs);
+export const AuthResolveResponse = response("auth.resolve", AuthResolveResult);
 
 /** Rotates a token family at the one instance allowed to write it.
  *
@@ -332,8 +332,8 @@ export const AuthRotateResult = Type.Object({
 });
 export type AuthRotateResult = Static<typeof AuthRotateResult>;
 
-export const AuthRotateRequest = request("auth_rotate", AuthRotateArgs);
-export const AuthRotateResponse = response("auth_rotate", AuthRotateResult);
+export const AuthRotateRequest = request("auth.rotate", AuthRotateArgs);
+export const AuthRotateResponse = response("auth.rotate", AuthRotateResult);
 
 // --- the replicated records ------------------------------------------------
 
@@ -513,7 +513,7 @@ export const AuthRecord = Type.Object(
 );
 export type AuthRecord = Static<typeof AuthRecord>;
 
-/** The `auth_records` topic: how credentials and token families reach every
+/** The `auth.records` topic: how credentials and token families reach every
  * instance.
  *
  * Apart from the store because of who may read it. The store is the person's to
@@ -522,6 +522,6 @@ export type AuthRecord = Static<typeof AuthRecord>;
  * it would be a new way in. Only instances subscribe, and a relay carries the
  * frames as the instance it is rather than on a person's behalf. */
 export const AuthRecordsFrame = topicFrame(
-  "auth_records",
+  "auth.records",
   Type.Object({ records: Type.Array(AuthRecord) }),
 );

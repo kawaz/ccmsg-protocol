@@ -26,135 +26,149 @@ export interface OpFixture {
  * implementation. Every one of them passes the op's schema, which the
  * contract's tests hold it to. */
 export const OP_FIXTURES = {
-  hello: { request: common.HELLO_REQUEST, response: common.HELLO_RESPONSE },
-  instance_ping: {
+  "hello.session": { request: common.HELLO_SESSION_REQUEST, response: common.HELLO_RESPONSE },
+  "hello.user": { request: common.HELLO_USER_REQUEST, response: common.HELLO_RESPONSE },
+  "hello.instance": {
+    request: common.HELLO_INSTANCE_REQUEST,
+    response: common.HELLO_RESPONSE,
+  },
+  "instance.ping": {
     request: common.INSTANCE_PING_REQUEST,
     response: common.INSTANCE_PING_RESPONSE,
   },
-  instance_shutdown: {
+  "instance.shutdown": {
     request: common.INSTANCE_SHUTDOWN_REQUEST,
     response: common.INSTANCE_SHUTDOWN_RESPONSE,
   },
-  session_stopping: {
+  "session.stopping": {
     request: common.SESSION_STOPPING_REQUEST,
     response: common.SESSION_STOPPING_RESPONSE,
   },
-  topic_subscribe: {
+  "topic.subscribe": {
     request: common.TOPIC_SUBSCRIBE_REQUEST,
     response: common.TOPIC_SUBSCRIBE_RESPONSE,
   },
-  topic_unsubscribe: {
+  "topic.unsubscribe": {
     request: common.TOPIC_UNSUBSCRIBE_REQUEST,
     response: common.TOPIC_UNSUBSCRIBE_RESPONSE,
   },
-  auth_challenge: {
+  "auth.challenge": {
     request: common.AUTH_CHALLENGE_REQUEST,
     response: common.AUTH_CHALLENGE_RESPONSE,
   },
-  auth_register: {
+  "auth.register": {
     request: common.AUTH_REGISTER_REQUEST,
     response: common.AUTH_REGISTER_RESPONSE,
   },
-  auth_assert: { request: common.AUTH_ASSERT_REQUEST, response: common.AUTH_ASSERT_RESPONSE },
-  auth_refresh_token: {
-    request: common.AUTH_REFRESH_TOKEN_REQUEST,
-    response: common.AUTH_REFRESH_TOKEN_RESPONSE,
+  "auth.assert": { request: common.AUTH_ASSERT_REQUEST, response: common.AUTH_ASSERT_RESPONSE },
+  "auth.token.refresh": {
+    request: common.AUTH_TOKEN_REFRESH_REQUEST,
+    response: common.AUTH_TOKEN_REFRESH_RESPONSE,
   },
-  auth_refresh: { request: common.AUTH_REFRESH_REQUEST, response: common.AUTH_REFRESH_RESPONSE },
-  auth_resolve: { request: common.AUTH_RESOLVE_REQUEST, response: common.AUTH_RESOLVE_RESPONSE },
-  auth_rotate: { request: common.AUTH_ROTATE_REQUEST, response: common.AUTH_ROTATE_RESPONSE },
+  "auth.extend": { request: common.AUTH_EXTEND_REQUEST, response: common.AUTH_EXTEND_RESPONSE },
+  "auth.resolve": { request: common.AUTH_RESOLVE_REQUEST, response: common.AUTH_RESOLVE_RESPONSE },
+  "auth.rotate": { request: common.AUTH_ROTATE_REQUEST, response: common.AUTH_ROTATE_RESPONSE },
 
-  message_send: {
+  "message.send": {
     request: messaging.MESSAGE_SEND_REQUEST,
     response: messaging.MESSAGE_SEND_RESPONSE,
   },
-  say_post: { request: messaging.SAY_POST_REQUEST, response: messaging.SAY_POST_RESPONSE },
-  say_mark_read: {
-    request: messaging.SAY_MARK_READ_REQUEST,
-    response: messaging.SAY_MARK_READ_RESPONSE,
+  "say.post": { request: messaging.SAY_POST_REQUEST, response: messaging.SAY_POST_RESPONSE },
+  "say.unread.clear": {
+    request: messaging.SAY_UNREAD_CLEAR_REQUEST,
+    response: messaging.SAY_UNREAD_CLEAR_RESPONSE,
   },
-  notify_send: { request: messaging.NOTIFY_SEND_REQUEST, response: messaging.NOTIFY_SEND_RESPONSE },
+  "notify.send": {
+    request: messaging.NOTIFY_SEND_REQUEST,
+    response: messaging.NOTIFY_SEND_RESPONSE,
+  },
 
-  session_kill: { request: control.SESSION_KILL_REQUEST, response: control.SESSION_KILL_RESPONSE },
-  session_rename: {
+  "session.kill": {
+    request: control.SESSION_KILL_REQUEST,
+    response: control.SESSION_KILL_RESPONSE,
+  },
+  "session.rename": {
     request: control.SESSION_RENAME_REQUEST,
     response: control.SESSION_RENAME_RESPONSE,
   },
-  session_env_read: {
+  "session.env.read": {
     request: control.SESSION_ENV_READ_REQUEST,
     response: control.SESSION_ENV_READ_RESPONSE,
   },
-  session_search: {
+  "session.search": {
     request: control.SESSION_SEARCH_REQUEST,
     response: control.SESSION_SEARCH_RESPONSE,
   },
-  session_dump_write: {
+  "session.dump.write": {
     request: control.SESSION_DUMP_WRITE_REQUEST,
     response: control.SESSION_DUMP_WRITE_RESPONSE,
   },
-  dump_presets_read: {
+  "dump.presets.read": {
     request: control.DUMP_PRESETS_READ_REQUEST,
     response: control.DUMP_PRESETS_READ_RESPONSE,
   },
-  transcript_read: {
+  "transcript.read": {
     request: control.TRANSCRIPT_READ_REQUEST,
     response: control.TRANSCRIPT_READ_RESPONSE,
   },
-  transcript_items_read: {
+  "transcript.items.read": {
     request: control.TRANSCRIPT_ITEMS_READ_REQUEST,
     response: control.TRANSCRIPT_ITEMS_READ_RESPONSE,
   },
-  session_fork_origin: {
-    request: control.SESSION_FORK_ORIGIN_REQUEST,
-    response: control.SESSION_FORK_ORIGIN_RESPONSE,
+  "session.fork.origin.read": {
+    request: control.SESSION_FORK_ORIGIN_READ_REQUEST,
+    response: control.SESSION_FORK_ORIGIN_READ_RESPONSE,
   },
-  session_last_live_remove: {
-    request: control.SESSION_LAST_LIVE_REMOVE_REQUEST,
-    response: control.SESSION_LAST_LIVE_REMOVE_RESPONSE,
+  "session.forget": {
+    request: control.SESSION_FORGET_REQUEST,
+    response: control.SESSION_FORGET_RESPONSE,
   },
 
-  dir_list: { request: control.DIR_LIST_REQUEST, response: control.DIR_LIST_RESPONSE },
-  file_read: { request: control.FILE_READ_REQUEST, response: control.FILE_READ_RESPONSE },
-  file_write: { request: control.FILE_WRITE_REQUEST, response: control.FILE_WRITE_RESPONSE },
-  file_create: { request: control.FILE_CREATE_REQUEST, response: control.FILE_CREATE_RESPONSE },
-  file_edit: { request: control.FILE_EDIT_REQUEST, response: control.FILE_EDIT_RESPONSE },
-  file_delete: { request: control.FILE_DELETE_REQUEST, response: control.FILE_DELETE_RESPONSE },
-  file_find: { request: control.FILE_FIND_REQUEST, response: control.FILE_FIND_RESPONSE },
-  file_stat_batch: {
-    request: control.FILE_STAT_BATCH_REQUEST,
-    response: control.FILE_STAT_BATCH_RESPONSE,
+  "dir.list": { request: control.DIR_LIST_REQUEST, response: control.DIR_LIST_RESPONSE },
+  "file.read": { request: control.FILE_READ_REQUEST, response: control.FILE_READ_RESPONSE },
+  "file.write": { request: control.FILE_WRITE_REQUEST, response: control.FILE_WRITE_RESPONSE },
+  "file.create": { request: control.FILE_CREATE_REQUEST, response: control.FILE_CREATE_RESPONSE },
+  "file.edit": { request: control.FILE_EDIT_REQUEST, response: control.FILE_EDIT_RESPONSE },
+  "file.delete": { request: control.FILE_DELETE_REQUEST, response: control.FILE_DELETE_RESPONSE },
+  "file.find": { request: control.FILE_FIND_REQUEST, response: control.FILE_FIND_RESPONSE },
+  "file.stat": {
+    request: control.FILE_STAT_REQUEST,
+    response: control.FILE_STAT_RESPONSE,
   },
-  dir_tree: { request: control.DIR_TREE_REQUEST, response: control.DIR_TREE_RESPONSE },
+  "dir.tree": { request: control.DIR_TREE_REQUEST, response: control.DIR_TREE_RESPONSE },
 
-  launcher_config_read: {
+  "launcher.config.read": {
     request: control.LAUNCHER_CONFIG_READ_REQUEST,
     response: control.LAUNCHER_CONFIG_READ_RESPONSE,
   },
-  launcher_run: { request: control.LAUNCHER_RUN_REQUEST, response: control.LAUNCHER_RUN_RESPONSE },
-  sandbox_grant: {
+  "launcher.run": {
+    request: control.LAUNCHER_RUN_REQUEST,
+    response: control.LAUNCHER_RUN_RESPONSE,
+  },
+  "sandbox.grant": {
     request: control.SANDBOX_GRANT_REQUEST,
     response: control.SANDBOX_GRANT_RESPONSE,
   },
-  sandbox_revoke: {
+  "sandbox.revoke": {
     request: control.SANDBOX_REVOKE_REQUEST,
     response: control.SANDBOX_REVOKE_RESPONSE,
   },
-  translate_run: {
+  "translate.run": {
     request: control.TRANSLATE_RUN_REQUEST,
     response: control.TRANSLATE_RUN_RESPONSE,
   },
-  llm_usage_read: {
+  "llm.usage.read": {
     request: control.LLM_USAGE_READ_REQUEST,
     response: control.LLM_USAGE_READ_RESPONSE,
   },
-  llm_stats_read: {
+  "llm.stats.read": {
     request: control.LLM_STATS_READ_REQUEST,
     response: control.LLM_STATS_READ_RESPONSE,
   },
 
-  kv_read: { request: control.KV_READ_REQUEST, response: control.KV_READ_RESPONSE },
-  kv_write: { request: control.KV_WRITE_REQUEST, response: control.KV_WRITE_RESPONSE },
-  kv_delete: { request: control.KV_DELETE_REQUEST, response: control.KV_DELETE_RESPONSE },
+  "kv.read": { request: control.KV_READ_REQUEST, response: control.KV_READ_RESPONSE },
+  "kv.write": { request: control.KV_WRITE_REQUEST, response: control.KV_WRITE_RESPONSE },
+  "kv.delete": { request: control.KV_DELETE_REQUEST, response: control.KV_DELETE_RESPONSE },
 } as const satisfies Record<OpName, OpFixture>;
 
 /** A representative frame for every topic, each one the snapshot a subscriber
@@ -165,12 +179,12 @@ export const TOPIC_FIXTURES = {
   peers: topics.PEERS_FRAME,
   instances: topics.INSTANCES_FRAME,
   agents: topics.AGENTS_FRAME,
-  session_status: topics.SESSION_STATUS_FRAME,
+  "session.status": topics.SESSION_STATUS_FRAME,
   transcript: topics.TRANSCRIPT_FRAME,
-  transcript_items: topics.TRANSCRIPT_ITEMS_FRAME,
-  session_errors: topics.SESSION_ERRORS_FRAME,
-  llm_requests: topics.LLM_REQUESTS_FRAME,
-  llm_status: topics.LLM_STATUS_FRAME,
+  "transcript.items": topics.TRANSCRIPT_ITEMS_FRAME,
+  "session.errors": topics.SESSION_ERRORS_FRAME,
+  "llm.requests": topics.LLM_REQUESTS_FRAME,
+  "llm.status": topics.LLM_STATUS_FRAME,
   kv: topics.KV_FRAME,
-  auth_records: topics.AUTH_RECORDS_FRAME,
+  "auth.records": topics.AUTH_RECORDS_FRAME,
 } as const satisfies Record<TopicKind, unknown>;

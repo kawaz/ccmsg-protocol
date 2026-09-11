@@ -34,12 +34,12 @@ describe("op attribute table", () => {
     const queueing = OP_NAMES.filter((op) =>
       (OP_ATTRIBUTES[op].errors as readonly string[]).includes("rate_limited"),
     );
-    expect(queueing.sort()).toEqual(["notify_send", "say_post"]);
+    expect(queueing.sort()).toEqual(["notify.send", "say.post"]);
   });
 
   test("attributes decide the derived codes", () => {
-    expect(opErrors("hello")).toEqual(["invalid_args"]);
-    expect(opErrors("session_rename")).toEqual([
+    expect(opErrors("hello.user")).toEqual(["invalid_args"]);
+    expect(opErrors("session.rename")).toEqual([
       "invalid_args",
       "session_not_found",
       "hello_required",
@@ -47,7 +47,7 @@ describe("op attribute table", () => {
       "capability_unavailable",
       "instance_unreachable",
     ]);
-    expect(opErrors("message_send")).toEqual([
+    expect(opErrors("message.send")).toEqual([
       "invalid_args",
       "session_not_found",
       "hello_required",
@@ -58,12 +58,14 @@ describe("op attribute table", () => {
   test("what is callable before hello is the greeting and what settles an identity", () => {
     const open = OP_NAMES.filter((op) => !OP_ATTRIBUTES[op].needs_hello);
     expect(open.sort()).toEqual([
-      "auth_assert",
-      "auth_challenge",
-      "auth_refresh_token",
-      "auth_register",
-      "hello",
-      "instance_ping",
+      "auth.assert",
+      "auth.challenge",
+      "auth.register",
+      "auth.token.refresh",
+      "hello.instance",
+      "hello.session",
+      "hello.user",
+      "instance.ping",
     ]);
   });
 
@@ -72,35 +74,35 @@ describe("op attribute table", () => {
     // connection exists — never who may call it: that stays this table's.
     const overHttp = OP_NAMES.filter((op) => opAttributes(op).carrier === "http");
     expect(overHttp.sort()).toEqual([
-      "auth_assert",
-      "auth_challenge",
-      "auth_refresh_token",
-      "auth_register",
+      "auth.assert",
+      "auth.challenge",
+      "auth.register",
+      "auth.token.refresh",
     ]);
     for (const op of overHttp) expect(OP_ATTRIBUTES[op].needs_hello).toBe(false);
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(13);
+    expect(opsOfPlane("common")).toHaveLength(15);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(46);
+    expect(OP_NAMES).toHaveLength(48);
     expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(13);
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
     const anywhere = opsOfPlane("control").filter((op) => OP_ATTRIBUTES[op].locality === "cluster");
-    expect(anywhere.sort()).toEqual(["kv_delete", "kv_read", "kv_write"]);
+    expect(anywhere.sort()).toEqual(["kv.delete", "kv.read", "kv.write"]);
   });
 
   test("role checks read the table", () => {
-    expect(isRoleAllowed("say_post", "session")).toBe(true);
-    expect(isRoleAllowed("say_post", "user")).toBe(false);
-    expect(isRoleAllowed("say_mark_read", "session")).toBe(false);
-    expect(isRoleAllowed("session_kill", "user")).toBe(true);
-    expect(isRoleAllowed("session_stopping", "session")).toBe(true);
-    expect(isRoleAllowed("session_stopping", "user")).toBe(false);
+    expect(isRoleAllowed("say.post", "session")).toBe(true);
+    expect(isRoleAllowed("say.post", "user")).toBe(false);
+    expect(isRoleAllowed("say.unread.clear", "session")).toBe(false);
+    expect(isRoleAllowed("session.kill", "user")).toBe(true);
+    expect(isRoleAllowed("session.stopping", "session")).toBe(true);
+    expect(isRoleAllowed("session.stopping", "user")).toBe(false);
   });
 });
 
@@ -113,11 +115,11 @@ describe("topic attribute table", () => {
   });
 
   test("a parameterized name folds like the kind behind it", () => {
-    expect(topicGranularity("session_status:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("whole");
+    expect(topicGranularity("session.status:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("whole");
     expect(topicGranularity("transcript:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe("append");
     // The kind is the whole head of the name: a longer topic that begins with a
     // shorter one is its own kind and not that one parameterized.
-    expect(topicGranularity("transcript_items:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe(
+    expect(topicGranularity("transcript.items:6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607")).toBe(
       "append",
     );
     expect(topicGranularity("kv:launcher")).toBe("element");
@@ -136,20 +138,20 @@ describe("topic attribute table", () => {
 
   test("a whole value several instances write folds per instance", () => {
     // A whole-value frame from one instance must not erase another's entries,
-    // so every instance-wide value is `per_instance_whole`; `session_status` is
+    // so every instance-wide value is `per_instance_whole`; `session.status` is
     // whole because one session lives on one instance.
-    for (const topic of ["instances", "session_errors", "llm_requests", "llm_status"]) {
+    for (const topic of ["instances", "session.errors", "llm.requests", "llm.status"]) {
       expect(TOPIC_ATTRIBUTES[topic as keyof typeof TOPIC_ATTRIBUTES].granularity).toBe(
         "per_instance_whole",
       );
     }
-    expect(TOPIC_ATTRIBUTES.session_status.granularity).toBe("whole");
+    expect(TOPIC_ATTRIBUTES["session.status"].granularity).toBe("whole");
   });
 
   test("a topic of rows that change on their own folds by element", () => {
     // The question the granularity answers: is there a reason to restate one
     // element when another changed? For a list of sessions there is none.
-    for (const topic of ["peers", "agents", "inbox", "kv", "auth_records"]) {
+    for (const topic of ["peers", "agents", "inbox", "kv", "auth.records"]) {
       expect(TOPIC_ATTRIBUTES[topic as keyof typeof TOPIC_ATTRIBUTES].granularity).toBe("element");
     }
   });
@@ -158,16 +160,16 @@ describe("topic attribute table", () => {
     const forInstances = Object.entries(TOPIC_ATTRIBUTES)
       .filter(([, attrs]) => !(attrs.roles as readonly string[]).includes("user"))
       .map(([topic]) => topic);
-    expect(forInstances).toEqual(["auth_records"]);
-    expect(TOPIC_ATTRIBUTES.auth_records.roles).toEqual(["instance"]);
+    expect(forInstances).toEqual(["auth.records"]);
+    expect(TOPIC_ATTRIBUTES["auth.records"].roles).toEqual(["instance"]);
   });
 
   test("subscribing is open to every role, and the topic table is what narrows it", () => {
-    // An instance subscribes as itself to `auth_records`, so the op cannot
+    // An instance subscribes as itself to `auth.records`, so the op cannot
     // refuse the role; what a person may not have is refused by the topic.
     for (const role of ["session", "user", "instance"] as const) {
-      expect(isRoleAllowed("topic_subscribe", role)).toBe(true);
-      expect(isRoleAllowed("topic_unsubscribe", role)).toBe(true);
+      expect(isRoleAllowed("topic.subscribe", role)).toBe(true);
+      expect(isRoleAllowed("topic.unsubscribe", role)).toBe(true);
     }
   });
 });

@@ -10,10 +10,10 @@ export const SessionErrorEntry = Type.Intersect(
 );
 export type SessionErrorEntry = Static<typeof SessionErrorEntry>;
 
-/** The `session_errors` topic: every connected session currently stopped on a
+/** The `session.errors` topic: every connected session currently stopped on a
  * harness error.
  *
- * Not per session, unlike `session_status`. A client showing a list of sessions
+ * Not per session, unlike `session.status`. A client showing a list of sessions
  * has to mark the stopped ones, and subscribing to a whole status fold for each
  * visible session is the cost this exists to avoid: the instance folds the one
  * error pattern over every connected session instead.
@@ -22,6 +22,6 @@ export type SessionErrorEntry = Static<typeof SessionErrorEntry>;
  * rather than appearing with an empty error, so a client that missed a frame
  * still converges on the next one. */
 export const SessionErrorsFrame = topicFrame(
-  "session_errors",
+  "session.errors",
   Type.Object({ errors: Type.Array(SessionErrorEntry) }),
 );

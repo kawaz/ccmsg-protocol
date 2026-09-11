@@ -48,8 +48,8 @@ export const TranscriptReadResult = Type.Object({
 });
 export type TranscriptReadResult = Static<typeof TranscriptReadResult>;
 
-export const TranscriptReadRequest = request("transcript_read", TranscriptReadArgs);
-export const TranscriptReadResponse = response("transcript_read", TranscriptReadResult);
+export const TranscriptReadRequest = request("transcript.read", TranscriptReadArgs);
+export const TranscriptReadResponse = response("transcript.read", TranscriptReadResult);
 
 /** Reads a slice of a transcript as the items it was read into.
  *
@@ -115,13 +115,13 @@ export const TranscriptItemsReadResult = Type.Object({
 });
 export type TranscriptItemsReadResult = Static<typeof TranscriptItemsReadResult>;
 
-export const TranscriptItemsReadRequest = request("transcript_items_read", TranscriptItemsReadArgs);
+export const TranscriptItemsReadRequest = request("transcript.items.read", TranscriptItemsReadArgs);
 export const TranscriptItemsReadResponse = response(
-  "transcript_items_read",
+  "transcript.items.read",
   TranscriptItemsReadResult,
 );
 
-/** The `transcript_items:<sid>` topic.
+/** The `transcript.items:<sid>` topic.
  *
  * What `transcript:<sid>` carries as appended bytes, carried as the items those
  * bytes were read as. A subscriber holds a list it only ever appends to, so the
@@ -133,7 +133,7 @@ export const TranscriptItemsReadResponse = response(
  * A record still being written is not classified until its line ends, which is
  * the same rule the raw topic sends whole lines under. */
 export const TranscriptItemsFrame = topicFrame(
-  "transcript_items",
+  "transcript.items",
   Type.Object({
     sid: Sid,
     items: Type.Array(TranscriptItem),

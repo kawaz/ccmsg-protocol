@@ -29,5 +29,5 @@ export const TranslateRunResult = Type.Object({
 });
 export type TranslateRunResult = Static<typeof TranslateRunResult>;
 
-export const TranslateRunRequest = request("translate_run", TranslateRunArgs);
-export const TranslateRunResponse = response("translate_run", TranslateRunResult);
+export const TranslateRunRequest = request("translate.run", TranslateRunArgs);
+export const TranslateRunResponse = response("translate.run", TranslateRunResult);

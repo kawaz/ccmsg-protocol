@@ -167,7 +167,7 @@ export const AGENTS_CHANGE_FRAME: Static<typeof AgentsFrame> = {
 
 export const SESSION_STATUS_FRAME: Static<typeof SessionStatusFrame> = {
   ev: "topic",
-  topic: `session_status:${sid}`,
+  topic: `session.status:${sid}`,
   snapshot: true,
   instance,
   data: {
@@ -297,7 +297,7 @@ export const TRANSCRIPT_SIZE_FRAME = {
 /** The typed topic, whose frames carry items rather than bytes. */
 export const TRANSCRIPT_ITEMS_FRAME = {
   ev: "topic",
-  topic: `transcript_items:${sid}`,
+  topic: `transcript.items:${sid}`,
   instance,
   data: { sid, items: TRANSCRIPT_ITEMS.slice(-2) },
 } satisfies Static<typeof TranscriptItemsFrame>;
@@ -306,7 +306,7 @@ export const TRANSCRIPT_ITEMS_FRAME = {
  * every frame after it, so a subscriber appends both the same way. */
 export const TRANSCRIPT_ITEMS_SNAPSHOT_FRAME = {
   ev: "topic",
-  topic: `transcript_items:${sid}`,
+  topic: `transcript.items:${sid}`,
   snapshot: true,
   instance,
   data: { sid, items: TRANSCRIPT_ITEMS },
@@ -314,7 +314,7 @@ export const TRANSCRIPT_ITEMS_SNAPSHOT_FRAME = {
 
 export const SESSION_ERRORS_FRAME: Static<typeof SessionErrorsFrame> = {
   ev: "topic",
-  topic: "session_errors",
+  topic: "session.errors",
   snapshot: true,
   instance,
   data: {
@@ -324,7 +324,7 @@ export const SESSION_ERRORS_FRAME: Static<typeof SessionErrorsFrame> = {
 
 export const LLM_REQUESTS_FRAME: Static<typeof LlmRequestsFrame> = {
   ev: "topic",
-  topic: "llm_requests",
+  topic: "llm.requests",
   snapshot: true,
   instance,
   data: [
@@ -349,7 +349,7 @@ export const LLM_REQUESTS_FRAME: Static<typeof LlmRequestsFrame> = {
 
 export const LLM_STATUS_FRAME: Static<typeof LlmStatusFrame> = {
   ev: "topic",
-  topic: "llm_status",
+  topic: "llm.status",
   snapshot: true,
   instance,
   data: {
@@ -396,7 +396,7 @@ export const KV_FRAME: Static<typeof KvFrame> = {
 
 export const AUTH_RECORDS_FRAME = {
   ev: "topic",
-  topic: "auth_records",
+  topic: "auth.records",
   snapshot: true,
   instance,
   data: {
@@ -431,7 +431,7 @@ export const AUTH_RECORDS_FRAME = {
  * issued it. */
 export const AUTH_RECORDS_FAMILY_FRAME = {
   ev: "topic",
-  topic: "auth_records",
+  topic: "auth.records",
   instance,
   data: {
     records: [
@@ -462,7 +462,7 @@ export const AUTH_RECORDS_FAMILY_FRAME = {
  * family's is kept only as long as a refresh token could still arrive. */
 export const AUTH_RECORDS_TOMBSTONE_FRAME = {
   ev: "topic",
-  topic: "auth_records",
+  topic: "auth.records",
   instance,
   data: {
     records: [

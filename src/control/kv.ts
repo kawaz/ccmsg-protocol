@@ -45,8 +45,8 @@ export const KvReadResult = Type.Object({
 });
 export type KvReadResult = Static<typeof KvReadResult>;
 
-export const KvReadRequest = request("kv_read", KvReadArgs);
-export const KvReadResponse = response("kv_read", KvReadResult);
+export const KvReadRequest = request("kv.read", KvReadArgs);
+export const KvReadResponse = response("kv.read", KvReadResult);
 
 /** Writes one value, replacing whatever the key held. */
 export const KvWriteArgs = Type.Object({
@@ -68,8 +68,8 @@ export const KvWriteResult = Type.Object({
 });
 export type KvWriteResult = Static<typeof KvWriteResult>;
 
-export const KvWriteRequest = request("kv_write", KvWriteArgs);
-export const KvWriteResponse = response("kv_write", KvWriteResult);
+export const KvWriteRequest = request("kv.write", KvWriteArgs);
+export const KvWriteResponse = response("kv.write", KvWriteResult);
 
 /** Removes one key. A key that was not there is no error: the caller wanted the
  * namespace to be without it, and it is. */
@@ -79,8 +79,8 @@ export type KvDeleteArgs = Static<typeof KvDeleteArgs>;
 export const KvDeleteResult = Type.Object({});
 export type KvDeleteResult = Static<typeof KvDeleteResult>;
 
-export const KvDeleteRequest = request("kv_delete", KvDeleteArgs);
-export const KvDeleteResponse = response("kv_delete", KvDeleteResult);
+export const KvDeleteRequest = request("kv.delete", KvDeleteArgs);
+export const KvDeleteResponse = response("kv.delete", KvDeleteResult);
 
 /** One entry, in a snapshot or in the change that produced it. */
 export const KvEntry = Type.Object(

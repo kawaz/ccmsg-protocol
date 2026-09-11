@@ -70,8 +70,8 @@ export const DirListResult = Type.Object({
 });
 export type DirListResult = Static<typeof DirListResult>;
 
-export const DirListRequest = request("dir_list", DirListArgs);
-export const DirListResponse = response("dir_list", DirListResult);
+export const DirListRequest = request("dir.list", DirListArgs);
+export const DirListResponse = response("dir.list", DirListResult);
 
 export const FileReadArgs = Type.Object({
   sid: Sid,
@@ -97,14 +97,14 @@ export const FileReadResult = Type.Object({
 });
 export type FileReadResult = Static<typeof FileReadResult>;
 
-export const FileReadRequest = request("file_read", FileReadArgs);
-export const FileReadResponse = response("file_read", FileReadResult);
+export const FileReadRequest = request("file.read", FileReadArgs);
+export const FileReadResponse = response("file.read", FileReadResult);
 
 /** Writes a new file into the session's inbox directory.
  *
  * The one place a client may put a file without the user having opened it
  * first, which is why it takes no `kind`: the destination is fixed and only the
- * name within it is the caller's. `file_create` is the general form. */
+ * name within it is the caller's. `file.create` is the general form. */
 export const FileWriteArgs = Type.Object({
   sid: Sid,
   /** Relative to the session's working directory. */
@@ -119,12 +119,12 @@ export const FileWriteResult = Type.Object({
 });
 export type FileWriteResult = Static<typeof FileWriteResult>;
 
-export const FileWriteRequest = request("file_write", FileWriteArgs);
-export const FileWriteResponse = response("file_write", FileWriteResult);
+export const FileWriteRequest = request("file.write", FileWriteArgs);
+export const FileWriteResponse = response("file.write", FileWriteResult);
 
 /** Creates a file that does not exist yet.
  *
- * The symmetric partner of `file_edit`: create versus overwrite. It never
+ * The symmetric partner of `file.edit`: create versus overwrite. It never
  * replaces an existing path, and it does not make parent directories. There is
  * no `external` kind — that allowlist names single files, so it holds no
  * directory to create in. */
@@ -143,8 +143,8 @@ export const FileCreateResult = Type.Object({
 });
 export type FileCreateResult = Static<typeof FileCreateResult>;
 
-export const FileCreateRequest = request("file_create", FileCreateArgs);
-export const FileCreateResponse = response("file_create", FileCreateResult);
+export const FileCreateRequest = request("file.create", FileCreateArgs);
+export const FileCreateResponse = response("file.create", FileCreateResult);
 
 /** Overwrites an existing text file in place.
  *
@@ -175,8 +175,8 @@ export const FileEditResult = Type.Object({
 });
 export type FileEditResult = Static<typeof FileEditResult>;
 
-export const FileEditRequest = request("file_edit", FileEditArgs);
-export const FileEditResponse = response("file_edit", FileEditResult);
+export const FileEditRequest = request("file.edit", FileEditArgs);
+export const FileEditResponse = response("file.edit", FileEditResult);
 
 /** Deletes one regular file. Never a directory, never a symlink, never
  * recursive: this only unlinks files a person could see as a leaf. `external`
@@ -195,8 +195,8 @@ export const FileDeleteResult = Type.Object({
 });
 export type FileDeleteResult = Static<typeof FileDeleteResult>;
 
-export const FileDeleteRequest = request("file_delete", FileDeleteArgs);
-export const FileDeleteResponse = response("file_delete", FileDeleteResult);
+export const FileDeleteRequest = request("file.delete", FileDeleteArgs);
+export const FileDeleteResponse = response("file.delete", FileDeleteResult);
 
 /** Searches for files by name under one browsable root.
  *
@@ -241,20 +241,20 @@ export const FileFindResult = Type.Object({
 });
 export type FileFindResult = Static<typeof FileFindResult>;
 
-export const FileFindRequest = request("file_find", FileFindArgs);
-export const FileFindResponse = response("file_find", FileFindResult);
+export const FileFindRequest = request("file.find", FileFindArgs);
+export const FileFindResponse = response("file.find", FileFindResult);
 
 /** Asks which of a batch of paths the instance is willing to serve as files.
  *
  * A client that has found path-shaped text in a message uses this to decide
  * which of them to turn into links. Each path is tried against the three
  * surfaces in turn and the first that admits it and finds a regular file wins. */
-export const FileStatBatchArgs = Type.Object({
+export const FileStatArgs = Type.Object({
   sid: Sid,
   /** Absolute paths, resolved by the caller. */
   paths: Type.Array(Type.String()),
 });
-export type FileStatBatchArgs = Static<typeof FileStatBatchArgs>;
+export type FileStatArgs = Static<typeof FileStatArgs>;
 
 export const FileStatEntry = Type.Object(
   {
@@ -266,7 +266,7 @@ export const FileStatEntry = Type.Object(
 );
 export type FileStatEntry = Static<typeof FileStatEntry>;
 
-export const FileStatBatchResult = Type.Object({
+export const FileStatResult = Type.Object({
   /** One slot per requested path, in the same order.
    *
    * Design rationale: an unresolved path is `null` rather than being left out,
@@ -278,10 +278,10 @@ export const FileStatBatchResult = Type.Object({
    * path the caller may not read exists. */
   results: Type.Array(Type.Union([FileStatEntry, Type.Null()])),
 });
-export type FileStatBatchResult = Static<typeof FileStatBatchResult>;
+export type FileStatResult = Static<typeof FileStatResult>;
 
-export const FileStatBatchRequest = request("file_stat_batch", FileStatBatchArgs);
-export const FileStatBatchResponse = response("file_stat_batch", FileStatBatchResult);
+export const FileStatRequest = request("file.stat", FileStatArgs);
+export const FileStatResponse = response("file.stat", FileStatResult);
 
 /** Reads the directory tree the launcher may start a session in.
  *
@@ -319,5 +319,5 @@ export const DirTreeResult = Type.Object({
 });
 export type DirTreeResult = Static<typeof DirTreeResult>;
 
-export const DirTreeRequest = request("dir_tree", DirTreeArgs);
-export const DirTreeResponse = response("dir_tree", DirTreeResult);
+export const DirTreeRequest = request("dir.tree", DirTreeArgs);
+export const DirTreeResponse = response("dir.tree", DirTreeResult);

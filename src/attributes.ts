@@ -17,7 +17,14 @@ export interface OpAttributes {
   readonly plane: Plane;
   /** Roles allowed to call the op. A role outside this set gets `forbidden`. */
   readonly roles: readonly Role[];
-  /** Whether the op requires an identity settled by `hello`. */
+  /** Whether the op requires an identity settled by a greeting.
+   *
+   * On a WebSocket connection the ops that may arrive before one are the three
+   * greetings and `instance.ping` — a reachability check answers about the
+   * instance and not about the caller, so there is no identity for it to want.
+   * The ops carried over HTTP answer before any connection exists, which is
+   * what `carrier` says; `needs_hello` is false on them because there is no
+   * greeting to have sent, not because they are open on a settled one. */
   readonly needs_hello: boolean;
   /** The capability the op needs, when it needs one. */
   readonly capability?: Capability;
@@ -51,32 +58,50 @@ const INSTANCE_ONLY = ["instance"] as const;
  * facts live: authorization, capability gating and forwarding all read it
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
-  // --- common: connect, declare the end, and subscribe (13) ---
-  // `hello` and `instance_ping` address the instance the caller reached, so
+  // --- common: connect, declare the end, and subscribe (15) ---
+  // A greeting settles what the connection is, and there is one per role: what
+  // each must carry is then the op's own schema rather than a rule read off a
+  // field, and a connection cannot be settled as something neither side meant.
+  //
+  // The greetings and `instance.ping` address the instance the caller reached, so
   // there is nothing to forward and no unreachable instance to report — which
   // is why they are `cluster` despite answering about one instance.
-  hello: {
+  "hello.session": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
     locality: "cluster",
     errors: [],
   },
-  instance_ping: {
+  "hello.user": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
     locality: "cluster",
     errors: [],
   },
-  instance_shutdown: {
+  "hello.instance": {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    errors: [],
+  },
+  "instance.ping": {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "cluster",
+    errors: [],
+  },
+  "instance.shutdown": {
     plane: "common",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: [],
   },
-  session_stopping: {
+  "session.stopping": {
     plane: "common",
     roles: SESSION_ONLY,
     needs_hello: true,
@@ -86,14 +111,14 @@ export const OP_ATTRIBUTES = {
   // Open to every role, with which role may have which topic left to the topic
   // table: an instance subscribes as itself to what only instances may hold,
   // and a person is refused there by that table rather than here.
-  topic_subscribe: {
+  "topic.subscribe": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: true,
     locality: "cluster",
     errors: ["topic_unknown"],
   },
-  topic_unsubscribe: {
+  "topic.unsubscribe": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: true,
@@ -102,12 +127,12 @@ export const OP_ATTRIBUTES = {
   },
 
   // The four ops that authenticate a person are open to every role for the
-  // same reason `hello` is: they run before there is an identity to check, and
-  // what they answer is what settles one. They are `cluster` because whichever
+  // same reason the greetings are: they run before there is an identity to
+  // check, and what they answer is what settles one. They are `cluster` because whichever
   // instance is reached answers — behind a load balancer that is not a choice
   // the caller makes — and each asks the issuing instance itself for the parts
   // only it holds.
-  auth_challenge: {
+  "auth.challenge": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
@@ -115,7 +140,7 @@ export const OP_ATTRIBUTES = {
     carrier: "http",
     errors: [],
   },
-  auth_register: {
+  "auth.register": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
@@ -123,7 +148,7 @@ export const OP_ATTRIBUTES = {
     carrier: "http",
     errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
   },
-  auth_assert: {
+  "auth.assert": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
@@ -131,7 +156,7 @@ export const OP_ATTRIBUTES = {
     carrier: "http",
     errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
   },
-  auth_refresh_token: {
+  "auth.token.refresh": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
@@ -140,8 +165,8 @@ export const OP_ATTRIBUTES = {
     errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
   },
   // Addresses the connection it arrives on, which is on the instance that
-  // received it: nothing to forward, as with `hello`.
-  auth_refresh: {
+  // received it: nothing to forward, as with a greeting.
+  "auth.extend": {
     plane: "common",
     roles: USER_ONLY,
     needs_hello: true,
@@ -151,14 +176,14 @@ export const OP_ATTRIBUTES = {
   // Between instances: what an issuer alone can answer. Instance-local by the
   // usual rule — the subject belongs to one instance, and it is reached by
   // `to_instance` being that instance's id.
-  auth_resolve: {
+  "auth.resolve": {
     plane: "common",
     roles: INSTANCE_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["auth_invalid", "auth_expired"],
   },
-  auth_rotate: {
+  "auth.rotate": {
     plane: "common",
     roles: INSTANCE_ONLY,
     needs_hello: true,
@@ -167,28 +192,28 @@ export const OP_ATTRIBUTES = {
   },
 
   // --- messaging: one-to-one delivery (4) ---
-  message_send: {
+  "message.send": {
     plane: "messaging",
     roles: AGENT_AND_USER,
     needs_hello: true,
     locality: "cluster",
     errors: ["session_not_found"],
   },
-  say_post: {
+  "say.post": {
     plane: "messaging",
     roles: SESSION_ONLY,
     needs_hello: true,
     locality: "cluster",
     errors: ["rate_limited"],
   },
-  say_mark_read: {
+  "say.unread.clear": {
     plane: "messaging",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "cluster",
     errors: [],
   },
-  notify_send: {
+  "notify.send": {
     plane: "messaging",
     roles: AGENT_AND_USER,
     needs_hello: true,
@@ -197,14 +222,14 @@ export const OP_ATTRIBUTES = {
   },
 
   // --- control: session observation and operation (10) ---
-  session_kill: {
+  "session.kill": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["session_not_found"],
   },
-  session_rename: {
+  "session.rename": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -212,35 +237,35 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: ["session_not_found"],
   },
-  session_env_read: {
+  "session.env.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["session_not_found"],
   },
-  session_search: {
+  "session.search": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: [],
   },
-  session_dump_write: {
+  "session.dump.write": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["not_found"],
   },
-  dump_presets_read: {
+  "dump.presets.read": {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,
     locality: "instance-local",
     errors: [],
   },
-  transcript_read: {
+  "transcript.read": {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,
@@ -248,7 +273,7 @@ export const OP_ATTRIBUTES = {
     scope: "role",
     errors: ["not_found"],
   },
-  transcript_items_read: {
+  "transcript.items.read": {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,
@@ -256,7 +281,7 @@ export const OP_ATTRIBUTES = {
     scope: "role",
     errors: ["not_found"],
   },
-  session_fork_origin: {
+  "session.fork.origin.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -264,7 +289,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: ["not_found"],
   },
-  session_last_live_remove: {
+  "session.forget": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -273,7 +298,7 @@ export const OP_ATTRIBUTES = {
   },
 
   // --- control: file access (9) ---
-  dir_list: {
+  "dir.list": {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,
@@ -281,7 +306,7 @@ export const OP_ATTRIBUTES = {
     scope: "role",
     errors: ["path_forbidden", "not_found"],
   },
-  file_read: {
+  "file.read": {
     plane: "control",
     roles: AGENT_AND_USER,
     needs_hello: true,
@@ -289,49 +314,49 @@ export const OP_ATTRIBUTES = {
     scope: "role",
     errors: ["path_forbidden", "not_found"],
   },
-  file_write: {
+  "file.write": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["path_not_writable", "file_exists"],
   },
-  file_create: {
+  "file.create": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["file_exists", "path_forbidden"],
   },
-  file_edit: {
+  "file.edit": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["file_conflict", "not_a_text_file"],
   },
-  file_delete: {
+  "file.delete": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["path_forbidden", "not_found"],
   },
-  file_find: {
+  "file.find": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: ["path_forbidden"],
   },
-  file_stat_batch: {
+  "file.stat": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "instance-local",
     errors: [],
   },
-  dir_tree: {
+  "dir.tree": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -341,7 +366,7 @@ export const OP_ATTRIBUTES = {
   },
 
   // --- control: launcher / sandbox / translate / llm (7) ---
-  launcher_config_read: {
+  "launcher.config.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -349,7 +374,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
-  launcher_run: {
+  "launcher.run": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -357,7 +382,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
-  sandbox_grant: {
+  "sandbox.grant": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -365,7 +390,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: ["path_forbidden"],
   },
-  sandbox_revoke: {
+  "sandbox.revoke": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -373,7 +398,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
-  translate_run: {
+  "translate.run": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -381,7 +406,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: ["translate_helper_failed"],
   },
-  llm_usage_read: {
+  "llm.usage.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -389,7 +414,7 @@ export const OP_ATTRIBUTES = {
     locality: "instance-local",
     errors: [],
   },
-  llm_stats_read: {
+  "llm.stats.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
@@ -401,21 +426,21 @@ export const OP_ATTRIBUTES = {
   // --- control: the shared key-value store (3) ---
   // The only control ops that are not instance-local: a value is held by every
   // instance rather than by one, so whichever is asked can answer.
-  kv_read: {
+  "kv.read": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "cluster",
     errors: ["not_found"],
   },
-  kv_write: {
+  "kv.write": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,
     locality: "cluster",
     errors: [],
   },
-  kv_delete: {
+  "kv.delete": {
     plane: "control",
     roles: USER_ONLY,
     needs_hello: true,

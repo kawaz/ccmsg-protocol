@@ -17,19 +17,19 @@ export const SayPostResult = Type.Object({
 });
 export type SayPostResult = Static<typeof SayPostResult>;
 
-export const SayPostRequest = request("say_post", SayPostArgs);
-export const SayPostResponse = response("say_post", SayPostResult);
+export const SayPostRequest = request("say.post", SayPostArgs);
+export const SayPostResponse = response("say.post", SayPostResult);
 
-/** Clears the unread mark a `say_post` raised. The mark is instance state that
+/** Clears the unread mark a `say.post` raised. The mark is instance state that
  * a restart may forget — nothing depends on it surviving. */
-export const SayMarkReadArgs = Type.Object({
+export const SayUnreadClearArgs = Type.Object({
   /** The session whose unread mark is cleared. Omit to clear every one. */
   sid: Type.Optional(Sid),
 });
-export type SayMarkReadArgs = Static<typeof SayMarkReadArgs>;
+export type SayUnreadClearArgs = Static<typeof SayUnreadClearArgs>;
 
-export const SayMarkReadResult = Type.Object({});
-export type SayMarkReadResult = Static<typeof SayMarkReadResult>;
+export const SayUnreadClearResult = Type.Object({});
+export type SayUnreadClearResult = Static<typeof SayUnreadClearResult>;
 
-export const SayMarkReadRequest = request("say_mark_read", SayMarkReadArgs);
-export const SayMarkReadResponse = response("say_mark_read", SayMarkReadResult);
+export const SayUnreadClearRequest = request("say.unread.clear", SayUnreadClearArgs);
+export const SayUnreadClearResponse = response("say.unread.clear", SayUnreadClearResult);

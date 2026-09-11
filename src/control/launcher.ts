@@ -53,9 +53,9 @@ export const LauncherConfigReadResult = Type.Object({
 });
 export type LauncherConfigReadResult = Static<typeof LauncherConfigReadResult>;
 
-export const LauncherConfigReadRequest = request("launcher_config_read", LauncherConfigReadArgs);
+export const LauncherConfigReadRequest = request("launcher.config.read", LauncherConfigReadArgs);
 export const LauncherConfigReadResponse = response(
-  "launcher_config_read",
+  "launcher.config.read",
   LauncherConfigReadResult,
 );
 
@@ -96,5 +96,5 @@ export const LauncherRunResult = Type.Object({
 });
 export type LauncherRunResult = Static<typeof LauncherRunResult>;
 
-export const LauncherRunRequest = request("launcher_run", LauncherRunArgs);
-export const LauncherRunResponse = response("launcher_run", LauncherRunResult);
+export const LauncherRunRequest = request("launcher.run", LauncherRunArgs);
+export const LauncherRunResponse = response("launcher.run", LauncherRunResult);

@@ -65,8 +65,8 @@ export const MessageSendResult = Type.Object({
 });
 export type MessageSendResult = Static<typeof MessageSendResult>;
 
-export const MessageSendRequest = request("message_send", MessageSendArgs);
-export const MessageSendResponse = response("message_send", MessageSendResult);
+export const MessageSendRequest = request("message.send", MessageSendArgs);
+export const MessageSendResponse = response("message.send", MessageSendResult);
 
 /** A message as the recipient receives it, on topic `inbox`.
  *
@@ -75,7 +75,7 @@ export const MessageSendResponse = response("message_send", MessageSendResult);
  * whoever renders it — see `direct-delivery.ts` for the one route whose
  * recipient reads text instead of this frame.
  *
- * A `from` of `user` is the exception: `message_send` addresses a sid, so there
+ * A `from` of `user` is the exception: `message.send` addresses a sid, so there
  * is no such thing as sending back to the person. An answer to one reaches them
  * as a notification instead, which is the instance's to arrange — this contract
  * only states that the sender can be a person, so a client stops treating one

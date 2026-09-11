@@ -9,14 +9,14 @@ export const PLAIN_TOPICS = [
   "peers",
   "instances",
   "agents",
-  "session_errors",
-  "llm_requests",
-  "llm_status",
-  "auth_records",
+  "session.errors",
+  "llm.requests",
+  "llm.status",
+  "auth.records",
 ] as const;
 
 /** Topics naming one session, written `<topic>:<sid>`. */
-export const SESSION_SCOPED_TOPICS = ["session_status", "transcript", "transcript_items"] as const;
+export const SESSION_SCOPED_TOPICS = ["session.status", "transcript", "transcript.items"] as const;
 
 /** Topics naming one namespace, written `<topic>:<ns>`. The parameter is a name
  * its users choose rather than an identifier this contract issues, so it is
@@ -36,13 +36,18 @@ export type TopicName =
   | `${SessionScopedTopic}:${string}`
   | `${NamespaceScopedTopic}:${string}`;
 
+/** A topic name is a `.`-separated hierarchy, so its dots are literal here
+ * rather than the regexp's any-character. */
+const alternation = (topics: readonly string[]): string =>
+  topics.map((topic) => topic.replace(/\./g, "\\.")).join("|");
+
 export const Topic = Type.String({
   $id: "Topic",
   pattern: [
     "^(?:",
-    PLAIN_TOPICS.join("|"),
-    `|(?:${SESSION_SCOPED_TOPICS.join("|")}):[0-9a-f-]{36}`,
-    `|(?:${NAMESPACE_SCOPED_TOPICS.join("|")}):${NAMESPACE_PATTERN}`,
+    alternation(PLAIN_TOPICS),
+    `|(?:${alternation(SESSION_SCOPED_TOPICS)}):[0-9a-f-]{36}`,
+    `|(?:${alternation(NAMESPACE_SCOPED_TOPICS)}):${NAMESPACE_PATTERN}`,
     ")$",
   ].join(""),
 });
@@ -101,27 +106,27 @@ export const TOPIC_ATTRIBUTES = {
   // A set the instance derives whole, by folding one error pattern over its
   // sessions: it learns which sessions are stopped, not that one of them
   // changed, so each frame is that reading entire.
-  session_errors: { roles: ["user"], granularity: "per_instance_whole" },
-  llm_requests: {
+  "session.errors": { roles: ["user"], granularity: "per_instance_whole" },
+  "llm.requests": {
     roles: ["user"],
     capability: "llm_events",
     granularity: "per_instance_whole",
   },
-  llm_status: { roles: ["user"], capability: "llm_status", granularity: "per_instance_whole" },
+  "llm.status": { roles: ["user"], capability: "llm_status", granularity: "per_instance_whole" },
   // One session lives on one instance, so its status has no other instance's
   // half to leave alone: the frame is simply the whole of it.
-  session_status: { roles: ["user"], granularity: "whole" },
+  "session.status": { roles: ["user"], granularity: "whole" },
   transcript: { roles: ["user"], granularity: "append" },
   // The same appending, in items rather than in bytes. Both are offered because
   // they answer different needs: one draws the conversation, the other shows a
   // record as it was written.
-  transcript_items: { roles: ["user"], granularity: "append" },
+  "transcript.items": { roles: ["user"], granularity: "append" },
   kv: { roles: ["user"], granularity: "element" },
   // The only topic no person may subscribe to: its elements are the secrets
   // that authenticate them. A relay carries it as the instance it is, not on a
   // caller's behalf, so there is no path by which a person's subscription
   // reaches it.
-  auth_records: { roles: ["instance"], granularity: "element" },
+  "auth.records": { roles: ["instance"], granularity: "element" },
 } as const satisfies Record<
   PlainTopic | SessionScopedTopic | NamespaceScopedTopic,
   TopicAttributes
@@ -136,7 +141,7 @@ export function topicKind(topic: string): TopicKind | undefined {
 }
 
 /** How the frames of a topic name fold, taken from the name a subscriber
- * actually uses — `session_status:<sid>` rather than the kind behind it.
+ * actually uses — `session.status:<sid>` rather than the kind behind it.
  * `undefined` for a name this generation does not define. */
 export function topicGranularity(topic: string): TopicGranularity | undefined {
   const kind = topicKind(topic);
@@ -152,8 +157,8 @@ export type TopicSubscribeArgs = Static<typeof TopicSubscribeArgs>;
 export const TopicSubscribeResult = Type.Object({ topic: Topic });
 export type TopicSubscribeResult = Static<typeof TopicSubscribeResult>;
 
-export const TopicSubscribeRequest = request("topic_subscribe", TopicSubscribeArgs);
-export const TopicSubscribeResponse = response("topic_subscribe", TopicSubscribeResult);
+export const TopicSubscribeRequest = request("topic.subscribe", TopicSubscribeArgs);
+export const TopicSubscribeResponse = response("topic.subscribe", TopicSubscribeResult);
 
 export const TopicUnsubscribeArgs = Type.Object({ topic: Topic });
 export type TopicUnsubscribeArgs = Static<typeof TopicUnsubscribeArgs>;
@@ -161,5 +166,5 @@ export type TopicUnsubscribeArgs = Static<typeof TopicUnsubscribeArgs>;
 export const TopicUnsubscribeResult = Type.Object({ topic: Topic });
 export type TopicUnsubscribeResult = Static<typeof TopicUnsubscribeResult>;
 
-export const TopicUnsubscribeRequest = request("topic_unsubscribe", TopicUnsubscribeArgs);
-export const TopicUnsubscribeResponse = response("topic_unsubscribe", TopicUnsubscribeResult);
+export const TopicUnsubscribeRequest = request("topic.unsubscribe", TopicUnsubscribeArgs);
+export const TopicUnsubscribeResponse = response("topic.unsubscribe", TopicUnsubscribeResult);

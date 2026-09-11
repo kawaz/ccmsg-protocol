@@ -14,8 +14,8 @@ import {
   FileFindResponse,
   FileReadRequest,
   FileReadResponse,
-  FileStatBatchRequest,
-  FileStatBatchResponse,
+  FileStatRequest,
+  FileStatResponse,
   FileWriteRequest,
 } from "../src/control/files.ts";
 import {
@@ -54,10 +54,10 @@ import { SessionStatusFrame } from "../src/control/session-status.ts";
 import {
   SessionDumpWriteRequest,
   SessionEnvReadResponse,
-  SessionForkOriginResponse,
+  SessionForkOriginReadResponse,
   SessionKillRequest,
   SessionKillResponse,
-  SessionLastLiveRemoveResponse,
+  SessionForgetResponse,
   SessionRenameRequest,
   SessionRenameResponse,
   SessionSearchRequest,
@@ -87,16 +87,16 @@ const NOW = 1_757_300_000_000;
 
 describe("session ops", () => {
   test("a kill names a session and never a pid", () => {
-    expect(isValid(SessionKillRequest, { request_id: "1", op: "session_kill", sid: SID })).toBe(
+    expect(isValid(SessionKillRequest, { request_id: "1", op: "session.kill", sid: SID })).toBe(
       true,
     );
     expect(
-      isValid(SessionKillRequest, { request_id: "1", op: "session_kill", sid: SID, force: true }),
+      isValid(SessionKillRequest, { request_id: "1", op: "session.kill", sid: SID, force: true }),
     ).toBe(true);
   });
 
   test("a kill without a session to kill is refused", () => {
-    expect(isValid(SessionKillRequest, { request_id: "1", op: "session_kill" })).toBe(false);
+    expect(isValid(SessionKillRequest, { request_id: "1", op: "session.kill" })).toBe(false);
   });
 
   test("an unconfirmed termination is a normal reply", () => {
@@ -109,7 +109,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionRenameRequest, {
         request_id: "2",
-        op: "session_rename",
+        op: "session.rename",
         sid: SID,
         title: "pv2 control ops",
       }),
@@ -127,7 +127,7 @@ describe("session ops", () => {
 
   test("a title stops at the length the contract states", () => {
     const rename = (title: string) =>
-      isValid(SessionRenameRequest, { request_id: "2", op: "session_rename", sid: SID, title });
+      isValid(SessionRenameRequest, { request_id: "2", op: "session.rename", sid: SID, title });
     expect(TITLE_MAX_CHARS).toBe(200);
     expect(rename("t".repeat(TITLE_MAX_CHARS))).toBe(true);
     expect(rename("t".repeat(TITLE_MAX_CHARS + 1))).toBe(false);
@@ -160,7 +160,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionSearchRequest, {
         request_id: "4",
-        op: "session_search",
+        op: "session.search",
         query: "protocol v2",
         modified_within_ms: 5 * 24 * 60 * 60 * 1000,
       }),
@@ -168,7 +168,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionSearchRequest, {
         request_id: "4",
-        op: "session_search",
+        op: "session.search",
         modified_within_ms: "5d",
       }),
     ).toBe(false);
@@ -228,7 +228,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionDumpWriteRequest, {
         request_id: "5",
-        op: "session_dump_write",
+        op: "session.dump.write",
         sid: SID,
         since_at: NOW,
         no_thinking: true,
@@ -237,7 +237,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionDumpWriteRequest, {
         request_id: "5",
-        op: "session_dump_write",
+        op: "session.dump.write",
         sid: SID,
         since_uuid: "1f0e2d3c-4b5a-4968-8776-655443322110",
       }),
@@ -248,7 +248,7 @@ describe("session ops", () => {
     expect(
       isValid(SessionDumpWriteRequest, {
         request_id: "5",
-        op: "session_dump_write",
+        op: "session.dump.write",
         sid: SID,
         since_at: "2026-09-08T00:00:00Z",
       }),
@@ -256,9 +256,9 @@ describe("session ops", () => {
   });
 
   test("no seam and no ancestor are the same absent origin", () => {
-    expect(isValid(SessionForkOriginResponse, { ok: true, request_id: "6" })).toBe(true);
+    expect(isValid(SessionForkOriginReadResponse, { ok: true, request_id: "6" })).toBe(true);
     expect(
-      isValid(SessionForkOriginResponse, {
+      isValid(SessionForkOriginReadResponse, {
         ok: true,
         request_id: "6",
         origin: { sid: OTHER_SID, boundary_uuid: "a1b2", copied: 812 },
@@ -267,15 +267,15 @@ describe("session ops", () => {
   });
 
   test("a null origin is refused — absence is how this contract says nothing", () => {
-    expect(isValid(SessionForkOriginResponse, { ok: true, request_id: "6", origin: null })).toBe(
-      false,
-    );
+    expect(
+      isValid(SessionForkOriginReadResponse, { ok: true, request_id: "6", origin: null }),
+    ).toBe(false);
   });
 
   test("removing an entry nobody had is a success", () => {
-    expect(
-      isValid(SessionLastLiveRemoveResponse, { ok: true, request_id: "7", removed: false }),
-    ).toBe(true);
+    expect(isValid(SessionForgetResponse, { ok: true, request_id: "7", removed: false })).toBe(
+      true,
+    );
   });
 });
 
@@ -308,7 +308,7 @@ describe("transcript items", () => {
   test("the standing an item was read from is not the name of who it talked to", () => {
     // `harness_name` is the other party's literal name and is absent whenever
     // the record does not give one; the subject's standing is always stated.
-    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message:team:out") as Record<
+    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message.team.out") as Record<
       string,
       unknown
     >;
@@ -324,16 +324,16 @@ describe("transcript items", () => {
     // errand and a teammate both answer whoever is above them, a session does
     // not. The table states this, and `subject` is what lets items say it.
     const relations = (items: { type: string }[]) =>
-      new Set(items.filter((item) => item.type.startsWith("message:")).map((item) => item.type));
+      new Set(items.filter((item) => item.type.startsWith("message.")).map((item) => item.type));
     const session = relations(TRANSCRIPT_ITEMS);
     const errand = relations(TRANSCRIPT_ITEMS_AGENT_SUBJECT);
     const teammate = relations(TRANSCRIPT_ITEMS_TEAM_SUBJECT);
-    expect(session).toContain("message:user:in");
-    expect(session).not.toContain("message:parent:in");
-    expect(errand).toContain("message:parent:in");
-    expect(errand).not.toContain("message:user:in");
-    expect(teammate).toContain("message:parent:in");
-    expect(teammate).toContain("message:user:in");
+    expect(session).toContain("message.user.in");
+    expect(session).not.toContain("message.parent.in");
+    expect(errand).toContain("message.parent.in");
+    expect(errand).not.toContain("message.user.in");
+    expect(teammate).toContain("message.parent.in");
+    expect(teammate).toContain("message.user.in");
   });
 
   test("every spelled-out type name is a shape an item can take", () => {
@@ -347,19 +347,19 @@ describe("transcript items", () => {
     }
     const closed: string[] = [...TRANSCRIPT_ITEM_TYPES];
     for (const name of closed) expect(spelled.has(name)).toBe(true);
-    // A `tool:<Name>` written out is fields sharpening how one tool reads, not
+    // A `tool.<Name>` written out is fields sharpening how one tool reads, not
     // a closing of the family, so it is spelled without being listed.
-    for (const name of spelled) if (!name.startsWith("tool:")) expect(closed).toContain(name);
+    for (const name of spelled) if (!name.startsWith("tool.")) expect(closed).toContain(name);
   });
 
   test("a message is typed by a relation, and a harness's name for a party is a field", () => {
-    // `message:main` would read as the main session's traffic being overheard
+    // `message.main` would read as the main session's traffic being overheard
     // wherever it happens; the relation meant is `parent`. `user` is the one
     // exception, being not a relation but the user.
     const relations = new Set(["user", "parent", "sub", "team", "session"]);
     for (const name of TRANSCRIPT_ITEM_TYPES)
-      if (name.startsWith("message:")) expect(relations.has(name.split(":")[1] ?? "")).toBe(true);
-    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message:team:out") as Record<
+      if (name.startsWith("message.")) expect(relations.has(name.split(".")[1] ?? "")).toBe(true);
+    const written = TRANSCRIPT_ITEMS.find((item) => item.type === "message.team.out") as Record<
       string,
       unknown
     >;
@@ -367,18 +367,18 @@ describe("transcript items", () => {
   });
 
   test("who the counterpart was is the type, and the subject decides which types occur", () => {
-    // Read from an agent, the brief it opened with is what `message:parent:in`
+    // Read from an agent, the brief it opened with is what `message.parent.in`
     // names; the session that started it reads the same exchange as
-    // `message:sub:*`. Neither side calls the other `user`, which is reserved
+    // `message.sub.*`. Neither side calls the other `user`, which is reserved
     // for a person.
     const types = TRANSCRIPT_ITEMS_AGENT_SUBJECT.map((item) => item.type);
-    expect(types).toContain("message:parent:in");
-    expect(types).not.toContain("message:user:in");
+    expect(types).toContain("message.parent.in");
+    expect(types).not.toContain("message.user.in");
   });
 
-  test("an agent's answer is prose, so `message:parent:out` needs no call behind it", () => {
+  test("an agent's answer is prose, so `message.parent.out` needs no call behind it", () => {
     const [said] = TRANSCRIPT_ITEMS_AGENT_SUBJECT.filter(
-      (item) => item.type === "message:parent:out" && !("tool_use_id" in item),
+      (item) => item.type === "message.parent.out" && !("tool_use_id" in item),
     ) as Record<string, unknown>[];
     expect(isValid(TranscriptItem, said)).toBe(true);
     expect(said?.["role"]).toBeUndefined();
@@ -387,7 +387,7 @@ describe("transcript items", () => {
   test("a teammate writes back as its own message, and only its start has a result", () => {
     // What separates `team` from `sub`: a throwaway agent answers the call that
     // made it, a teammate stays and its replies arrive addressed and unpaired.
-    const incoming = TRANSCRIPT_ITEMS.filter((item) => item.type === "message:team:in") as Record<
+    const incoming = TRANSCRIPT_ITEMS.filter((item) => item.type === "message.team.in") as Record<
       string,
       unknown
     >[];
@@ -407,7 +407,7 @@ describe("transcript items", () => {
         uuid: "aa11bb22",
         subject: "main",
         source: { offset: 4_096, bytes: 310 },
-        type: "tool:Workflow",
+        type: "tool.Workflow",
         at: 1_757_300_000_000,
         role: "use",
         tool_use_id: "toolu_02",
@@ -423,7 +423,7 @@ describe("transcript items", () => {
         uuid: "bb22cc33",
         subject: "main",
         source: { offset: 4_406, bytes: 120 },
-        type: "system:attachment:telemetry",
+        type: "system.attachment.telemetry",
         at: 1_757_300_000_000,
         attachment: { type: "telemetry" },
       }),
@@ -431,14 +431,14 @@ describe("transcript items", () => {
   });
 
   test("a hook is typed by its event, and carries the matcher as a field", () => {
-    // `hook:PreToolUse:Bash` would read as a third level of the hierarchy and
-    // leave `hook:PreToolUse` selecting nothing.
+    // `hook.PreToolUse.Bash` would read as a third level of the hierarchy and
+    // leave `hook.PreToolUse` selecting nothing.
     const hook = {
       id: "cc33dd44:0",
       uuid: "cc33dd44",
       subject: "main",
       source: { offset: 4_526, bytes: 240 },
-      type: "hook:PreToolUse",
+      type: "hook.PreToolUse",
       at: 1_757_300_000_000,
       hook_name: "PreToolUse:Bash",
       outcome: "additionalContext",
@@ -525,9 +525,9 @@ describe("transcript items", () => {
   });
 
   test("a selection names types, prefixes, exclusions and presets", () => {
-    for (const selector of ["tool", "tool:Bash", "-message:sub", "@howto", "system:api-error"])
+    for (const selector of ["tool", "tool.Bash", "-message.sub", "@howto", "system.api.error"])
       expect(isValid(TranscriptItemSelector, selector)).toBe(true);
-    for (const selector of ["", "tool:", "@", "-@ho to", "Tool"])
+    for (const selector of ["", "tool.", "@", "-@ho to", "Tool"])
       expect(isValid(TranscriptItemSelector, selector)).toBe(false);
   });
 
@@ -542,7 +542,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptReadRequest, {
         request_id: "8",
-        op: "transcript_read",
+        op: "transcript.read",
         sid: SID,
         before: 1_048_576,
         max_bytes: 65_536,
@@ -554,7 +554,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptReadRequest, {
         request_id: "8",
-        op: "transcript_read",
+        op: "transcript.read",
         sid: SID,
         agent_id: "a3f1c9d2",
         run_id: "wf_1a2b3c4d-001",
@@ -566,7 +566,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptReadRequest, {
         request_id: "8",
-        op: "transcript_read",
+        op: "transcript.read",
         sid: SID,
         before: "1048576",
       }),
@@ -577,10 +577,10 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptItemsReadRequest, {
         request_id: "8",
-        op: "transcript_items_read",
+        op: "transcript.items.read",
         sid: SID,
         since_id: "f10b6d43:1",
-        types: ["tool", "-tool:Read"],
+        types: ["tool", "-tool.Read"],
         limit: 100,
       }),
     ).toBe(true);
@@ -589,7 +589,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptItemsReadRequest, {
         request_id: "8",
-        op: "transcript_items_read",
+        op: "transcript.items.read",
         sid: SID,
         since_id: "f10b6d43",
       }),
@@ -600,7 +600,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptItemsReadRequest, {
         request_id: "8",
-        op: "transcript_items_read",
+        op: "transcript.items.read",
         sid: SID,
         until_id: "18d6f2c9:0",
         limit: 50,
@@ -611,7 +611,7 @@ describe("transcript", () => {
     expect(
       isValid(TranscriptItemsReadRequest, {
         request_id: "8",
-        op: "transcript_items_read",
+        op: "transcript.items.read",
         sid: SID,
         until_id: "18d6f2c9",
       }),
@@ -649,7 +649,7 @@ describe("transcript", () => {
   test("the typed topic carries items where the raw one carries bytes", () => {
     const frame = {
       ev: "topic",
-      topic: `transcript_items:${SID}`,
+      topic: `transcript.items:${SID}`,
       instance: INSTANCE,
       data: { sid: SID, items: TRANSCRIPT_ITEMS },
     };
@@ -693,7 +693,7 @@ describe("file access", () => {
       expect(
         isValid(FileReadRequest, {
           request_id: "9",
-          op: "file_read",
+          op: "file.read",
           sid: SID,
           kind,
           path: "docs/design/protocol-v2.md",
@@ -706,7 +706,7 @@ describe("file access", () => {
     expect(
       isValid(DirListRequest, {
         request_id: "9",
-        op: "dir_list",
+        op: "dir.list",
         sid: SID,
         kind: "external",
         path: "/tmp",
@@ -715,7 +715,7 @@ describe("file access", () => {
     expect(
       isValid(FileFindRequest, {
         request_id: "9",
-        op: "file_find",
+        op: "file.find",
         sid: SID,
         kind: "external",
         query: "protocol",
@@ -767,7 +767,7 @@ describe("file access", () => {
     expect(
       isValid(FileEditRequest, {
         request_id: "10",
-        op: "file_edit",
+        op: "file.edit",
         sid: SID,
         kind: "contained",
         path: "docs/DESIGN.md",
@@ -792,7 +792,7 @@ describe("file access", () => {
     expect(
       isValid(FileEditRequest, {
         request_id: "10",
-        op: "file_edit",
+        op: "file.edit",
         sid: SID,
         kind: "contained",
         path: "a",
@@ -805,7 +805,7 @@ describe("file access", () => {
     expect(
       isValid(FileCreateRequest, {
         request_id: "11",
-        op: "file_create",
+        op: "file.create",
         sid: SID,
         kind: "workspace",
         path: "/Users/x/ws/notes.md",
@@ -815,7 +815,7 @@ describe("file access", () => {
     expect(
       isValid(FileDeleteRequest, {
         request_id: "11",
-        op: "file_delete",
+        op: "file.delete",
         sid: SID,
         kind: "external",
         path: "/tmp/x",
@@ -827,7 +827,7 @@ describe("file access", () => {
     expect(
       isValid(FileWriteRequest, {
         request_id: "12",
-        op: "file_write",
+        op: "file.write",
         sid: SID,
         path: "docs/inbox/note.md",
         content: "text",
@@ -839,7 +839,7 @@ describe("file access", () => {
     expect(
       isValid(FileFindRequest, {
         request_id: "13",
-        op: "file_find",
+        op: "file.find",
         sid: SID,
         kind: "contained",
         query: "protocol -node_modules",
@@ -859,15 +859,15 @@ describe("file access", () => {
 
   test("an unresolved path keeps its slot, so the reply lines up with the request", () => {
     expect(
-      isValid(FileStatBatchRequest, {
+      isValid(FileStatRequest, {
         request_id: "14",
-        op: "file_stat_batch",
+        op: "file.stat",
         sid: SID,
         paths: ["/Users/x/src/p/a.ts", "/nope"],
       }),
     ).toBe(true);
     expect(
-      isValid(FileStatBatchResponse, {
+      isValid(FileStatResponse, {
         ok: true,
         request_id: "14",
         results: [{ kind: "contained", path: "a.ts" }, null],
@@ -879,7 +879,7 @@ describe("file access", () => {
     expect(
       isValid(DirTreeRequest, {
         request_id: "15",
-        op: "dir_tree",
+        op: "dir.tree",
         roots: ["/Users/x/src"],
         depth: 1,
       }),
@@ -922,7 +922,7 @@ describe("launcher, sandbox and translate", () => {
     expect(
       isValid(LauncherRunRequest, {
         request_id: "17",
-        op: "launcher_run",
+        op: "launcher.run",
         cwd: "/Users/x/src/p",
         params: { MODEL: "opus" },
         template: "default",
@@ -956,7 +956,7 @@ describe("launcher, sandbox and translate", () => {
     expect(
       isValid(SandboxGrantRequest, {
         request_id: "18",
-        op: "sandbox_grant",
+        op: "sandbox.grant",
         sid: SID,
         kind: "external",
         path: "/Users/x/report.html",
@@ -976,7 +976,7 @@ describe("launcher, sandbox and translate", () => {
 
   test("a batch succeeds while individual texts fail", () => {
     expect(
-      isValid(TranslateRunRequest, { request_id: "19", op: "translate_run", texts: ["hello"] }),
+      isValid(TranslateRunRequest, { request_id: "19", op: "translate.run", texts: ["hello"] }),
     ).toBe(true);
     expect(
       isValid(TranslateRunResponse, {
@@ -993,7 +993,7 @@ describe("launcher, sandbox and translate", () => {
 
 describe("llm", () => {
   test("spend comes back keyed by the gateway's own days", () => {
-    expect(isValid(LlmStatsReadRequest, { request_id: "20", op: "llm_stats_read", days: 30 })).toBe(
+    expect(isValid(LlmStatsReadRequest, { request_id: "20", op: "llm.stats.read", days: 30 })).toBe(
       true,
     );
     expect(
@@ -1040,7 +1040,7 @@ describe("llm", () => {
     expect(
       isValid(LlmRequestsFrame, {
         ev: "topic",
-        topic: "llm_requests",
+        topic: "llm.requests",
         snapshot: true,
         instance: INSTANCE,
         data: [
@@ -1065,7 +1065,7 @@ describe("llm", () => {
     expect(
       isValid(LlmRequestsFrame, {
         ev: "topic",
-        topic: "llm_requests",
+        topic: "llm.requests",
         instance: INSTANCE,
         data: [{ ts: NOW, sid: SID, instance: INSTANCE, main: true }],
       }),
@@ -1076,7 +1076,7 @@ describe("llm", () => {
     expect(
       isValid(LlmStatusFrame, {
         ev: "topic",
-        topic: "llm_status",
+        topic: "llm.status",
         instance: INSTANCE,
         data: {
           generated_at: NOW,
@@ -1105,7 +1105,7 @@ describe("llm", () => {
     expect(
       isValid(LlmStatusFrame, {
         ev: "topic",
-        topic: "llm_status",
+        topic: "llm.status",
         instance: INSTANCE,
         data: { overall: { severity: "catastrophic", service_counts: {} }, services: [] },
       }),
@@ -1269,7 +1269,7 @@ describe("session observation topics", () => {
     expect(
       isValid(SessionStatusFrame, {
         ev: "topic",
-        topic: `session_status:${SID}`,
+        topic: `session.status:${SID}`,
         snapshot: true,
         instance: INSTANCE,
         data: {
@@ -1313,7 +1313,7 @@ describe("session observation topics", () => {
     expect(
       isValid(SessionErrorsFrame, {
         ev: "topic",
-        topic: "session_errors",
+        topic: "session.errors",
         instance: INSTANCE,
         data: {
           errors: [{ sid: SID, instance: INSTANCE, text: "API Error: 529", occurred_at: NOW }],
@@ -1323,7 +1323,7 @@ describe("session observation topics", () => {
     expect(
       isValid(SessionErrorsFrame, {
         ev: "topic",
-        topic: "session_errors",
+        topic: "session.errors",
         instance: INSTANCE,
         data: {
           errors: [{ sid: SID, instance: INSTANCE, text: "x", timestamp: "2026-09-08T00:00:00Z" }],
@@ -1339,7 +1339,7 @@ describe("the shared key-value store", () => {
       expect(
         isValid(KvWriteRequest, {
           request_id: "23",
-          op: "kv_write",
+          op: "kv.write",
           ns: "theme",
           key: "default",
           value,
@@ -1352,7 +1352,7 @@ describe("the shared key-value store", () => {
     expect(
       isValid(KvWriteRequest, {
         request_id: "23",
-        op: "kv_write",
+        op: "kv.write",
         ns: "theme",
         key: "device:ipad",
         value: {},
@@ -1366,7 +1366,7 @@ describe("the shared key-value store", () => {
     expect(
       isValid(KvWriteRequest, {
         request_id: "23",
-        op: "kv_write",
+        op: "kv.write",
         ns: "theme",
         key: "default",
         value: {},
@@ -1377,7 +1377,7 @@ describe("the shared key-value store", () => {
 
   test("a read answers with the value and when it was written", () => {
     expect(
-      isValid(KvReadRequest, { request_id: "24", op: "kv_read", ns: "theme", key: "default" }),
+      isValid(KvReadRequest, { request_id: "24", op: "kv.read", ns: "theme", key: "default" }),
     ).toBe(true);
     expect(
       isValid(KvReadResponse, {
@@ -1395,7 +1395,7 @@ describe("the shared key-value store", () => {
 
   test("a key holds what a person typed, within bounds", () => {
     const del = (key: unknown) =>
-      isValid(KvDeleteRequest, { request_id: "25", op: "kv_delete", ns: "theme", key });
+      isValid(KvDeleteRequest, { request_id: "25", op: "kv.delete", ns: "theme", key });
     expect(del("device:kawaz の ipad")).toBe(true);
     expect(del("x".repeat(256))).toBe(true);
     expect(del("x".repeat(257))).toBe(false);
@@ -1405,7 +1405,7 @@ describe("the shared key-value store", () => {
 
   test("a namespace stays an identifier, since it names a topic too", () => {
     const write = (ns: unknown) =>
-      isValid(KvWriteRequest, { request_id: "25", op: "kv_write", ns, key: "k", value: 1 });
+      isValid(KvWriteRequest, { request_id: "25", op: "kv.write", ns, key: "k", value: 1 });
     expect(write("theme")).toBe(true);
     expect(write("Theme")).toBe(false);
     expect(write("theme:extra")).toBe(false);
@@ -1416,17 +1416,17 @@ describe("the shared key-value store", () => {
     expect(
       isValid(TopicSubscribeRequest, {
         request_id: "26",
-        op: "topic_subscribe",
+        op: "topic.subscribe",
         topic: "kv:theme",
       }),
     ).toBe(true);
     expect(
-      isValid(TopicSubscribeRequest, { request_id: "26", op: "topic_subscribe", topic: "kv" }),
+      isValid(TopicSubscribeRequest, { request_id: "26", op: "topic.subscribe", topic: "kv" }),
     ).toBe(false);
     expect(
       isValid(TopicSubscribeRequest, {
         request_id: "26",
-        op: "topic_subscribe",
+        op: "topic.subscribe",
         topic: "kv:Theme",
       }),
     ).toBe(false);

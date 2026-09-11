@@ -13,8 +13,8 @@ import { Sid, Timestamp } from "../identifiers.ts";
  * down here. That split is what lets a harness change its file, or a second
  * harness be read at all, without the contract moving.
  *
- * A type name is `:`-separated and read left to right, so a prefix names
- * everything below it: `tool` is every tool, `message:user` is both directions
+ * A type name is `.`-separated and read left to right, so a prefix names
+ * everything below it: `tool` is every tool, `message.user` is both directions
  * of what a person and a session said. Three families stay open, because their
  * last segment is a name someone else coins — a tool, an attachment kind, a
  * hook event — and closing them would turn every newcomer into `unknown`. */
@@ -22,49 +22,56 @@ import { Sid, Timestamp } from "../identifiers.ts";
 /** A type name as written on the wire and in a selection.
  *
  * Segments after the first carry the spelling of whatever named them, which is
- * why they are not held to snake_case: `tool:Bash` and `hook:PreToolUse` are
+ * why they are not held to snake_case: `tool.Bash` and `hook.PreToolUse` are
  * the harness's words, and rewriting them would leave the reader unable to
- * match what it sees against what it ran.
+ * match what it sees against what it ran. That segment carries no `.` of its
+ * own — a harness name holding one is written with `_` by whoever coins the
+ * type — so a reader may split any type name on `.` and get the hierarchy.
+ *
+ * `tool.unknown` is the reserved name for a call whose tool the reader could
+ * not name. It is a coined segment like any other, so a harness tool actually
+ * called `unknown` lands on it; what is lost is that distinction and nothing
+ * else, where dropping the item would lose the call.
  *
  * Under `message`, the second segment is **a relation read from the subject**:
  * `parent` is whoever started this agent, `sub` a throwaway agent it started,
  * `team` a named counterpart that goes on standing, `session` another session
  * over ccmsg. The one exception is `user` — a person is not a relation to
  * anyone, but the user, standing alone. A harness's own name for a party is
- * never a type: `message:main` would read as the main session's traffic being
+ * never a type: `message.main` would read as the main session's traffic being
  * overheard wherever it happens, when what is meant is the party this subject
  * answers to — which is what `parent` says. The literal names (`main`, a
  * lead's, a teammate's) are kept in `harness_name` on the item. */
 export const TranscriptItemType = Type.String({
-  pattern: "^[a-z]+(?::[A-Za-z0-9_.-]+)*$",
+  pattern: "^[a-z][a-z0-9_]*(?:\\.[A-Za-z0-9_-]+)*$",
   $id: "TranscriptItemType",
 });
 export type TranscriptItemType = Static<typeof TranscriptItemType>;
 
 /** The type names that are fully spelled out here. The three open families
- * (`tool:<Name>`, `system:attachment:<kind>`, `hook:<Event>`) are not in the
+ * (`tool.<Name>`, `system.attachment.<kind>`, `hook.<Event>`) are not in the
  * list: their last segment is coined elsewhere, and a name absent from this
  * list is a newcomer rather than an error. */
 export const TRANSCRIPT_ITEM_TYPES = [
-  "message:user:in",
-  "message:user:out",
-  "message:parent:in",
-  "message:parent:out",
-  "message:sub:in",
-  "message:sub:out",
-  "message:team:in",
-  "message:team:out",
-  "message:session:in",
-  "message:session:out",
+  "message.user.in",
+  "message.user.out",
+  "message.parent.in",
+  "message.parent.out",
+  "message.sub.in",
+  "message.sub.out",
+  "message.team.in",
+  "message.team.out",
+  "message.session.in",
+  "message.session.out",
   "thinking",
-  "notice:slash",
-  "notice:interrupt",
-  "system:compact",
-  "system:api-error",
-  "system:task",
-  "system:caveat",
-  "system:resume",
-  "system:unknown",
+  "notice.slash",
+  "notice.interrupt",
+  "system.compact",
+  "system.api.error",
+  "system.task",
+  "system.caveat",
+  "system.resume",
+  "system.unknown",
 ] as const;
 export type KnownTranscriptItemType = (typeof TRANSCRIPT_ITEM_TYPES)[number];
 
@@ -74,7 +81,7 @@ export type KnownTranscriptItemType = (typeof TRANSCRIPT_ITEM_TYPES)[number];
  * Elements apply left to right, so an exclusion reaches whatever a prefix or an
  * expansion before it brought in. */
 export const TranscriptItemSelector = Type.String({
-  pattern: "^-?(?:@[A-Za-z0-9][A-Za-z0-9_-]*|[a-z]+(?::[A-Za-z0-9_.-]+)*)$",
+  pattern: "^-?(?:@[A-Za-z0-9][A-Za-z0-9_-]*|[a-z][a-z0-9_]*(?:\\.[A-Za-z0-9_-]+)*)$",
   $id: "TranscriptItemSelector",
 });
 export type TranscriptItemSelector = Static<typeof TranscriptItemSelector>;
@@ -84,7 +91,7 @@ export type TranscriptItemSelector = Static<typeof TranscriptItemSelector>;
  * started to answer once — and `team` a teammate's, an agent that was named and
  * goes on standing.
  *
- * It is what the relations are read from. `message:parent:in` under a `sub` is
+ * It is what the relations are read from. `message.parent.in` under a `sub` is
  * an errand's brief and under a `team` is what its lead wrote, and an item that
  * does not say which of the two it stood in can only be placed by whoever
  * remembers the request that fetched it. Carrying it on the item is what lets
@@ -105,7 +112,7 @@ export type TranscriptSubject = Static<typeof TranscriptSubject>;
  *
  * An item is what a reader made of a record, and a reader is fallible: the one
  * question it cannot answer is what the record actually said. These two numbers
- * are that answer's address — `transcript_read` bounded to end at `offset +
+ * are that answer's address — `transcript.read` bounded to end at `offset +
  * bytes` and to carry `bytes` returns the record itself — which is what lets a
  * client show items and still let a person open the line behind one. Several
  * items read out of a single record share the address, so what comes back is
@@ -208,24 +215,24 @@ const Text = Type.String();
  * the one above: an agent's parent is a session or another agent, and calling it
  * `user` would have a reader take a machine for a person.
  *
- * `message:user` is a person and nobody else. Both directions occur under a
+ * `message.user` is a person and nobody else. Both directions occur under a
  * session and under a teammate, which someone can type at directly; under a
  * throwaway agent neither does. A combination a subject is not expected to show
  * — `team` below an agent, say — is not refused: an unexpected line is still a
  * line, and it is emitted under the name it fits. */
-const MessageUserIn = item(Type.Literal("message:user:in"), { text: Text });
-const MessageUserOut = item(Type.Literal("message:user:out"), { text: Text });
+const MessageUserIn = item(Type.Literal("message.user.in"), { text: Text });
+const MessageUserOut = item(Type.Literal("message.user.out"), { text: Text });
 
 /** What the one above said, and what was said back to it.
  *
  * An agent's first line is the brief it was started with, and its last is the
  * answer that brief is discharged by; in between it may hand its parent
  * something mid-flight. The answer is plain prose the harness collects, with no
- * call behind it, so `parent:out` is prose-or-call and not a call alone:
+ * call behind it, so `parent.out` is prose-or-call and not a call alone:
  * addressed to the parent is what the two forms have in common, and requiring a
  * `tool_use_id` would leave the one message an agent is certain to send
  * unnameable. */
-const MessageParentIn = item(Type.Literal("message:parent:in"), {
+const MessageParentIn = item(Type.Literal("message.parent.in"), {
   text: Text,
   /** The harness's own name for the parent — `main`, a lead's name, the agent
    * above. Left out when the record says only that it came from above, which is
@@ -236,7 +243,7 @@ const MessageParentIn = item(Type.Literal("message:parent:in"), {
 
 /** Sent to the parent through a call, which the parent's own transcript has the
  * other half of. */
-const MessageParentOutSent = item(Type.Literal("message:parent:out"), {
+const MessageParentOutSent = item(Type.Literal("message.parent.out"), {
   ...USE_FIELDS,
   text: Text,
   /** The harness's own name for the parent, as the subject addressed it. */
@@ -245,7 +252,7 @@ const MessageParentOutSent = item(Type.Literal("message:parent:out"), {
 });
 
 /** Answered to the parent as prose — the agent's reply, final or interim. */
-const MessageParentOutSaid = item(Type.Literal("message:parent:out"), { text: Text });
+const MessageParentOutSaid = item(Type.Literal("message.parent.out"), { text: Text });
 
 /** A teammate is an agent that was given a name and goes on standing, so what
  * passes between the subject and one is a correspondence rather than an errand:
@@ -253,10 +260,10 @@ const MessageParentOutSaid = item(Type.Literal("message:parent:out"), { text: Te
  * written, and not as the answer to the call that sent it.
  *
  * That is the whole of what separates `team` from `sub`. A throwaway agent is
- * started, answers once and is done, which is why `sub:in` is the result of the
- * `sub:out` that started it. Here the two halves of a round trip are two
+ * started, answers once and is done, which is why `sub.in` is the result of the
+ * `sub.out` that started it. Here the two halves of a round trip are two
  * messages, and only the start of a teammate has a result to pair with. */
-const MessageTeamOut = item(Type.Literal("message:team:out"), {
+const MessageTeamOut = item(Type.Literal("message.team.out"), {
   ...USE_FIELDS,
   text: Text,
   /** The teammate addressed, by the name it stands under. */
@@ -271,7 +278,7 @@ const MessageTeamOut = item(Type.Literal("message:team:out"), {
 
 /** A teammate writing to the subject, arriving under its own name whenever it
  * was written. */
-const MessageTeamInSaid = item(Type.Literal("message:team:in"), {
+const MessageTeamInSaid = item(Type.Literal("message.team.in"), {
   text: Text,
   /** The name the teammate stands under. */
   harness_name: Type.Optional(Type.String()),
@@ -279,7 +286,7 @@ const MessageTeamInSaid = item(Type.Literal("message:team:in"), {
 });
 
 /** A teammate's run ending, which answers the call that started it. */
-const MessageTeamInDone = item(Type.Literal("message:team:in"), {
+const MessageTeamInDone = item(Type.Literal("message.team.in"), {
   ...RESULT_FIELDS,
   text: Text,
   harness_name: Type.Optional(Type.String()),
@@ -288,7 +295,7 @@ const MessageTeamInDone = item(Type.Literal("message:team:in"), {
   duration_ms: Type.Optional(Type.Integer({ minimum: 0 })),
 });
 
-const MessageSubOut = item(Type.Literal("message:sub:out"), {
+const MessageSubOut = item(Type.Literal("message.sub.out"), {
   ...USE_FIELDS,
   prompt: Text,
   agent_id: Type.Optional(Type.String()),
@@ -298,7 +305,7 @@ const MessageSubOut = item(Type.Literal("message:sub:out"), {
   description: Type.Optional(Type.String()),
 });
 
-const MessageSubIn = item(Type.Literal("message:sub:in"), {
+const MessageSubIn = item(Type.Literal("message.sub.in"), {
   ...RESULT_FIELDS,
   text: Text,
   agent_id: Type.Optional(Type.String()),
@@ -306,7 +313,7 @@ const MessageSubIn = item(Type.Literal("message:sub:in"), {
   duration_ms: Type.Optional(Type.Integer({ minimum: 0 })),
 });
 
-const MessageSessionOut = item(Type.Literal("message:session:out"), {
+const MessageSessionOut = item(Type.Literal("message.session.out"), {
   text: Text,
   /** The addressee as the subject wrote it: a sid, or a name that was resolved
    * to one. Kept unresolved when that is all the transcript says. */
@@ -315,7 +322,7 @@ const MessageSessionOut = item(Type.Literal("message:session:out"), {
   reply_to: Type.Optional(Type.String()),
 });
 
-const MessageSessionIn = item(Type.Literal("message:session:in"), {
+const MessageSessionIn = item(Type.Literal("message.session.in"), {
   text: Text,
   from: Type.Optional(Type.String()),
   msg_id: Type.Optional(Type.String()),
@@ -325,52 +332,52 @@ const Thinking = item(Type.Literal("thinking"), { text: Text });
 
 // --- notice: a person operated the harness ---
 
-/** Kept apart from `system:*` because these explain a break in the
+/** Kept apart from `system.*` because these explain a break in the
  * conversation: someone typed a command or stopped a turn. A reader skimming
  * for why the thread jumps needs them, and can skip what the harness injected
  * for its own reasons. */
-const NoticeSlash = item(Type.Literal("notice:slash"), {
+const NoticeSlash = item(Type.Literal("notice.slash"), {
   command: Type.String(),
   args: Type.Optional(Type.String()),
   stdout: Type.Optional(Type.String()),
 });
-const NoticeInterrupt = item(Type.Literal("notice:interrupt"), {
+const NoticeInterrupt = item(Type.Literal("notice.interrupt"), {
   text: Type.Optional(Text),
 });
 
 // --- system: the harness talking in someone else's voice ---
 
-const SystemCompact = item(Type.Literal("system:compact"), { text: Text });
-const SystemApiError = item(Type.Literal("system:api-error"), { text: Text });
-const SystemTask = item(Type.Literal("system:task"), {
+const SystemCompact = item(Type.Literal("system.compact"), { text: Text });
+const SystemApiError = item(Type.Literal("system.api.error"), { text: Text });
+const SystemTask = item(Type.Literal("system.task"), {
   text: Text,
   /** The background task or monitor the event came from. */
   task_id: Type.Optional(Type.String()),
   event: Type.Optional(Type.String()),
 });
-const SystemCaveat = item(Type.Literal("system:caveat"), { text: Text });
-const SystemResume = item(Type.Literal("system:resume"), { text: Text });
+const SystemCaveat = item(Type.Literal("system.caveat"), { text: Text });
+const SystemResume = item(Type.Literal("system.resume"), { text: Text });
 
-/** `system:attachment:<kind>` — the kind is the harness's own word for what it
+/** `system.attachment.<kind>` — the kind is the harness's own word for what it
  * attached, taken through unchanged so an attachment nobody has seen before
  * still arrives under its own name instead of collapsing into `unknown`. */
-const SystemAttachment = item(Type.String({ pattern: "^system:attachment:[A-Za-z0-9_.-]+$" }), {
+const SystemAttachment = item(Type.String({ pattern: "^system\\.attachment\\.[A-Za-z0-9_-]+$" }), {
   attachment: Type.Record(Type.String(), Type.Unknown()),
 });
 
 /** What the reader could not place. It is still an item: a line that vanishes
  * silently is the one failure a dump cannot be read around. */
-const SystemUnknown = item(Type.Literal("system:unknown"), {
+const SystemUnknown = item(Type.Literal("system.unknown"), {
   record: Type.Record(Type.String(), Type.Unknown()),
 });
 
 // --- hook: code the operator installed ---
 
-/** `hook:<Event>` — the event alone, never the matcher. The name a hook runs
+/** `hook.<Event>` — the event alone, never the matcher. The name a hook runs
  * under is `PreToolUse:Bash`, whose `:` would read as a level of the hierarchy
- * and make `hook:PreToolUse` select nothing; the full name is a field instead,
+ * and make `hook.PreToolUse` select nothing; the full name is a field instead,
  * and prefix selection keeps meaning what it says. */
-const Hook = item(Type.String({ pattern: "^hook:[A-Za-z0-9_.-]+$" }), {
+const Hook = item(Type.String({ pattern: "^hook\\.[A-Za-z0-9_-]+$" }), {
   /** The hook's full name, matcher included. */
   hook_name: Type.String(),
   outcome: Type.Union([
@@ -387,19 +394,19 @@ const Hook = item(Type.String({ pattern: "^hook:[A-Za-z0-9_.-]+$" }), {
   tool_use_id: Type.Optional(Type.String()),
 });
 
-// --- tool: `tool:<Name>`, one item for the call and one for the result ---
+// --- tool: `tool.<Name>`, one item for the call and one for the result ---
 
-const ToolType = Type.String({ pattern: "^tool:[A-Za-z0-9_.-]+$" });
+const ToolType = Type.String({ pattern: "^tool\\.[A-Za-z0-9_-]+$" });
 
 function toolUse<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
-  return item(Type.Literal(`tool:${name}` as const), {
+  return item(Type.Literal(`tool.${name}` as const), {
     ...USE_FIELDS,
     ...fields,
   });
 }
 
 function toolResult<N extends string, F extends Record<string, TSchema>>(name: N, fields: F) {
-  return item(Type.Literal(`tool:${name}` as const), {
+  return item(Type.Literal(`tool.${name}` as const), {
     ...RESULT_FIELDS,
     ...fields,
   });
@@ -453,7 +460,7 @@ const TOOL_ITEMS = [
   toolResult("WebFetch", { text: OptText }),
   toolUse("WebSearch", { query: Type.String() }),
   toolResult("WebSearch", { results: OptCount }),
-  /** The same exchange `message:sub:*` carries, seen from the calling side:
+  /** The same exchange `message.sub.*` carries, seen from the calling side:
    * this pair states that an agent was started and how it ended, and what it
    * answered stays with the message. */
   toolUse("Agent", {
@@ -493,7 +500,7 @@ const TOOL_ITEMS = [
  * Items are finer than lines: one assistant record becomes the thinking, the
  * text and each tool call it held. A reader that does not recognise a record
  * still emits one — as a tool it has no fields for, an attachment under its own
- * kind, or `system:unknown` — so nothing in the file goes missing without
+ * kind, or `system.unknown` — so nothing in the file goes missing without
  * saying so. */
 export const TranscriptItem = Type.Union(
   [
@@ -628,5 +635,5 @@ export const DumpPresetsReadResult = Type.Object({
 });
 export type DumpPresetsReadResult = Static<typeof DumpPresetsReadResult>;
 
-export const DumpPresetsReadRequest = request("dump_presets_read", DumpPresetsReadArgs);
-export const DumpPresetsReadResponse = response("dump_presets_read", DumpPresetsReadResult);
+export const DumpPresetsReadRequest = request("dump.presets.read", DumpPresetsReadArgs);
+export const DumpPresetsReadResponse = response("dump.presets.read", DumpPresetsReadResult);

@@ -3,7 +3,8 @@ import { Type } from "@sinclair/typebox";
 /** The fields that describe where a session lives and what it runs as.
  *
  * Stated once and referenced wherever a session is described: the session names
- * them itself in `hello`, and the instance repeats them on the `peers` topic
+ * them itself in `hello.session`, and the instance repeats them on the `peers`
+ * topic
  * for connected and last-known sessions alike. Which of them are required
  * differs by place — a greeting may leave any of them unsaid — so each place
  * wraps what it needs in `Type.Optional`, but the name and the type of a field

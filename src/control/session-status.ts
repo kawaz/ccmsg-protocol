@@ -303,9 +303,9 @@ export const SessionStatusSnapshot = Type.Object(
 );
 export type SessionStatusSnapshot = Static<typeof SessionStatusSnapshot>;
 
-/** The `session_status:<sid>` topic. Whole-value: the fold is recomputed and
+/** The `session.status:<sid>` topic. Whole-value: the fold is recomputed and
  * sent entire whenever something in the transcript changes it. */
 export const SessionStatusFrame = topicFrame(
-  "session_status",
+  "session.status",
   Type.Intersect([Type.Object({ sid: Sid }), SessionStatusSnapshot]),
 );

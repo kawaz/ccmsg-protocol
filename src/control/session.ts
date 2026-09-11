@@ -25,8 +25,8 @@ export const SessionKillResult = Type.Object({
 });
 export type SessionKillResult = Static<typeof SessionKillResult>;
 
-export const SessionKillRequest = request("session_kill", SessionKillArgs);
-export const SessionKillResponse = response("session_kill", SessionKillResult);
+export const SessionKillRequest = request("session.kill", SessionKillArgs);
+export const SessionKillResponse = response("session.kill", SessionKillResult);
 
 /** How long a title may be. A title is typed into a terminal and shown as a
  * session's first line, where anything longer is unreadable whatever the
@@ -63,8 +63,8 @@ export const SessionRenameResult = Type.Object({
 });
 export type SessionRenameResult = Static<typeof SessionRenameResult>;
 
-export const SessionRenameRequest = request("session_rename", SessionRenameArgs);
-export const SessionRenameResponse = response("session_rename", SessionRenameResult);
+export const SessionRenameRequest = request("session.rename", SessionRenameArgs);
+export const SessionRenameResponse = response("session.rename", SessionRenameResult);
 
 /** Reads the environment of a session's own process.
  *
@@ -84,8 +84,8 @@ export const SessionEnvReadResult = Type.Object({
 });
 export type SessionEnvReadResult = Static<typeof SessionEnvReadResult>;
 
-export const SessionEnvReadRequest = request("session_env_read", SessionEnvReadArgs);
-export const SessionEnvReadResponse = response("session_env_read", SessionEnvReadResult);
+export const SessionEnvReadRequest = request("session.env.read", SessionEnvReadArgs);
+export const SessionEnvReadResponse = response("session.env.read", SessionEnvReadResult);
 
 /** Searches the transcripts of sessions that have run on this instance,
  * including ones long finished. */
@@ -162,8 +162,8 @@ export const SessionSearchResult = Type.Object({
 });
 export type SessionSearchResult = Static<typeof SessionSearchResult>;
 
-export const SessionSearchRequest = request("session_search", SessionSearchArgs);
-export const SessionSearchResponse = response("session_search", SessionSearchResult);
+export const SessionSearchRequest = request("session.search", SessionSearchArgs);
+export const SessionSearchResponse = response("session.search", SessionSearchResult);
 
 /** Writes a session's dump to a file on the instance's host and answers with
  * its path.
@@ -201,7 +201,7 @@ export const SessionDumpWriteArgs = Type.Object({
    * thing in the vocabulary the rest of the selection is written in. */
   no_thinking: Type.Optional(Type.Boolean()),
   /** Leave out the machinery of in-process agents, which
-   * `["-message:sub", "-tool:Agent"]` also says. */
+   * `["-message.sub", "-tool.Agent"]` also says. */
   no_agent: Type.Optional(Type.Boolean()),
 });
 export type SessionDumpWriteArgs = Static<typeof SessionDumpWriteArgs>;
@@ -221,16 +221,16 @@ export const SessionDumpWriteResult = Type.Object({
 });
 export type SessionDumpWriteResult = Static<typeof SessionDumpWriteResult>;
 
-export const SessionDumpWriteRequest = request("session_dump_write", SessionDumpWriteArgs);
-export const SessionDumpWriteResponse = response("session_dump_write", SessionDumpWriteResult);
+export const SessionDumpWriteRequest = request("session.dump.write", SessionDumpWriteArgs);
+export const SessionDumpWriteResponse = response("session.dump.write", SessionDumpWriteResult);
 
 /** Asks where a forked session stopped being a copy of its ancestor.
  *
  * Forking duplicates the ancestor's records keeping each record id, so nothing
  * inside the file marks the seam; finding it means comparing against the
  * sibling transcripts the instance can already enumerate. */
-export const SessionForkOriginArgs = Type.Object({ sid: Sid });
-export type SessionForkOriginArgs = Static<typeof SessionForkOriginArgs>;
+export const SessionForkOriginReadArgs = Type.Object({ sid: Sid });
+export type SessionForkOriginReadArgs = Static<typeof SessionForkOriginReadArgs>;
 
 export const ForkOrigin = Type.Object(
   {
@@ -245,38 +245,39 @@ export const ForkOrigin = Type.Object(
 );
 export type ForkOrigin = Static<typeof ForkOrigin>;
 
-export const SessionForkOriginResult = Type.Object({
+export const SessionForkOriginReadResult = Type.Object({
   /** Absent both when the session is no fork and when it is one whose ancestor
    * file is gone. Nothing left on disk tells those two apart, and neither has a
    * seam to place. */
   origin: Type.Optional(ForkOrigin),
 });
-export type SessionForkOriginResult = Static<typeof SessionForkOriginResult>;
+export type SessionForkOriginReadResult = Static<typeof SessionForkOriginReadResult>;
 
-export const SessionForkOriginRequest = request("session_fork_origin", SessionForkOriginArgs);
-export const SessionForkOriginResponse = response("session_fork_origin", SessionForkOriginResult);
+export const SessionForkOriginReadRequest = request(
+  "session.fork.origin.read",
+  SessionForkOriginReadArgs,
+);
+export const SessionForkOriginReadResponse = response(
+  "session.fork.origin.read",
+  SessionForkOriginReadResult,
+);
 
-/** Drops one entry from the list of sessions that were running when the
- * instance last saw them.
+/** A person dropping one session an instance still holds a row for, which is
+ * the other way a row reaches `peers` as a `PeerRemoved` — the one that does
+ * not wait for the retention window.
  *
- * The removal touches that list alone: the session stays resumable by every
- * other route, and an instance that later sees it connected records it again.
- * An unknown session is not an error — two clients pressing the same button is
- * the ordinary case, and the caller's goal holds either way. */
-export const SessionLastLiveRemoveArgs = Type.Object({ sid: Sid });
-export type SessionLastLiveRemoveArgs = Static<typeof SessionLastLiveRemoveArgs>;
+ * Forgetting touches the row alone: the session stays resumable by every other
+ * route, and an instance that later sees it connected records it again. An
+ * unknown session is not an error — two clients pressing the same button is the
+ * ordinary case, and the caller's goal holds either way. */
+export const SessionForgetArgs = Type.Object({ sid: Sid });
+export type SessionForgetArgs = Static<typeof SessionForgetArgs>;
 
-export const SessionLastLiveRemoveResult = Type.Object({
+export const SessionForgetResult = Type.Object({
   /** Whether the entry was there to remove. */
   removed: Type.Boolean(),
 });
-export type SessionLastLiveRemoveResult = Static<typeof SessionLastLiveRemoveResult>;
+export type SessionForgetResult = Static<typeof SessionForgetResult>;
 
-export const SessionLastLiveRemoveRequest = request(
-  "session_last_live_remove",
-  SessionLastLiveRemoveArgs,
-);
-export const SessionLastLiveRemoveResponse = response(
-  "session_last_live_remove",
-  SessionLastLiveRemoveResult,
-);
+export const SessionForgetRequest = request("session.forget", SessionForgetArgs);
+export const SessionForgetResponse = response("session.forget", SessionForgetResult);

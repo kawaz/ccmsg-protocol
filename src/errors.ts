@@ -5,7 +5,7 @@ import { type Static, Type } from "@sinclair/typebox";
 export const ERROR_CODES = [
   // --- connection level (no single op owns these) ---
   /** The request could not be dispatched at all: unparseable JSON, no `op`, no
-   * `request_id`, or a `hello` announcing another protocol generation. */
+   * `request_id`, or a greeting announcing another protocol generation. */
   "bad_request",
   /** The op name is not in the op attribute table. */
   "unknown_op",

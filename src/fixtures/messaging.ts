@@ -2,8 +2,8 @@ import type { Static } from "@sinclair/typebox";
 import type { MessageSendRequest, MessageSendResponse } from "../messaging/message.ts";
 import type { NotifySendRequest, NotifySendResponse } from "../messaging/notify.ts";
 import type {
-  SayMarkReadRequest,
-  SayMarkReadResponse,
+  SayUnreadClearRequest,
+  SayUnreadClearResponse,
   SayPostRequest,
   SayPostResponse,
 } from "../messaging/say.ts";
@@ -13,7 +13,7 @@ const { sid, other_sid, instance, mid, request_id } = FIXTURE_IDS;
 
 export const MESSAGE_SEND_REQUEST: Static<typeof MessageSendRequest> = {
   request_id,
-  op: "message_send",
+  op: "message.send",
   to: other_sid,
   text: "契約の fixture を export した",
   reply_to: mid,
@@ -23,7 +23,7 @@ export const MESSAGE_SEND_REQUEST: Static<typeof MessageSendRequest> = {
  * fields and the identity it was called with. */
 export const MESSAGE_SEND_FORWARDED_REQUEST: Static<typeof MessageSendRequest> = {
   request_id,
-  op: "message_send",
+  op: "message.send",
   to: other_sid,
   text: "契約の fixture を export した",
   from_instance: instance,
@@ -49,7 +49,7 @@ export const MESSAGE_SEND_HELD_RESPONSE: Static<typeof MessageSendResponse> = {
 
 export const SAY_POST_REQUEST: Static<typeof SayPostRequest> = {
   request_id,
-  op: "say_post",
+  op: "say.post",
   text: "終わりました",
 };
 
@@ -59,20 +59,20 @@ export const SAY_POST_RESPONSE: Static<typeof SayPostResponse> = {
   posted_at: FIXTURE_NOW,
 };
 
-export const SAY_MARK_READ_REQUEST: Static<typeof SayMarkReadRequest> = {
+export const SAY_UNREAD_CLEAR_REQUEST: Static<typeof SayUnreadClearRequest> = {
   request_id,
-  op: "say_mark_read",
+  op: "say.unread.clear",
   sid,
 };
 
-export const SAY_MARK_READ_RESPONSE: Static<typeof SayMarkReadResponse> = {
+export const SAY_UNREAD_CLEAR_RESPONSE: Static<typeof SayUnreadClearResponse> = {
   ok: true,
   request_id,
 };
 
 export const NOTIFY_SEND_REQUEST: Static<typeof NotifySendRequest> = {
   request_id,
-  op: "notify_send",
+  op: "notify.send",
   sid,
   text: "確認して",
 };

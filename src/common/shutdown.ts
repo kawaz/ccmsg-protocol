@@ -11,8 +11,8 @@ export type InstanceShutdownArgs = Static<typeof InstanceShutdownArgs>;
 export const InstanceShutdownResult = Type.Object({});
 export type InstanceShutdownResult = Static<typeof InstanceShutdownResult>;
 
-export const InstanceShutdownRequest = request("instance_shutdown", InstanceShutdownArgs);
-export const InstanceShutdownResponse = response("instance_shutdown", InstanceShutdownResult);
+export const InstanceShutdownRequest = request("instance.shutdown", InstanceShutdownArgs);
+export const InstanceShutdownResponse = response("instance.shutdown", InstanceShutdownResult);
 
 /** A session saying it is about to go, so that its disconnection reads as a
  * pause rather than a loss.
@@ -44,5 +44,5 @@ export const SessionStoppingResult = Type.Object({
 });
 export type SessionStoppingResult = Static<typeof SessionStoppingResult>;
 
-export const SessionStoppingRequest = request("session_stopping", SessionStoppingArgs);
-export const SessionStoppingResponse = response("session_stopping", SessionStoppingResult);
+export const SessionStoppingRequest = request("session.stopping", SessionStoppingArgs);
+export const SessionStoppingResponse = response("session.stopping", SessionStoppingResult);

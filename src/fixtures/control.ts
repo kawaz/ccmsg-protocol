@@ -14,8 +14,8 @@ import type {
   FileFindResponse,
   FileReadRequest,
   FileReadResponse,
-  FileStatBatchRequest,
-  FileStatBatchResponse,
+  FileStatRequest,
+  FileStatResponse,
   FileWriteRequest,
   FileWriteResponse,
 } from "../control/files.ts";
@@ -56,12 +56,12 @@ import type {
   SessionDumpWriteResponse,
   SessionEnvReadRequest,
   SessionEnvReadResponse,
-  SessionForkOriginRequest,
-  SessionForkOriginResponse,
+  SessionForkOriginReadRequest,
+  SessionForkOriginReadResponse,
   SessionKillRequest,
   SessionKillResponse,
-  SessionLastLiveRemoveRequest,
-  SessionLastLiveRemoveResponse,
+  SessionForgetRequest,
+  SessionForgetResponse,
   SessionRenameRequest,
   SessionRenameResponse,
   SessionSearchRequest,
@@ -83,7 +83,7 @@ const FILE_PATH = "src/fixtures/index.ts";
 
 export const SESSION_KILL_REQUEST: Static<typeof SessionKillRequest> = {
   request_id,
-  op: "session_kill",
+  op: "session.kill",
   to_instance: instance,
   sid,
   force: false,
@@ -97,7 +97,7 @@ export const SESSION_KILL_RESPONSE: Static<typeof SessionKillResponse> = {
 
 export const SESSION_RENAME_REQUEST: Static<typeof SessionRenameRequest> = {
   request_id,
-  op: "session_rename",
+  op: "session.rename",
   sid,
   title: "contract fixtures",
 };
@@ -112,7 +112,7 @@ export const SESSION_RENAME_RESPONSE: Static<typeof SessionRenameResponse> = {
 
 export const SESSION_ENV_READ_REQUEST: Static<typeof SessionEnvReadRequest> = {
   request_id,
-  op: "session_env_read",
+  op: "session.env.read",
   sid,
 };
 
@@ -126,7 +126,7 @@ export const SESSION_ENV_READ_RESPONSE: Static<typeof SessionEnvReadResponse> = 
 
 export const SESSION_SEARCH_REQUEST: Static<typeof SessionSearchRequest> = {
   request_id,
-  op: "session_search",
+  op: "session.search",
   query: "fixture",
   target_agent: true,
   modified_within_ms: 86_400_000,
@@ -158,12 +158,12 @@ export const SESSION_SEARCH_RESPONSE: Static<typeof SessionSearchResponse> = {
 
 export const SESSION_DUMP_WRITE_REQUEST: Static<typeof SessionDumpWriteRequest> = {
   request_id,
-  op: "session_dump_write",
+  op: "session.dump.write",
   sid,
   agent_id: "a471372f2",
   since_at: FIXTURE_NOW - 3_600_000,
   preset: "howto",
-  types: ["@file", "-tool:Grep", "thinking"],
+  types: ["@file", "-tool.Grep", "thinking"],
 };
 
 export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse> = {
@@ -171,7 +171,7 @@ export const SESSION_DUMP_WRITE_RESPONSE: Static<typeof SessionDumpWriteResponse
   request_id,
   path: "/transcripts/6f1a2b3c.dump.json",
   instance,
-  entries: { thinking: 41, "tool:Bash": 62, "tool:Read": 25 },
+  entries: { thinking: 41, "tool.Bash": 62, "tool.Read": 25 },
   ids: [
     {
       kind: "agent",
@@ -191,14 +191,14 @@ export const SESSION_DUMP_FILE: Static<typeof SessionDumpFile> = {
   sid,
   agent_id: "a471372f2",
   written_at: FIXTURE_NOW,
-  types: ["tool:Read", "tool:Write", "tool:Edit", "tool:Glob", "thinking"],
+  types: ["tool.Read", "tool.Write", "tool.Edit", "tool.Glob", "thinking"],
   items: [],
   ids: [{ kind: "agent", id: "a471372f2", label: "dump-kinds-design", status: "ok" }],
 };
 
 export const DUMP_PRESETS_READ_REQUEST: Static<typeof DumpPresetsReadRequest> = {
   request_id,
-  op: "dump_presets_read",
+  op: "dump.presets.read",
 };
 
 export const DUMP_PRESETS_READ_RESPONSE: Static<typeof DumpPresetsReadResponse> = {
@@ -208,13 +208,13 @@ export const DUMP_PRESETS_READ_RESPONSE: Static<typeof DumpPresetsReadResponse> 
     {
       name: "file",
       description: "reading, writing and searching, as one interest",
-      opts: { types: ["tool:Read", "tool:Write", "tool:Edit", "tool:Glob", "tool:Grep"] },
+      opts: { types: ["tool.Read", "tool.Write", "tool.Edit", "tool.Glob", "tool.Grep"] },
     },
     {
       name: "howto",
       description: "how the work was done: what was thought, run, read and written",
       opts: {
-        types: ["thinking", "message:user", "message:parent", "message:sub", "tool:Bash", "@file"],
+        types: ["thinking", "message.user", "message.parent", "message.sub", "tool.Bash", "@file"],
       },
     },
   ],
@@ -232,7 +232,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "3f9a21c4",
     subject: "main",
     source: { offset: 180_000, bytes: 420 },
-    type: "message:user:in",
+    type: "message.user.in",
     at: FIXTURE_NOW - 3_600_000,
     turn: 1,
     text: "dump のアイテム型を整理して",
@@ -251,7 +251,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "f10b6d43",
     subject: "main",
     source: { offset: 180_420, bytes: 980 },
-    type: "tool:Bash",
+    type: "tool.Bash",
     at: FIXTURE_NOW - 3_400_000,
     role: "use",
     tool_use_id: "toolu_01Ne9BDS",
@@ -264,7 +264,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "18d6f2c9",
     subject: "main",
     source: { offset: 181_400, bytes: 260 },
-    type: "tool:Bash",
+    type: "tool.Bash",
     at: FIXTURE_NOW - 3_399_000,
     role: "result",
     parent_item: "f10b6d43:1",
@@ -277,7 +277,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "b7e41d09",
     subject: "main",
     source: { offset: 181_660, bytes: 640 },
-    type: "message:sub:out",
+    type: "message.sub.out",
     at: FIXTURE_NOW - 3_300_000,
     role: "use",
     result_item: "c2d80f16:0",
@@ -291,7 +291,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "92e6d4f5",
     subject: "main",
     source: { offset: 182_300, bytes: 310 },
-    type: "hook:PreToolUse",
+    type: "hook.PreToolUse",
     at: FIXTURE_NOW - 3_200_000,
     hook_name: "PreToolUse:Bash",
     outcome: "additionalContext",
@@ -303,7 +303,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "81d5c3e4",
     subject: "main",
     source: { offset: 182_610, bytes: 190 },
-    type: "system:attachment:queued_command",
+    type: "system.attachment.queued_command",
     at: FIXTURE_NOW - 3_100_000,
     attachment: { type: "queued_command", command: "/pre-clear" },
   },
@@ -312,12 +312,12 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "c8a2f371",
     subject: "main",
     source: { offset: 182_800, bytes: 520 },
-    type: "message:team:out",
+    type: "message.team.out",
     at: FIXTURE_NOW - 3_000_000,
     role: "use",
     result_item: "d4c1a0b2:0",
     tool_use_id: "toolu_01Tm5XYp",
-    text: "契約に message:parent と message:team を足して",
+    text: "契約に message.parent と message.team を足して",
     harness_name: "contract-dump-items",
     agent_id: "b83e0f114",
     subagent_type: "opus5-worker-high",
@@ -327,7 +327,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "e5b70c93",
     subject: "main",
     source: { offset: 183_320, bytes: 300 },
-    type: "message:team:in",
+    type: "message.team.in",
     at: FIXTURE_NOW - 2_900_000,
     text: "fixtures まで通ったので ci を回す",
     harness_name: "contract-dump-items",
@@ -337,7 +337,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
     uuid: "d4c1a0b2",
     subject: "main",
     source: { offset: 183_620, bytes: 410 },
-    type: "message:team:in",
+    type: "message.team.in",
     at: FIXTURE_NOW - 2_800_000,
     role: "result",
     parent_item: "c8a2f371:0",
@@ -352,7 +352,7 @@ export const TRANSCRIPT_ITEMS: Static<typeof TranscriptItem>[] = [
 /** The same vocabulary read with a throwaway agent as the subject.
  *
  * Nothing here is a new type: the brief an agent opens with and the answer it
- * closes with are what `message:parent` names from wherever it is read, and the
+ * closes with are what `message.parent` names from wherever it is read, and the
  * answer comes as prose with no call behind it. What says these were read from
  * an errand's transcript rather than a session's is `subject`, which every item
  * carries. */
@@ -362,7 +362,7 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "a9f30d15",
     subject: "sub",
     source: { offset: 0, bytes: 1_240 },
-    type: "message:parent:in",
+    type: "message.parent.in",
     at: FIXTURE_NOW - 3_290_000,
     turn: 1,
     text: "docs/design/dump-kinds.md を書き直す",
@@ -372,7 +372,7 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "b0e41c26",
     subject: "sub",
     source: { offset: 1_240, bytes: 380 },
-    type: "message:parent:out",
+    type: "message.parent.out",
     at: FIXTURE_NOW - 3_260_000,
     role: "use",
     tool_use_id: "toolu_01Qz8Vbn",
@@ -385,7 +385,7 @@ export const TRANSCRIPT_ITEMS_AGENT_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "c1f52d37",
     subject: "sub",
     source: { offset: 1_620, bytes: 690 },
-    type: "message:parent:out",
+    type: "message.parent.out",
     at: FIXTURE_NOW - 3_200_000,
     text: "型一覧を 4 群に整理し、preset の例も揃えた",
   },
@@ -404,10 +404,10 @@ export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "d2a63e48",
     subject: "team",
     source: { offset: 0, bytes: 1_480 },
-    type: "message:parent:in",
+    type: "message.parent.in",
     at: FIXTURE_NOW - 3_000_000,
     turn: 1,
-    text: "契約に message:parent と message:team を足して",
+    text: "契約に message.parent と message.team を足して",
     harness_name: "main",
   },
   {
@@ -415,7 +415,7 @@ export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "e3b74f59",
     subject: "team",
     source: { offset: 1_480, bytes: 260 },
-    type: "message:user:in",
+    type: "message.user.in",
     at: FIXTURE_NOW - 2_950_000,
     text: "fixtures も忘れずに",
   },
@@ -424,7 +424,7 @@ export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "f4c8506a",
     subject: "team",
     source: { offset: 1_740, bytes: 340 },
-    type: "message:team:out",
+    type: "message.team.out",
     at: FIXTURE_NOW - 2_920_000,
     role: "use",
     tool_use_id: "toolu_01Wc7Zdq",
@@ -436,7 +436,7 @@ export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
     uuid: "a5d9617b",
     subject: "team",
     source: { offset: 2_080, bytes: 410 },
-    type: "message:parent:out",
+    type: "message.parent.out",
     at: FIXTURE_NOW - 2_800_000,
     text: "4 型を足して 1.17.0 を切った",
   },
@@ -444,7 +444,7 @@ export const TRANSCRIPT_ITEMS_TEAM_SUBJECT: Static<typeof TranscriptItem>[] = [
 
 export const TRANSCRIPT_READ_REQUEST: Static<typeof TranscriptReadRequest> = {
   request_id,
-  op: "transcript_read",
+  op: "transcript.read",
   sid,
   before: 182_400,
   max_bytes: 65_536,
@@ -462,10 +462,10 @@ export const TRANSCRIPT_READ_RESPONSE: Static<typeof TranscriptReadResponse> = {
 
 export const TRANSCRIPT_ITEMS_READ_REQUEST: Static<typeof TranscriptItemsReadRequest> = {
   request_id,
-  op: "transcript_items_read",
+  op: "transcript.items.read",
   sid,
   since_at: FIXTURE_NOW - 3_600_000,
-  types: ["message", "thinking", "tool:Bash"],
+  types: ["message", "thinking", "tool.Bash"],
   limit: 200,
 };
 
@@ -483,7 +483,7 @@ export const TRANSCRIPT_ITEMS_READ_RESPONSE: Static<typeof TranscriptItemsReadRe
  * walks back by handing the `prev` it was given to the next call. */
 export const TRANSCRIPT_ITEMS_READ_BACKWARD_REQUEST: Static<typeof TranscriptItemsReadRequest> = {
   request_id,
-  op: "transcript_items_read",
+  op: "transcript.items.read",
   sid,
   until_id: "18d6f2c9:0",
   limit: 2,
@@ -496,25 +496,25 @@ export const TRANSCRIPT_ITEMS_READ_BACKWARD_RESPONSE: Static<typeof TranscriptIt
   prev: "f10b6d43:0",
 };
 
-export const SESSION_FORK_ORIGIN_REQUEST: Static<typeof SessionForkOriginRequest> = {
+export const SESSION_FORK_ORIGIN_READ_REQUEST: Static<typeof SessionForkOriginReadRequest> = {
   request_id,
-  op: "session_fork_origin",
+  op: "session.fork.origin.read",
   sid,
 };
 
-export const SESSION_FORK_ORIGIN_RESPONSE: Static<typeof SessionForkOriginResponse> = {
+export const SESSION_FORK_ORIGIN_READ_RESPONSE: Static<typeof SessionForkOriginReadResponse> = {
   ok: true,
   request_id,
   origin: { sid: other_sid, boundary_uuid: "6d1f0c2e-8a44-4b1e-9f30-5c7a2d9e4b81", copied: 128 },
 };
 
-export const SESSION_LAST_LIVE_REMOVE_REQUEST: Static<typeof SessionLastLiveRemoveRequest> = {
+export const SESSION_FORGET_REQUEST: Static<typeof SessionForgetRequest> = {
   request_id,
-  op: "session_last_live_remove",
+  op: "session.forget",
   sid: other_sid,
 };
 
-export const SESSION_LAST_LIVE_REMOVE_RESPONSE: Static<typeof SessionLastLiveRemoveResponse> = {
+export const SESSION_FORGET_RESPONSE: Static<typeof SessionForgetResponse> = {
   ok: true,
   request_id,
   removed: true,
@@ -522,7 +522,7 @@ export const SESSION_LAST_LIVE_REMOVE_RESPONSE: Static<typeof SessionLastLiveRem
 
 export const DIR_LIST_REQUEST: Static<typeof DirListRequest> = {
   request_id,
-  op: "dir_list",
+  op: "dir.list",
   sid,
   kind: "workspace",
   path: "src/fixtures",
@@ -541,7 +541,7 @@ export const DIR_LIST_RESPONSE: Static<typeof DirListResponse> = {
 
 export const FILE_READ_REQUEST: Static<typeof FileReadRequest> = {
   request_id,
-  op: "file_read",
+  op: "file.read",
   sid,
   kind: "workspace",
   path: FILE_PATH,
@@ -561,7 +561,7 @@ export const FILE_READ_RESPONSE: Static<typeof FileReadResponse> = {
 
 export const FILE_WRITE_REQUEST: Static<typeof FileWriteRequest> = {
   request_id,
-  op: "file_write",
+  op: "file.write",
   sid,
   path: FILE_PATH,
   content: "export const OP_FIXTURES = {} as const;\n",
@@ -576,7 +576,7 @@ export const FILE_WRITE_RESPONSE: Static<typeof FileWriteResponse> = {
 
 export const FILE_CREATE_REQUEST: Static<typeof FileCreateRequest> = {
   request_id,
-  op: "file_create",
+  op: "file.create",
   sid,
   kind: "workspace",
   path: "src/fixtures/ids.ts",
@@ -592,7 +592,7 @@ export const FILE_CREATE_RESPONSE: Static<typeof FileCreateResponse> = {
 
 export const FILE_EDIT_REQUEST: Static<typeof FileEditRequest> = {
   request_id,
-  op: "file_edit",
+  op: "file.edit",
   sid,
   kind: "workspace",
   path: FILE_PATH,
@@ -612,7 +612,7 @@ export const FILE_EDIT_RESPONSE: Static<typeof FileEditResponse> = {
 
 export const FILE_DELETE_REQUEST: Static<typeof FileDeleteRequest> = {
   request_id,
-  op: "file_delete",
+  op: "file.delete",
   sid,
   kind: "workspace",
   path: "src/fixtures/scratch.ts",
@@ -627,7 +627,7 @@ export const FILE_DELETE_RESPONSE: Static<typeof FileDeleteResponse> = {
 
 export const FILE_FIND_REQUEST: Static<typeof FileFindRequest> = {
   request_id,
-  op: "file_find",
+  op: "file.find",
   sid,
   kind: "workspace",
   root: "src",
@@ -646,16 +646,16 @@ export const FILE_FIND_RESPONSE: Static<typeof FileFindResponse> = {
   truncated: false,
 };
 
-export const FILE_STAT_BATCH_REQUEST: Static<typeof FileStatBatchRequest> = {
+export const FILE_STAT_REQUEST: Static<typeof FileStatRequest> = {
   request_id,
-  op: "file_stat_batch",
+  op: "file.stat",
   sid,
   paths: [FILE_PATH, "/etc/hosts"],
 };
 
 /** A path the session may not reach answers `null` in its place rather than
  * dropping out of the list, so the results line up with the paths asked for. */
-export const FILE_STAT_BATCH_RESPONSE: Static<typeof FileStatBatchResponse> = {
+export const FILE_STAT_RESPONSE: Static<typeof FileStatResponse> = {
   ok: true,
   request_id,
   results: [{ kind: "workspace", path: FILE_PATH }, null],
@@ -663,7 +663,7 @@ export const FILE_STAT_BATCH_RESPONSE: Static<typeof FileStatBatchResponse> = {
 
 export const DIR_TREE_REQUEST: Static<typeof DirTreeRequest> = {
   request_id,
-  op: "dir_tree",
+  op: "dir.tree",
   roots: ["/repos/kawaz"],
   depth: 2,
   filter: "ccmsg",
@@ -682,7 +682,7 @@ export const DIR_TREE_RESPONSE: Static<typeof DirTreeResponse> = {
 
 export const LAUNCHER_CONFIG_READ_REQUEST: Static<typeof LauncherConfigReadRequest> = {
   request_id,
-  op: "launcher_config_read",
+  op: "launcher.config.read",
 };
 
 export const LAUNCHER_CONFIG_READ_RESPONSE: Static<typeof LauncherConfigReadResponse> = {
@@ -700,7 +700,7 @@ export const LAUNCHER_CONFIG_READ_RESPONSE: Static<typeof LauncherConfigReadResp
 
 export const LAUNCHER_RUN_REQUEST: Static<typeof LauncherRunRequest> = {
   request_id,
-  op: "launcher_run",
+  op: "launcher.run",
   cwd: WORKSPACE,
   params: { effort: "high" },
   template: "claude",
@@ -717,7 +717,7 @@ export const LAUNCHER_RUN_RESPONSE: Static<typeof LauncherRunResponse> = {
 
 export const SANDBOX_GRANT_REQUEST: Static<typeof SandboxGrantRequest> = {
   request_id,
-  op: "sandbox_grant",
+  op: "sandbox.grant",
   sid,
   kind: "workspace",
   path: FILE_PATH,
@@ -734,7 +734,7 @@ export const SANDBOX_GRANT_RESPONSE: Static<typeof SandboxGrantResponse> = {
 
 export const SANDBOX_REVOKE_REQUEST: Static<typeof SandboxRevokeRequest> = {
   request_id,
-  op: "sandbox_revoke",
+  op: "sandbox.revoke",
   gid: "g-01J9Z3W2Q",
 };
 
@@ -745,7 +745,7 @@ export const SANDBOX_REVOKE_RESPONSE: Static<typeof SandboxRevokeResponse> = {
 
 export const TRANSLATE_RUN_REQUEST: Static<typeof TranslateRunRequest> = {
   request_id,
-  op: "translate_run",
+  op: "translate.run",
   texts: ["the contract's own fixtures", "one that the helper could not take"],
 };
 
@@ -762,7 +762,7 @@ export const TRANSLATE_RUN_RESPONSE: Static<typeof TranslateRunResponse> = {
 
 export const LLM_USAGE_READ_REQUEST: Static<typeof LlmUsageReadRequest> = {
   request_id,
-  op: "llm_usage_read",
+  op: "llm.usage.read",
   refresh: true,
 };
 
@@ -804,7 +804,7 @@ export const LLM_USAGE_READ_RESPONSE: Static<typeof LlmUsageReadResponse> = {
 
 export const LLM_STATS_READ_REQUEST: Static<typeof LlmStatsReadRequest> = {
   request_id,
-  op: "llm_stats_read",
+  op: "llm.stats.read",
   days: 7,
 };
 
@@ -833,7 +833,7 @@ export const LLM_STATS_READ_RESPONSE: Static<typeof LlmStatsReadResponse> = {
 
 export const KV_READ_REQUEST: Static<typeof KvReadRequest> = {
   request_id,
-  op: "kv_read",
+  op: "kv.read",
   ns: "webui",
   key: "layout",
 };
@@ -847,7 +847,7 @@ export const KV_READ_RESPONSE: Static<typeof KvReadResponse> = {
 
 export const KV_WRITE_REQUEST: Static<typeof KvWriteRequest> = {
   request_id,
-  op: "kv_write",
+  op: "kv.write",
   ns: "webui",
   key: "layout",
   value: { pane: "peers", collapsed: true },
@@ -862,7 +862,7 @@ export const KV_WRITE_RESPONSE: Static<typeof KvWriteResponse> = {
 
 export const KV_DELETE_REQUEST: Static<typeof KvDeleteRequest> = {
   request_id,
-  op: "kv_delete",
+  op: "kv.delete",
   ns: "webui",
   key: "layout",
 };

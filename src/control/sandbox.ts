@@ -37,8 +37,8 @@ export const SandboxGrantResult = Type.Object({
 });
 export type SandboxGrantResult = Static<typeof SandboxGrantResult>;
 
-export const SandboxGrantRequest = request("sandbox_grant", SandboxGrantArgs);
-export const SandboxGrantResponse = response("sandbox_grant", SandboxGrantResult);
+export const SandboxGrantRequest = request("sandbox.grant", SandboxGrantArgs);
+export const SandboxGrantResponse = response("sandbox.grant", SandboxGrantResult);
 
 /** Ends a grant early, as when a preview is closed.
  *
@@ -54,5 +54,5 @@ export type SandboxRevokeArgs = Static<typeof SandboxRevokeArgs>;
 export const SandboxRevokeResult = Type.Object({});
 export type SandboxRevokeResult = Static<typeof SandboxRevokeResult>;
 
-export const SandboxRevokeRequest = request("sandbox_revoke", SandboxRevokeArgs);
-export const SandboxRevokeResponse = response("sandbox_revoke", SandboxRevokeResult);
+export const SandboxRevokeRequest = request("sandbox.revoke", SandboxRevokeArgs);
+export const SandboxRevokeResponse = response("sandbox.revoke", SandboxRevokeResult);

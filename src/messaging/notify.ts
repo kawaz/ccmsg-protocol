@@ -3,7 +3,7 @@ import { request, response, topicFrame } from "../envelope.ts";
 import { Sid, Timestamp } from "../identifiers.ts";
 
 /** A short line meant to reach a person watching, not the session's own turn.
- * Delivery is best effort and unacknowledged; unlike `message_send`, nothing is
+ * Delivery is best effort and unacknowledged; unlike `message.send`, nothing is
  * held for later. */
 export const NotifySendArgs = Type.Object({
   /** The session the notification is about. Omit to mean the caller. */
@@ -15,8 +15,8 @@ export type NotifySendArgs = Static<typeof NotifySendArgs>;
 export const NotifySendResult = Type.Object({});
 export type NotifySendResult = Static<typeof NotifySendResult>;
 
-export const NotifySendRequest = request("notify_send", NotifySendArgs);
-export const NotifySendResponse = response("notify_send", NotifySendResult);
+export const NotifySendRequest = request("notify.send", NotifySendArgs);
+export const NotifySendResponse = response("notify.send", NotifySendResult);
 
 export const Notification = Type.Object(
   {

@@ -3,7 +3,7 @@ import { request, response } from "../envelope.ts";
 import { Capability, Endpoint, InstanceId, Role, Sid, Timestamp } from "../identifiers.ts";
 import { SessionMetaFields } from "../session-meta.ts";
 
-/** The mesh handshake's opening claim, carried by a `role: "instance"` hello.
+/** The mesh handshake's opening claim, carried by `hello.instance`.
  *
  * It is not signed and proves nothing on its own: it names the peer and says
  * where its one-off key can be fetched. The proof that binds this connection to
@@ -36,42 +36,39 @@ export const MeshHello = Type.Object(
 );
 export type MeshHello = Static<typeof MeshHello>;
 
-/** The greeting that settles what a connection is.
+/** What every greeting carries, whichever of the three it is. */
+const GREETING_FIELDS = {
+  /** The generation the caller speaks. A hello announcing another generation
+   * is refused with `bad_request`; there is no path that serves it anyway. */
+  protocol_version: Type.Integer({ minimum: 1 }),
+  /** The client build, for display in diagnostics. Nothing gates on it. */
+  client_version: Type.Optional(Type.String()),
+};
+
+/** The greeting that settles what a connection is. There is one op per role,
+ * so what a greeting must carry is the schema's to state rather than a check
+ * the instance runs against a `role` field: a session names its `sid`, an
+ * instance its mesh claim, and a person neither.
  *
- * Which of the fields below are required is decided by `role`, which no single
- * object schema can state — so the instance checks it, and a greeting that
- * breaks one of these is refused with `invalid_args`:
- *
- * - `role: "session"` carries `sid`.
- * - `role: "user"` carries no `sid`: a person speaks for no one session, and a
- *   greeting that names one is refused rather than quietly ignored.
- * - `role: "instance"` carries `mesh`.
- *
- * A field that belongs to another role is as much a refusal as a missing one:
+ * A field that belongs to another role is as much a refusal as a missing one —
  * `mesh` on a session greeting says the caller has confused which handshake it
- * is in, and accepting it would leave the connection settled as something
- * neither side meant.
+ * is in — which is what the three ops keep apart: a greeting arrives under the
+ * name of the thing it settles, and there is no state in which the name and the
+ * fields disagree.
  *
  * A session's meta (`cwd`, `repo_root`, `transcript_path`, `title`, ...) is
  * taken field by field: a greeting that leaves a field out does not withdraw
  * it, and the instance keeps what it already knows for that `sid`. One session
  * reaches an instance as a run of short-lived processes (a session-start hook,
  * a `post`, a session-end hook), none of which knows every field. */
-export const HelloArgs = Type.Object({
-  role: Role,
-  /** The generation the caller speaks. A hello announcing another generation
-   * is refused with `bad_request`; there is no path that serves it anyway. */
-  protocol_version: Type.Integer({ minimum: 1 }),
-  /** Required for `role: "session"`: the session the connection speaks for. */
-  sid: Type.Optional(Sid),
-  /** Required for `role: "instance"`: the mesh handshake claim. */
-  mesh: Type.Optional(MeshHello),
-  /** The client build, for display in diagnostics. Nothing gates on it. */
-  client_version: Type.Optional(Type.String()),
-  /** What a `role: "session"` connection says about itself. All optional: a
-   * session states what it knows, and the instance derives or leaves unknown
-   * what it is not told. The instance repeats these on the `peers` topic, so
-   * they are the same fields under the same names there. */
+export const HelloSessionArgs = Type.Object({
+  ...GREETING_FIELDS,
+  /** The session the connection speaks for. */
+  sid: Sid,
+  /** What the session says about itself. All optional: a session states what it
+   * knows, and the instance derives or leaves unknown what it is not told. The
+   * instance repeats these on the `peers` topic, so they are the same fields
+   * under the same names there. */
   repo: Type.Optional(SessionMetaFields.repo),
   ws: Type.Optional(SessionMetaFields.ws),
   cwd: Type.Optional(SessionMetaFields.cwd),
@@ -82,9 +79,22 @@ export const HelloArgs = Type.Object({
   model: Type.Optional(SessionMetaFields.model),
   effort: Type.Optional(SessionMetaFields.effort),
 });
-export type HelloArgs = Static<typeof HelloArgs>;
+export type HelloSessionArgs = Static<typeof HelloSessionArgs>;
 
-/** One instance as seen from the instance answering `hello`. */
+/** A person greeting. It names no session: a person speaks for none of them,
+ * and the sessions they may act on are decided by the op table rather than by
+ * anything settled here. */
+export const HelloUserArgs = Type.Object(GREETING_FIELDS);
+export type HelloUserArgs = Static<typeof HelloUserArgs>;
+
+/** A peer instance greeting, which opens the mesh handshake. */
+export const HelloInstanceArgs = Type.Object({
+  ...GREETING_FIELDS,
+  mesh: MeshHello,
+});
+export type HelloInstanceArgs = Static<typeof HelloInstanceArgs>;
+
+/** One instance as seen from the instance answering a greeting. */
 export const InstanceInfo = Type.Object(
   {
     /** Absent until the handshake with it has settled: an endpoint an operator
@@ -148,10 +158,38 @@ export const HelloResult = Type.Object({
    * closes it. Present on a connection an access token opened; absent where
    * reaching the instance is itself the permission (the Unix socket) or where
    * the connection is a mesh link. The person's client renews before this
-   * instant with `auth_refresh` rather than reconnecting. */
+   * instant with `auth.extend` rather than reconnecting. */
   auth_expires_at: Type.Optional(Timestamp),
 });
 export type HelloResult = Static<typeof HelloResult>;
 
-export const HelloRequest = request("hello", HelloArgs);
-export const HelloResponse = response("hello", HelloResult);
+export const HelloSessionRequest = request("hello.session", HelloSessionArgs);
+export const HelloSessionResponse = response("hello.session", HelloResult);
+
+export const HelloUserRequest = request("hello.user", HelloUserArgs);
+export const HelloUserResponse = response("hello.user", HelloResult);
+
+export const HelloInstanceRequest = request("hello.instance", HelloInstanceArgs);
+export const HelloInstanceResponse = response("hello.instance", HelloResult);
+
+/** The role a greeting settles, read from the op that carried it.
+ *
+ * The role itself stays — the op table and the topic table are written against
+ * it, and a forwarded request names it in `caller` — and what a greeting no
+ * longer carries is a second place to say it. */
+export const HELLO_OPS = {
+  "hello.session": "session",
+  "hello.user": "user",
+  "hello.instance": "instance",
+} as const satisfies Record<string, Role>;
+
+export type HelloOp = keyof typeof HELLO_OPS;
+
+export function isHelloOp(op: string): op is HelloOp {
+  return op in HELLO_OPS;
+}
+
+/** The role a connection speaks once `op` has been answered. */
+export function helloRole(op: HelloOp): Role {
+  return HELLO_OPS[op];
+}
