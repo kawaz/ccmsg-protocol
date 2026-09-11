@@ -20,8 +20,8 @@ bun add @ccmsg/protocol
 import { isValid, MessageSendRequest, OP_ATTRIBUTES, opErrors } from "@ccmsg/protocol";
 
 isValid(MessageSendRequest, incoming); // wire の検証は契約側の仕事
-OP_ATTRIBUTES.message_send.roles; // 認可は表を引く (分岐を書かない)
-opErrors("session_rename"); // その op が返しうるコード
+OP_ATTRIBUTES["message.send"].roles; // 認可は表を引く (分岐を書かない)
+opErrors("session.rename"); // その op が返しうるコード
 ```
 
 ## ドキュメント

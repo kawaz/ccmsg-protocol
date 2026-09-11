@@ -20,8 +20,8 @@ bun add @ccmsg/protocol
 import { isValid, MessageSendRequest, OP_ATTRIBUTES, opErrors } from "@ccmsg/protocol";
 
 isValid(MessageSendRequest, incoming); // validating the wire is the contract's job
-OP_ATTRIBUTES.message_send.roles; // authorization reads the table, not a branch
-opErrors("session_rename"); // the codes this op may answer with
+OP_ATTRIBUTES["message.send"].roles; // authorization reads the table, not a branch
+opErrors("session.rename"); // the codes this op may answer with
 ```
 
 ## Documentation
