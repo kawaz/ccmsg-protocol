@@ -88,7 +88,7 @@ op が要り、そのために daemon が送信済み索引を持つことにな
 |---|---|
 | `plane` | 面の所属 |
 | `roles` | 呼べる role。外の role は `forbidden` |
-| `needs_hello` | 挨拶で identity が確定していることを要求するか。WS 接続で挨拶前に 許されるのは `hello.*` と `instance.ping` (到達確認は呼び手でなく instance について 答えるので identity を要さない)。HTTP で運ぶ 4 op は接続が存在する前に答えるので、そもそも送るべき挨拶が無い |
+| `needs_hello` | 挨拶で identity が確定していることを要求するか。WS 接続で挨拶前に許されるのは `hello.*` だけ (名乗らない呼び手に答えるものは無く、instance が居ることは接続が張れた時点で分かっている)。HTTP で運ぶ 4 op は接続が存在する前に答えるので、そもそも送るべき挨拶が無い |
 | `capability` | 必要な能力。挨拶が返した集合に無ければ `capability_unavailable` |
 | `locality` | `instance-local` な op は担当 instance へ転送。届かなければ `instance_unreachable` |
 | `scope` | role で「可否」でなく「応答の可視範囲」が変わる op に付く |

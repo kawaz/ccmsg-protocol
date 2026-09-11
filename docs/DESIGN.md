@@ -93,7 +93,7 @@ forwarding all read this table instead of each keeping their own copy of the sam
 |---|---|
 | `plane` | which face the op belongs to |
 | `roles` | who may call it; anyone else gets `forbidden` |
-| `needs_hello` | whether an identity settled by a greeting is required. On a WebSocket connection what may arrive before one is `hello.*` and `instance.ping`, a reachability check that answers about the instance rather than about the caller. The four ops carried over HTTP answer before any connection exists, so there is no greeting for them to have sent |
+| `needs_hello` | whether an identity settled by a greeting is required. On a WebSocket connection the only ops that may arrive before one are `hello.*`: a caller that will not say who it is has nothing to be answered, and that the instance is there is known once the connection was made. The four ops carried over HTTP answer before any connection exists, so there is no greeting for them to have sent |
 | `capability` | the capability it needs; absent from the set a greeting answered with means `capability_unavailable` |
 | `locality` | `instance-local` ops are forwarded to the owning instance, or answer `instance_unreachable` |
 | `scope` | present when the role changes what the reply may contain rather than whether the call is allowed |

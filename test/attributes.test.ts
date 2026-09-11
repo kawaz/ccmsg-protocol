@@ -65,7 +65,6 @@ describe("op attribute table", () => {
       "hello.instance",
       "hello.session",
       "hello.user",
-      "instance.ping",
     ]);
   });
 

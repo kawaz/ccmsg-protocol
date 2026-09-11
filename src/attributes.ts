@@ -19,10 +19,10 @@ export interface OpAttributes {
   readonly roles: readonly Role[];
   /** Whether the op requires an identity settled by a greeting.
    *
-   * On a WebSocket connection the ops that may arrive before one are the three
-   * greetings and `instance.ping` — a reachability check answers about the
-   * instance and not about the caller, so there is no identity for it to want.
-   * The ops carried over HTTP answer before any connection exists, which is
+   * On a WebSocket connection the only ops that may arrive before one are the
+   * three greetings: a caller that will not say who it is has nothing to be
+   * answered, and whether the instance is there is already known once the
+   * connection was made. The ops carried over HTTP answer before any connection exists, which is
    * what `carrier` says; `needs_hello` is false on them because there is no
    * greeting to have sent, not because they are open on a settled one. */
   readonly needs_hello: boolean;
@@ -90,7 +90,7 @@ export const OP_ATTRIBUTES = {
   "instance.ping": {
     plane: "common",
     roles: ALL_ROLES,
-    needs_hello: false,
+    needs_hello: true,
     locality: "cluster",
     errors: [],
   },
