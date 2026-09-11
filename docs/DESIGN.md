@@ -180,6 +180,11 @@ for one that was lost (`paused`, `disappeared`), which the presence of `stopped_
 separates. Being pinned is a mark a person put there rather than a classification, so it
 travels beside it as `pinned`.
 
+`protocol_version` on a `peers` row is the generation the row's own connection announced,
+so it is absent for a `live_unmanaged` row: such a row exists because an instance's state
+file names a session live with no connection at all, not because a client greeted it and
+was refused.
+
 There is one way in to `stopped_at`: `session_stopping`, by which a session states that it
 is about to stop, with the instance holding that declaration until the disconnection
 arrives so that the two are one event in that order. A session that goes without saying so

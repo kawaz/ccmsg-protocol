@@ -57,7 +57,7 @@ export const StaleClientInfo = Type.Object(
 );
 export type StaleClientInfo = Static<typeof StaleClientInfo>;
 
-/** One connected session.
+/** One session an instance can call live (connected or not).
  *
  * The paths are the host's, so the entry names the instance holding them:
  * `peers` carries every instance's sessions in one list, and two hosts' paths
@@ -122,10 +122,11 @@ export const PeerInfo = Type.Object(
     send_message: Type.Optional(Type.Boolean()),
     /** The build of the client that last greeted for this session. */
     client_version: Type.Optional(Type.String()),
-    /** The generation that client speaks. Always stated: a client that does not
-     * announce one is refused, so there is no connected session whose
-     * generation is a guess. */
-    protocol_version: Type.Integer({ minimum: 1 }),
+    /** The generation the connected client speaks. Absent from a row that has
+     * no connection to read one from — the instance's state file names such a
+     * session live without any client ever having greeted it, so there is no
+     * generation to state. */
+    protocol_version: Type.Optional(Type.Integer({ minimum: 1 })),
     /** Set while some client of this session is being refused. */
     stale_client: Type.Optional(StaleClientInfo),
   },

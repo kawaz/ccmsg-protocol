@@ -166,6 +166,10 @@ instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (
 `stopped_at` の有無ひとつ。Pinned は人が付けた印であって分類ではないので、`pinned` として
 分類の隣に置く。
 
+`peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、
+`live_unmanaged` の行では欠ける。この行は client が greet して拒まれたのではなく、
+instance の状態ファイルがそのセッションを接続なしで生きていると名乗っているだけだからだ。
+
 `stopped_at` が付く入口は `session_stopping` ひとつ。セッションが自分で「これから止まる」と
 宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは
 `disappeared` になる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で

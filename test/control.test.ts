@@ -1027,16 +1027,19 @@ describe("session observation topics", () => {
     ).toBe(true);
   });
 
-  test("a peer whose generation is a guess is refused", () => {
+  test("a live_unmanaged peer with no connection states no generation", () => {
     const { protocol_version: _dropped, ...unannounced } = peer;
     expect(
       isValid(PeersFrame, {
         ev: "topic",
         topic: "peers",
         instance: INSTANCE,
-        data: { peers: [unannounced], last_live: [] },
+        data: {
+          peers: [{ ...unannounced, state: "live_unmanaged" }],
+          last_live: [],
+        },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("an empty list is stated, not omitted", () => {

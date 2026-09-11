@@ -88,6 +88,14 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
           protocol_version: 2,
         },
       },
+      {
+        sid: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+        instance,
+        repo: "ccmsg",
+        ws: "daemon-v2",
+        cwd: "/repos/kawaz/ccmsg/daemon-v2",
+        state: "live_unmanaged",
+      },
     ],
     last_live: [
       {
