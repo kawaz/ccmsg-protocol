@@ -115,10 +115,20 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 | granularity | frame が持つもの | 購読側の畳み方 | snapshot | topic |
 |---|---|---|---|---|
 | `whole` | 値の全体 | 手元を丸ごと置換 | 有 | `session_status:<sid>` |
-| `per_instance_whole` | その `instance` が知る全体 | その instance の分だけ置換し、他 instance の行は残す (手元の値は instance 横断の和) | 有 | `peers` `agents` `session_errors` `llm_requests` `llm_status` |
-| `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `inbox` `kv:<ns>` `auth_records` |
+| `per_instance_whole` | その `instance` が知る全体 | その instance の分だけ置換し、他 instance の行は残す (手元の値は instance 横断の和) | 有 | `instances` `session_errors` `llm_requests` `llm_status` |
+| `element` | 変化した要素 | 要素の id で突き合わせて追加・更新。触れられなかった要素はそのまま。削除は印を付けた要素として届く (変化の一覧における不在は何も言わない) | 有 | `peers` `agents` `inbox` `kv:<ns>` `auth_records` |
 | `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` `transcript_items:<sid>` |
 | `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
+
+どれを取るかは、その値が何であるかから決まる。要素が独立して変化する (行の出入り・更新が別々の
+時刻に起きる) なら `element`。値が 1 つの塊として意味を持ち、一部だけが単独で更新されることが
+無いなら `whole`、その塊を instance ごとに持つなら `per_instance_whole`。増える一方なら
+`append`、値でなく出来事なら `event`。迷ったら「1 つの要素の変化で他の要素を送り直す理由が
+あるか」を問う。`peers` と `agents` はセッションの行の集まりで各行が別々に動くので、frame は
+変化した行だけを運ぶ。`instances` は 1 つの instance が自分の全リンクをまとめて読んだ結果
+なので、`peers` の行ではなく独立した topic にする。`session_errors` は instance が 1 つの
+error パターンを全セッションに畳んで導く集合、`llm_status` は 1 つの報告文書で、どちらも
+「一部だけが変わった」と分かる作りになっていない。
 
 `event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の
 発生から届く。`session_status` が instance ごとでなく全体置換なのは、1 セッションが 1
@@ -163,7 +173,9 @@ instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (
 一覧の分類 (`state`) は **instance が導いて行に載せる**。生の入力を返して client 側で
 組み立てると、instance ごとに解釈がずれる。語彙は接続中の 3 つ (`waiting` / `live` /
 `live_unmanaged`) と、失われた側の 2 つ (`paused` / `disappeared`) で、両者を分けるのは
-`stopped_at` の有無ひとつ。Pinned は人が付けた印であって分類ではないので、`pinned` として
+`stopped_at` の有無ひとつ。接続中と失われた側は 2 つの一覧ではなく同じ 1 種類の行で、
+セッションの登録や消失は同一性を保ったままの更新として、client が既に持つ行に届く。
+Pinned は人が付けた印であって分類ではないので、`pinned` として
 分類の隣に置く。
 
 `peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、
@@ -182,7 +194,7 @@ CLI がその代理になる。
 が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、では
 なく観測手段が無い)。
 
-未配送メッセージと last_live の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` /
+未配送メッセージと、失われたセッションの行の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` /
 `LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは
 「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。
 件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に
@@ -289,9 +301,8 @@ instance 間の認証は接続確立時 1 回で、`role: "instance"` の `hello
 で扱われ、instance-local op は属性表どおり `forbidden` になる。同じ instance を 2 度通る
 request は封筒の `hops` で落とし、ループさせない。
 
-mesh の断絶は購読からも見える。`peers` の frame は発生元 instance が見た instance 一覧
-(`instances`、`reachable` 付き) を任意で載せられるので、断絶を知るために `hello` を叩き直す
-必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは
+mesh の断絶は購読からも見える。`instances` topic が発生元 instance から見た mesh 一覧
+(`reachable` 付き) を運ぶので、断絶を知るために `hello` を叩き直す必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは
 正常にあり得る。
 
 ## 人の認証
@@ -377,7 +388,7 @@ credential record と token family は topic `auth_records` (`roles: ["instance"
 | 単位 | 数 | 内訳 |
 |---|---|---|
 | op | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
-| topic | 12 | messaging 2 (`inbox` / `notify`)、control 9、common 1 (`auth_records`) |
+| topic | 13 | messaging 2 (`inbox` / `notify`)、control 10、common 1 (`auth_records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 21 | 閉じた union |
 

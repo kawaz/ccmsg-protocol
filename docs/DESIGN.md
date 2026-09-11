@@ -122,10 +122,22 @@ local table of it.
 | granularity | What a frame carries | How a subscriber folds it | snapshot | Topics |
 |---|---|---|---|---|
 | `whole` | the whole value | replaces everything held | yes | `session_status:<sid>` |
-| `per_instance_whole` | the whole of what its `instance` knows | replaces that instance's entries and leaves every other instance's alone (what is held is the union across instances) | yes | `peers`, `agents`, `session_errors`, `llm_requests`, `llm_status` |
-| `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `inbox`, `kv:<ns>`, `auth_records` |
+| `per_instance_whole` | the whole of what its `instance` knows | replaces that instance's entries and leaves every other instance's alone (what is held is the union across instances) | yes | `instances`, `session_errors`, `llm_requests`, `llm_status` |
+| `element` | the elements that changed | matches on each element's own id and adds or updates; elements it does not mention are untouched, so a removal arrives as a marked element (an absence in a list of changes says nothing) | yes | `peers`, `agents`, `inbox`, `kv:<ns>`, `auth_records` |
 | `append` | what has been added since the last frame | appends, and never rewrites what is already there | yes | `transcript:<sid>`, `transcript_items:<sid>` |
 | `event` | an occurrence rather than a value | holds nothing | no | `notify` |
+
+Which one a topic takes follows from what its value is. Elements that change independently —
+rows that come, go and are updated at separate moments — take `element`. A value that means
+something only entire, where no part of it is ever updated alone, takes `whole`, or
+`per_instance_whole` when several instances each hold a part. A value that only ever grows takes
+`append`, and something that is an occurrence rather than a value takes `event`. The question
+that settles a doubtful case: is there a reason to restate one element because another changed?
+`peers` and `agents` are rows of sessions, each moving on its own, so a frame carries the rows
+that changed. `instances` is one instance's reading of all its links, taken together, which is
+why it is a topic of its own rather than a row of `peers`. `session_errors` is a set the
+instance derives whole by folding one error pattern over its sessions, and `llm_status` is one
+report document — neither has a part that is ever known to have changed by itself.
 
 Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence
 rather than a current state. `session_status` is whole rather than per instance because one
@@ -200,7 +212,7 @@ client reads recency against its own threshold. It is absent on an instance with
 configured, which means there is nothing observing inference, never that the session is
 quiet.
 
-The retention windows for undelivered messages and for the last-known list are values the
+The retention windows for undelivered messages and for the rows of lost sessions are values the
 contract holds (`INBOX_RETENTION_MS` and `LAST_LIVE_RETENTION_MS` of 7 days,
 `INBOX_MAX_PER_SID` of 256). What a person comes back to is one thing — the session and
 what was said to it — so the two cannot expire at different times. The count is matched to
@@ -320,10 +332,10 @@ dispatched as the role of the connection it arrived on (`instance`), which the a
 answers with `forbidden` for every instance-local op. A request that would pass through the
 same instance twice is dropped on the envelope's `hops` rather than looped.
 
-A broken link is visible from a subscription too. A `peers` frame may carry the sending
-instance's view of the instances (`instances`, each with `reachable`), so learning that a link
-went down does not mean greeting again to find out. Reachability is stated from the sender's
-position, so two instances legitimately disagreeing about one is not a fault.
+A broken link is visible from a subscription too. The `instances` topic carries the sending
+instance's view of the mesh, each entry with `reachable`, so learning that a link went down
+does not mean greeting again to find out. Reachability is stated from the sender's position, so
+two instances legitimately disagreeing about one is not a fault.
 
 ## Authenticating a person
 
@@ -419,7 +431,7 @@ absence in a list of changes says nothing.
 | Unit | Count | Breakdown |
 |---|---|---|
 | ops | 46 | common 13 / messaging 4 / control 29 / mesh 0 |
-| topics | 12 | messaging 2 (`inbox` / `notify`), control 9, common 1 (`auth_records`) |
+| topics | 13 | messaging 2 (`inbox` / `notify`), control 10, common 1 (`auth_records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | error codes | 21 | one closed union |
 
