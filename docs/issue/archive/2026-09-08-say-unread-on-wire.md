@@ -1,6 +1,6 @@
 ---
 title: say-unread-on-wire
-status: open
+status: discarded
 category: design
 created: 2026-09-08T23:15:03+09:00
 last_read:
@@ -8,9 +8,9 @@ open_entered: 2026-09-08T23:15:03+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
-discarded_entered:
+discarded_entered: 2026-09-13T23:33:44+09:00
 resolved_entered:
-discard_reason:
+discard_reason: ["kawaz 裁定 (2026-09-13): say は契約に載せない。`ccmsg say` は廃止し、ハーネスの PushNotification ツール + PostToolUse hook (発声 + notify.send) で置き換え (daemon v0.12.0)。TL での特別表示は分類器が tool.PushNotification を拾う。既読の印は人間用なので webui のローカル状態"]
 pending_reason:
 close_reason:
 blocked_by:
