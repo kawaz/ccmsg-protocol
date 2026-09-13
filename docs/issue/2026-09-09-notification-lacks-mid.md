@@ -33,9 +33,13 @@ webui (ccmsg-webui スライス 4) は人宛の返事を「transcript の `ccmsg
 2. 通知自身に `mid` を振るか (event 粒度で保持しないものに id が要るか)
 3. `say_post` 由来の通知との区別 (`kind`) を持たせるか
 
+## 裁定 (kawaz 2026-09-13)
+
+`reply_to` (どの item への返事かの鍵) を notify の frame に optional で足す。通知の種別 (`kind`) は持たない。契約 minor A で入れる (locality の改名 any_instance / owner_instance、transcript snapshot の liveness 否定の 1 文、dump の format 引数と同梱)。
+
 ## 受け入れ条件
 
-- [ ] 上記 3 論点それぞれについて採否を決める
+- [x] 上記 3 論点それぞれについて採否を決める (論点1: 採用 / 論点2: 見送り、通知自身の id は持たない / 論点3: 見送り、`kind` は持たない)
 - [ ] 採用した設計で webui が transcript 到着後に対応する通知を確実に消せることを確認する
 
 ## TODO
