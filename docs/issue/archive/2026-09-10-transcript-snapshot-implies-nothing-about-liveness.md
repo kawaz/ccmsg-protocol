@@ -1,6 +1,6 @@
 ---
 title: transcript:<sid> の snapshot が返ることの意味を契約 DESIGN に明記するか
-status: open
+status: resolved
 category: design
 created: 2026-09-10T14:01:24+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered:
-resolved_entered:
+resolved_entered: 2026-09-14T00:48:07+09:00
 discard_reason:
 pending_reason:
-close_reason:
+close_reason: ["契約 1.23.0 の DESIGN (観測系の節) に「transcript の snapshot は購読時点のファイル末尾を述べるだけで稼働中を含意しない、稼働中かどうかは peers が言う」を明記","done"]
 blocked_by:
 origin: kawaz/ccmsg
 ---
