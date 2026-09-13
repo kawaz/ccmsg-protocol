@@ -1,6 +1,6 @@
 ---
 title: inbox topic が user role へ配送されず、要素の削除印も表現できない
-status: open
+status: resolved
 category: design
 created: 2026-09-09T18:58:11+09:00
 last_read:
@@ -9,10 +9,10 @@ wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered: 2026-09-13T23:33:39+09:00
-resolved_entered:
+resolved_entered: 2026-09-14T00:46:58+09:00
 discard_reason: ["統括の誤読で discard していた。kawaz 裁定 (2026-09-13) は a: 人 (webui) は inbox を読める(読んでも配送済みの印は付かない、閲覧)。用途 = セッション宛に送ったがまだ届いていないメッセージをTLに未到達と分かる印付きで出し、届いた(inboxから消えた)ら通常のitemに置き換える。契約: (1) 人の読みは副作用なしの閲覧、をtopicの規約に明記(sessionの読みは配送)、(2) 削除(配送済み/失効/溢れ)をelementの印として流す。契約minor Aに同梱。"]
 pending_reason:
-close_reason:
+close_reason: ["done:契約 1.23.0 で InboxFrame の doc/DESIGN に人の読み=閲覧・session の読み=配送を明記", "done:InboxMessage.to(optional)、InboxRemoved{mid,removed:true,reason:delivered|expired|dropped}、InboxElement union を契約に追加", "implemented:daemon v0.13.0 (人の購読は sid 絞り込み無しの閲覧、消える3経路でInboxRemovedをpublish)", "implemented:webui v0.18.0 (未到達の印付き表示、deliveredで置き換え、expired/dropped は印)", "kawaz裁定a、2026-09-13"]
 blocked_by:
 origin: ccmsg (webui スライス 6 での実機観測)
 ---
