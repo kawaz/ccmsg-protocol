@@ -10,7 +10,6 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | 2026-09-10 | design | open | [transcript-snapshot-implies-nothing-about-liveness](./2026-09-10-transcript-snapshot-implies-nothing-about-liveness.md) | transcript:<sid> の snapshot が返ることの意味を契約 DESIGN に明記するか |
 | 2026-09-10 | design | open | [schema-library-choice-record](./2026-09-10-schema-library-choice-record.md) | TypeBox (JSON Schema) 採用根拠が記録されていない |
 | 2026-09-09 | design | open | [passkey-list-for-people](./2026-09-09-passkey-list-for-people.md) | 人 (webui) が自分の passkey 一覧を見て保守する op が契約に無い |
-| 2026-09-09 | design | open | [file-read-paging-and-external-listing](./2026-09-09-file-read-paging-and-external-listing.md) | webui Files タブが file_read paging と外部ファイル列挙を契約で表現できない |
 | 2026-09-09 | design | open | [notification-lacks-mid](./2026-09-09-notification-lacks-mid.md) | notify Notification に reply_to (mid) が無く webui が返事の重複表示を消せない |
 | 2026-09-09 | design | open | [session-status-partial-marker](./2026-09-09-session-status-partial-marker.md) | daemon v2 の fold は末尾 1 MiB seed のため累積フィールドが窓から落ちて消える |
 

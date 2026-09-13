@@ -1,6 +1,6 @@
 ---
 title: webui Files タブが file_read paging と外部ファイル列挙を契約で表現できない
-status: open
+status: discarded
 category: design
 created: 2026-09-09T18:33:36+09:00
 last_read:
@@ -8,9 +8,9 @@ open_entered: 2026-09-09T18:33:36+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
-discarded_entered:
+discarded_entered: 2026-09-13T23:34:28+09:00
 resolved_entered:
-discard_reason:
+discard_reason: ["discarded: kawaz 裁定(2026-09-13)。paging は頼んでいない保守的案のため取り下げ(ファイルは全文読み、大きければビューアへ)。外部ファイル列挙は契約の session.status の external_files で足りるため契約変更なし"]
 pending_reason:
 close_reason:
 blocked_by:
