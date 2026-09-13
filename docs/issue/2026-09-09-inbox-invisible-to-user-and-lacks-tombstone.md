@@ -1,16 +1,16 @@
 ---
 title: inbox topic が user role へ配送されず、要素の削除印も表現できない
-status: discarded
+status: open
 category: design
 created: 2026-09-09T18:58:11+09:00
 last_read:
-open_entered: 2026-09-09T18:58:11+09:00
+open_entered: 2026-09-13T23:38:00+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
 discarded_entered: 2026-09-13T23:33:39+09:00
 resolved_entered:
-discard_reason: ["kawaz 裁定 (2026-09-13): 人が inbox を読む機能は要らない (現状維持、session だけが読む)"]
+discard_reason: ["統括の誤読で discard していた。kawaz 裁定 (2026-09-13) は a: 人 (webui) は inbox を読める(読んでも配送済みの印は付かない、閲覧)。用途 = セッション宛に送ったがまだ届いていないメッセージをTLに未到達と分かる印付きで出し、届いた(inboxから消えた)ら通常のitemに置き換える。契約: (1) 人の読みは副作用なしの閲覧、をtopicの規約に明記(sessionの読みは配送)、(2) 削除(配送済み/失効/溢れ)をelementの印として流す。契約minor Aに同梱。"]
 pending_reason:
 close_reason:
 blocked_by:
@@ -32,8 +32,12 @@ origin: ccmsg (webui スライス 6 での実機観測)
 snapshot も delta も来ない。`peers` 行にも未配送件数は無い。人が「ある
 セッション宛の未配送」を見る経路が世代 2 に存在しない。
 
-論点: `inbox` に `scope: "role"` を付け、user は全 sid の未配送 (`sid`
-付き) を見る / session は自分宛だけ、と契約に書くか。
+**kawaz 裁定 (2026-09-13)**: 人 (webui) は inbox を読める。ただし人の読みは
+**副作用なしの閲覧** (読んでも配送済みの印は付かない)。session の読みは
+これまで通り配送 (読むと配送済みになる)。用途は「セッション宛に送ったが
+まだ届いていないメッセージを、TL に未到達と分かる印付きで出し、届いた
+(inbox から消えた) ら通常の item に置き換える」こと。この非対称
+(人=閲覧 / session=配送) を topic の規約に明記する。
 
 **(2) element 粒度なのに削除印を運ぶ場所が schema に無い**
 
@@ -56,9 +60,10 @@ ccmsg-webui のスライス 6 実装中に、webui (user role 接続) から
 
 ## 受け入れ条件
 
-- [ ] `inbox` topic の user role 配送経路について契約上の扱いを決定する
-      (`scope: "role"` を追加するか、別の設計を採るか)
-- [ ] `InboxMessage` schema に削除印 (tombstone 相当) を追加するか、
-      `inbox` の粒度を `per_instance_whole` に変更するか決定する
+- [ ] topic の規約に「人の読みは副作用なしの閲覧、session の読みは配送」
+      という非対称を明記する
+- [ ] `InboxMessage` (element) に削除印を追加し、配送済み / 失効 / 溢れ
+      による削除を element の印として流せるようにする
 - [ ] 決定を契約書 (TOPIC_ATTRIBUTES / schema) に反映し、daemon 実装
       (`delivery.ts`) と整合させる
+- [ ] 契約 minor A に同梱する
