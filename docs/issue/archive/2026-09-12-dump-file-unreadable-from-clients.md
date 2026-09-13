@@ -1,6 +1,6 @@
 ---
 title: dump-file-unreadable-from-clients
-status: open
+status: discarded
 category: design
 created: 2026-09-12T20:22:49+09:00
 last_read:
@@ -8,9 +8,9 @@ open_entered: 2026-09-12T20:22:49+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
-discarded_entered:
+discarded_entered: 2026-09-13T23:35:15+09:00
 resolved_entered:
-discard_reason:
+discard_reason: ["kawaz 裁定 (2026-09-13): dump は外部利用の道具で、webui から中身を読む必要は無い (path と型ごとの件数を出すだけ)"]
 pending_reason:
 close_reason:
 blocked_by:
