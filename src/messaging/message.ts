@@ -89,10 +89,56 @@ export const InboxMessage = Type.Object(
     text: Type.String(),
     reply_to: Type.Optional(Mid),
     sent_at: Timestamp,
+    /** Who it is addressed to. A session's own subscription is already the
+     * recipient, so a row reaching one says nothing by repeating it; a person
+     * holds the inbox of every session in one subscription, and a row that
+     * does not name its recipient cannot be placed against any of them. So the
+     * instance states it on the rows it answers a person with. */
+    to: Type.Optional(Sid),
   },
   { $id: "InboxMessage" },
 );
 export type InboxMessage = Static<typeof InboxMessage>;
+
+/** Why a message is no longer in the inbox.
+ *
+ * The three are apart because they are three different things to have happened
+ * to a message, and a reader watching for one it sent draws each differently:
+ * `delivered` means the recipient has it and its own account of it follows,
+ * while the other two mean it never arrived and never will. A removal with no
+ * reason would leave a waiting message and an abandoned one looking alike. */
+export const InboxRemovedReason = Type.Union(
+  [
+    /** Handed to the recipient. */
+    Type.Literal("delivered"),
+    /** `INBOX_RETENTION_MS` ran out with the recipient never taking it. */
+    Type.Literal("expired"),
+    /** Dropped, oldest first, to take a newer message into a full inbox —
+     * the same event the newer message's sender was told as `inbox_full`. */
+    Type.Literal("dropped"),
+  ],
+  { $id: "InboxRemovedReason" },
+);
+export type InboxRemovedReason = Static<typeof InboxRemovedReason>;
+
+/** A message that has left the inbox.
+ *
+ * A removal has to be a marked element rather than an absence, since a frame
+ * carries only what changed and an absence in it says nothing. It names the
+ * `mid` every row is matched by, and why — there is no message left to
+ * describe, and the reason is the one thing the reader cannot derive. */
+export const InboxRemoved = Type.Object(
+  {
+    mid: Mid,
+    removed: Type.Literal(true),
+    reason: InboxRemovedReason,
+  },
+  { $id: "InboxRemoved" },
+);
+export type InboxRemoved = Static<typeof InboxRemoved>;
+
+export const InboxElement = Type.Union([InboxMessage, InboxRemoved], { $id: "InboxElement" });
+export type InboxElement = Static<typeof InboxElement>;
 
 /** How long an undelivered message is kept for its recipient. The same window
  * a lost session stays listed for: a message outliving the session it was
@@ -106,6 +152,21 @@ export const INBOX_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
  * accepts is one the recipient can still be handed. */
 export const INBOX_MAX_PER_SID = 256;
 
-/** The `inbox` topic. Its snapshot is whatever is still undelivered for this
- * session; each later frame is one newly arrived message. */
-export const InboxFrame = topicFrame("inbox", Type.Array(InboxMessage));
+/** The `inbox` topic: what is waiting, for whoever may see it.
+ *
+ * Elements, matched by `mid`. The snapshot is what is still undelivered and
+ * each later frame is what changed — a message arriving, or one leaving as an
+ * `InboxRemoved`.
+ *
+ * **A session's subscription is the delivery and a person's is a view.** What
+ * the session is handed it has been given, and the message leaves its inbox;
+ * what a person reads leaves the inbox exactly as it was, because a person is
+ * not who any of it was addressed to. The asymmetry is the point rather than an
+ * exception: without the view there is no way to see that something sent is
+ * still waiting, and a view that consumed what it looked at would deliver
+ * messages to no one by being opened.
+ *
+ * A person therefore sees a message twice over: waiting here, and afterwards in
+ * the recipient's own transcript. `mid` is what joins the two, and the removal
+ * marked `delivered` is what says the second is coming. */
+export const InboxFrame = topicFrame("inbox", Type.Array(InboxElement));

@@ -33,6 +33,7 @@ import {
   FIXTURE_IDS,
   HELLO_INSTANCE_REQUEST,
   HELLO_USER_REQUEST,
+  INBOX_REMOVED_FRAME,
   MESSAGE_SEND_FORWARDED_REQUEST,
   MESSAGE_SEND_HELD_RESPONSE,
   OP_FIXTURES,
@@ -93,6 +94,7 @@ describe("the fixtures cover the contract", () => {
     ],
     ["a forwarded send", MessageSendRequest, MESSAGE_SEND_FORWARDED_REQUEST],
     ["a send nobody took", MessageSendResponse, MESSAGE_SEND_HELD_RESPONSE],
+    ["messages that have left an inbox", InboxFrame, INBOX_REMOVED_FRAME],
     ["a transcript's opening frame", TOPIC_SCHEMAS.transcript, TRANSCRIPT_SIZE_FRAME],
     ["a token family", AuthRecordsFrame, AUTH_RECORDS_FAMILY_FRAME],
     ["a removal", AuthRecordsFrame, AUTH_RECORDS_TOMBSTONE_FRAME],
@@ -501,8 +503,29 @@ describe("retention", () => {
 
 describe("topic frames", () => {
   test("a message a person sent names them as the sender", () => {
-    const senders = TOPIC_FIXTURES.inbox.data.map((message) => message.from);
+    const senders = TOPIC_FIXTURES.inbox.data.flatMap((element) =>
+      "removed" in element ? [] : [element.from],
+    );
     expect(senders).toContain("user");
+  });
+
+  test("a message that left the inbox names the mid it is matched by, and why", () => {
+    const [delivered] = INBOX_REMOVED_FRAME.data;
+    expect(delivered).toEqual({ mid: delivered.mid, removed: true, reason: "delivered" });
+  });
+
+  test("a removal without its reason is refused — waiting and abandoned would look alike", () => {
+    const [{ mid }] = INBOX_REMOVED_FRAME.data;
+    expect(isValid(InboxFrame, { ...INBOX_REMOVED_FRAME, data: [{ mid, removed: true }] })).toBe(
+      false,
+    );
+  });
+
+  test("a removal that is not marked is refused — an absence would say nothing", () => {
+    const [{ mid }] = INBOX_REMOVED_FRAME.data;
+    expect(
+      isValid(InboxFrame, { ...INBOX_REMOVED_FRAME, data: [{ mid, reason: "delivered" }] }),
+    ).toBe(false);
   });
 
   test("a sender that is neither a sid nor the person is refused", () => {

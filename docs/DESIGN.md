@@ -40,6 +40,12 @@ A notification may name the `mid` it answers (`reply_to`). One answer reaches a 
 
 A message that was not handed over right away has not failed. The reply says it went to the inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh, out of inbox room, or not taking anything at the moment), so the sender can choose between waiting and addressing another session.
 
+**A person may read the inbox, and a person reading it hands nothing over.** The `inbox` topic is one subscription with two meanings: what a session is sent it has been given, and the message leaves its inbox; what a person reads leaves the inbox as it was, because a person is not who any of it was addressed to. The asymmetry is what makes the view possible at all — a view that consumed what it looked at would deliver messages to no one by being opened — and without it nothing can see that something sent is still waiting. It is stated on the frame rather than as an attribute beside `granularity`: it is not how a frame folds and not who may subscribe, and a subscriber does the same thing with what arrives whichever it is.
+
+A person holds every session's inbox in that one subscription, so a row there says `to`, the session it is addressed to. A session's own subscription is already the recipient and its rows need not repeat it.
+
+Messages leave the inbox, and a removal is an element marked `removed: true` naming the `mid` it is matched by and **why it left** — `delivered`, `expired`, or `dropped` to make room for a newer message in a full inbox. The reason is what a watcher cannot derive and the one thing it draws differently: `delivered` says the recipient has it and its own account of it follows, where the other two say it never arrived and never will. A person therefore sees one message twice over — waiting here, then in the recipient's transcript — and `mid` is what joins the two.
+
 ## Wording a message handed over directly
 
 One recipient cannot read the delivery frame. It is the route that writes into the harness's own messaging socket: there the recipient is the model rather than a client, and what arrives is one block of text. With no frame to look at, **a message without `mid` and `from` in its body cannot be answered** — the recipient knows something came and not what to answer or how. So this one wording belongs to the contract (`renderDirectDelivery` / `parseDirectDelivery`).

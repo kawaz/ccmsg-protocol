@@ -29,6 +29,7 @@ export const INBOX_FRAME: Static<typeof InboxFrame> = {
       from_label: "contract-fixtures",
       text: "fixture を export した",
       sent_at: FIXTURE_NOW,
+      to: sid,
     },
     {
       mid: `${instance}/1842`,
@@ -37,7 +38,20 @@ export const INBOX_FRAME: Static<typeof InboxFrame> = {
       text: "確認する",
       reply_to: mid,
       sent_at: FIXTURE_NOW + 1_000,
+      to: sid,
     },
+  ],
+};
+
+/** A later frame, where one message has been handed over and another was never
+ * taken. */
+export const INBOX_REMOVED_FRAME: Static<typeof InboxFrame> = {
+  ev: "topic",
+  topic: "inbox",
+  instance,
+  data: [
+    { mid, removed: true, reason: "delivered" },
+    { mid: `${instance}/1842`, removed: true, reason: "expired" },
   ],
 };
 

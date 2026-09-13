@@ -93,6 +93,12 @@ export interface TopicAttributes {
  * `forbidden`, and one naming a capability the instance lacks answers
  * `capability_unavailable`. */
 export const TOPIC_ATTRIBUTES = {
+  // The one topic where the same subscription means two things: a session is
+  // handed what was addressed to it, so what it reads leaves its inbox, while a
+  // person is looking at somebody else's mail and reading it moves nothing.
+  // Stated on the frame rather than as an attribute here — it is not a fold and
+  // not an authorization, and a subscriber does the same thing with the frames
+  // whichever it is.
   inbox: { roles: ["session", "user"], granularity: "element" },
   notify: { roles: ["session", "user"], granularity: "event" },
   // A row here changes on its own — one session becomes busy while the rest
