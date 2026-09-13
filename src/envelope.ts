@@ -62,7 +62,7 @@ export const RequestEnvelope = Type.Object(
      *
      * A forwarded request that names none is dispatched as the `instance` role
      * it arrived on, which the attribute table already answers: an
-     * instance-local op called by an instance is `forbidden`. */
+     * an `owner_instance` op called by an instance is `forbidden`. */
     caller: Type.Optional(CallerIdentity),
   },
   { $id: "RequestEnvelope" },

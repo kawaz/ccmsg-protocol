@@ -7,8 +7,8 @@ export type InstancePingArgs = Static<typeof InstancePingArgs>;
 
 /** How the answering daemon process is running.
  *
- * This is about one process, which is why the op is instance-local: the health
- * of the cluster is `hello`'s `instances[]`, not a ping fanned out. */
+ * This is about one process, which is why the op is `owner_instance`: the health
+ * of the mesh is `hello`'s `instances[]`, not a ping fanned out. */
 export const InstancePingResult = Type.Object({
   instance: InstanceId,
   version: Type.String(),

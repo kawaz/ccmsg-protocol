@@ -7,7 +7,7 @@ import { InstanceId, Mid, Sender, Sid, Timestamp } from "../identifiers.ts";
  * These are not errors: the op succeeded and the message is held in the
  * recipient's inbox. They tell the sender what to do next — wait, resend to
  * another session, or give up. The op itself fails only when `to` names no
- * session anywhere in the cluster (`session_not_found`). */
+ * session anywhere in the mesh (`session_not_found`). */
 export const UndeliveredReason = Type.Union(
   [
     /** Alive, but not yet listening. The daemon delivers when it starts. */

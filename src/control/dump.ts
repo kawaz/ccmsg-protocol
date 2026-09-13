@@ -576,7 +576,28 @@ export type DumpIdEntry = Static<typeof DumpIdEntry>;
 export const DumpIds = Type.Array(DumpIdEntry, { $id: "DumpIds" });
 export type DumpIds = Static<typeof DumpIds>;
 
-/** The file a dump is written to.
+/** How the selected items are written out.
+ *
+ * The selection is one thing and its rendering another: which items a dump is
+ * of follows from the range and the `types`, and a format decides only what the
+ * file then says about them. So all three are dumps of the same items, and the
+ * reply describes that selection whichever was asked for.
+ *
+ * `items` is this contract's own vocabulary, the typed items as
+ * `SessionDumpFile`. `records` writes the transcript records those items were
+ * read from, unchanged, one JSON document per line — for a tool that already
+ * reads the harness's file and wants the classifying alone, which is why
+ * nothing of ours is added around them. An item names its record, so several
+ * items out of one record are one record here and the line count is not the
+ * item count. `text` renders the items for a person to read. */
+export const SessionDumpFormat = Type.Union(
+  [Type.Literal("items"), Type.Literal("records"), Type.Literal("text")],
+  { $id: "SessionDumpFormat" },
+);
+export type SessionDumpFormat = Static<typeof SessionDumpFormat>;
+
+/** The file an `items` dump is written to. The other two formats are not this
+ * shape: `records` is the harness's own lines and `text` is prose.
  *
  * The reply to a dump names a path rather than carrying the items, so the file
  * is where they actually travel — which makes its shape as much a part of the

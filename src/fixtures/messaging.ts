@@ -75,6 +75,7 @@ export const NOTIFY_SEND_REQUEST: Static<typeof NotifySendRequest> = {
   op: "notify.send",
   sid,
   text: "確認して",
+  reply_to: mid,
 };
 
 export const NOTIFY_SEND_RESPONSE: Static<typeof NotifySendResponse> = {

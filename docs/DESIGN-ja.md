@@ -36,6 +36,8 @@ messaging は会話の器 (room) を持たない。宛先は sid ひとつで、
 
 宛先は sid だが、**送信者は sid とは限らない**。`message.send` を呼べるのは session と user の両 role で、人 (webui) は sid を持たない。だから `from` は `Sender` = `Sid | "user"` で、リテラルを置くのは「人が送った」と「セッションが送って id が落ちた」を読み分けさせるため (省略にすると区別できない)。既存の sid 値はそのまま通る。`user` 宛には送り返せないので、人への返信をどう届けるかは instance の裁量に置く。
 
+notify は答えた相手の `mid` を名乗ってよい (`reply_to`)。1 つの返事は人のところへ 2 度届く — notify として、そして少し遅れて正本であるセッションの transcript として — ので、両方を持つ読み手に「これは同じ 1 つだ」と言う鍵が無いと、同じ返事が 2 つ並ぶ。名乗るのは「何に答えたか」だけで、通知の種別は持たない。通知は誰から来ても通知ひとつで、種別を持たせると描き分ける理由として読まれる。
+
 即時配送されなかった送信は失敗ではない。応答は inbox に積んだことと、その理由 (相手が準備中 / Paused / 消えている / instance に届かない / inbox が一杯 / 相手が今は受け取らない) を返し、送信側が待つか別セッションへ送り直すかを選べるようにする。
 
 ## 直送時の本文表現
@@ -58,7 +60,7 @@ messaging は会話の器 (room) を持たない。宛先は sid ひとつで、
 | `roles` | 呼べる role。外の role は `forbidden` |
 | `needs_hello` | 挨拶で identity が確定していることを要求するか。WS 接続で挨拶前に許されるのは `hello.*` だけ (名乗らない呼び手に答えるものは無く、instance が居ることは接続が張れた時点で分かっている)。HTTP で運ぶ 4 op は接続が存在する前に答えるので、そもそも送るべき挨拶が無い |
 | `capability` | 必要な能力。挨拶が返した集合に無ければ `capability_unavailable` |
-| `locality` | `instance-local` な op は担当 instance へ転送。届かなければ `instance_unreachable` |
+| `locality` | `owner_instance` な op は対象を持つ instance へ転送し、届かなければ `instance_unreachable`。`any_instance` な op は聞かれた instance がそのまま答える |
 | `scope` | role で「可否」でなく「応答の可視範囲」が変わる op に付く |
 | `carrier` | WS の frame でなく HTTP で運ぶ op に付く。誰が呼べるかは carrier では決まらない (下記) |
 | `errors` | その op に固有のコード |
@@ -85,11 +87,13 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 
 `event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の発生から届く。`session.status` が instance ごとでなく全体置換なのは、1 セッションが 1 instance にしか居らず、他 instance の分を残す必要が無いため。
 
+**snapshot が言うのは「今の手元の値」だけで、何かが動き続けていることは一切含意しない。** `transcript:<sid>` は購読した時点のファイル末尾を返し、それは二度と追記されないファイルでも、今まさに書かれているファイルでも同じように返る。購読側はその `size` を読み始める位置として使い、それ以上の意味を読み取らない。セッションが稼働中かどうかを言うのは `peers` の側。
+
 ## 共有 kv
 
 control 面に namespace 付きの kv (`kv.read` / `kv.write` / `kv.delete`) がある。契約が約束するのは **ns 内で key が一意**なことだけで、`value` は任意の JSON、意味は書き手と読み手のものになる。
 
-kv だけは control 面で唯一 `locality: cluster`。値は特定の instance ではなくクラスタが持つので、どの instance に聞いても答えられる。instance 間のミラーは daemon の責務で、食い違った時は `updated_at` の新しい方が残る。だから書き込みは `updated_at` を明示でき、届かなかった間に書かれた値が後から実際の時刻のまま合流できる。
+kv だけは control 面で唯一 `locality: any_instance`。値は特定の instance ではなく mesh 全体が持つので、どの instance に聞いても答えられる。instance 間のミラーは daemon の責務で、食い違った時は `updated_at` の新しい方が残る。だから書き込みは `updated_at` を明示でき、届かなかった間に書かれた値が後から実際の時刻のまま合流できる。
 
 topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapshot は ns の全 entry、以後の frame は変化した entry で、**削除は `deleted: true` を付けた entry として届く** (変化の一覧における不在は何も言わないため)。ns が topic 名の一部になるので、ns は識別子に限る (key は人が打った文字列を許し、長さと制御文字だけを縛る)。
 
@@ -147,6 +151,8 @@ transcript は harness が自分の都合で書くファイルで、ccmsg の合
 
 dump の返答は path を返すだけで item を運ばないので、**item が実際に travel するのは file の側**になる。だから file の形も契約が持つ (`SessionDumpFile`: `sid` / `agent_id?` / `written_at` / 適用後の `types` / `items` / `ids` の JSON)。path を渡された後継セッションや、それを取りに行く client が、どこにも書かれていない形式を読むことになるのを避けるため。file が依頼内容を繰り返し持つのは、file が依頼より長生きするから — 何の dump で何を落としたかを、file 自身が言えなければならない。
 
+`format` が決めるのは「選ばれた item について file が何を書くか」だけで、どの item が選ばれるかには関与しない。`items` は上の `SessionDumpFile` そのもので、`format` を省いた時の意味でもある。`records` は選ばれた item の元になった transcript の record を無加工のまま 1 行 1 JSON で書く — harness のファイルを既に読める外部ツールに、この契約の分類だけを貸す形式なので、こちら側の包みを何も付けない。1 record から複数 item が出た分はそこでは 1 record なので、行数は item 数と一致しない。`text` は人が読む描画。応答の `entries` と `ids` はどの形式でも「選ばれた item」について述べる — 呼び手が頼んだのはその選択で、結果もそれに対して読むものなので、描画で数が動くと毎回別の問いに答えることになる。
+
 ## 送る側が守る上限
 
 守れるのが送る側だけの上限は、契約が値として持つ。相手だけが知っている上限は、超えた時に「なぜ落ちたか」を送信側が読み取れないため。
@@ -169,7 +175,7 @@ route は endpoint の**下**にあり、endpoint の一部ではない: WS は 
 
 instance 間の認証は接続確立時 1 回で、`hello.instance` がその起点になる。mesh は自分の op を持たず、入口はこの挨拶ひとつで、以降 instance をまたぐのは封筒の mesh フィールドを載せた同じ op である (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint — 信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance` の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に束縛済みの id を名乗る hello は新しく来た側を閉じる (既存の束縛を優先する)。手順の正本は daemon リポの decisions にある mesh peer 認証の項。
 
-転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら `sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の主張だけ — 転送元は認証済み peer なので「誰が呼んだか」の申告は信じる、という 1 deployment 内でだけ成り立つ前提に立つ。`caller` の無い転送 request は接続そのものの role (`instance`) で扱われ、instance-local op は属性表どおり `forbidden` になる。同じ instance を 2 度通る request は封筒の `hops` で落とし、ループさせない。
+転送された request の認可は転送先が全段やり直す。封筒の `caller` (`role` と、session なら `sid`) が dispatch の identity で、転送元の認可結果は引き継がない。信じるのは identity の主張だけ — 転送元は認証済み peer なので「誰が呼んだか」の申告は信じる、という 1 deployment 内でだけ成り立つ前提に立つ。`caller` の無い転送 request は接続そのものの role (`instance`) で扱われ、`owner_instance` の op は属性表どおり `forbidden` になる。同じ instance を 2 度通る request は封筒の `hops` で落とし、ループさせない。
 
 mesh の断絶は購読からも見える。`instances` topic が発生元 instance から見た mesh 一覧 (`reachable` 付き) を運ぶので、断絶を知るために挨拶をやり直す必要が無い。`reachable` は発生元から見た可達性なので、2 つの instance が食い違うことは正常にあり得る。
 
@@ -198,7 +204,7 @@ credential record は登録時の authenticator data の BE / BS フラグ (`bac
 残り 3 op:
 
 - `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、切らずに延ばす
-- `auth.resolve` / `auth.rotate` は instance 間 (`roles: ["instance"]`、`locality: instance-local`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず `last_refresh` に書く (自分で観測した値と同じ扱い)
+- `auth.resolve` / `auth.rotate` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず `last_refresh` に書く (自分で観測した値と同じ扱い)
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
 

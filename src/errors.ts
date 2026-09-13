@@ -35,14 +35,14 @@ export const ERROR_CODES = [
   "invalid_args",
   /** The op declares a `capability` this instance does not have. */
   "capability_unavailable",
-  /** An `instance-local` op could not be forwarded to the instance that owns
+  /** An `owner_instance` op could not be forwarded to the instance that owns
    * the subject. */
   "instance_unreachable",
   // --- subscription ---
   /** The topic name is not one this protocol generation defines. */
   "topic_unknown",
   // --- subject lookup ---
-  /** The `sid` names no session anywhere in the cluster. */
+  /** The `sid` names no session anywhere in the mesh. */
   "session_not_found",
   /** The path, transcript, or record named by the arguments does not exist. */
   "not_found",
@@ -66,7 +66,7 @@ export const ERROR_CODES = [
    * and `msg` says no more than the instance's own log would want. */
   "auth_invalid",
   /** The instance that issued the challenge or registration, and alone can
-   * spend it, is not one this cluster knows or could reach just now. The client
+   * spend it, is not one this mesh knows or could reach just now. The client
    * asks for a fresh one, which the instance it is talking to can issue. */
   "auth_unknown_issuer",
   // --- translate ---

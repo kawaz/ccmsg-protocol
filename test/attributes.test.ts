@@ -91,7 +91,9 @@ describe("op attribute table", () => {
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
-    const anywhere = opsOfPlane("control").filter((op) => OP_ATTRIBUTES[op].locality === "cluster");
+    const anywhere = opsOfPlane("control").filter(
+      (op) => OP_ATTRIBUTES[op].locality === "any_instance",
+    );
     expect(anywhere.sort()).toEqual(["kv.delete", "kv.read", "kv.write"]);
   });
 

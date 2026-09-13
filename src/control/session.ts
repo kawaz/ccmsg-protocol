@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
 import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
-import { DumpIds, TranscriptItemSelector, TranscriptItemType } from "./dump.ts";
+import { DumpIds, SessionDumpFormat, TranscriptItemSelector, TranscriptItemType } from "./dump.ts";
 
 /** Ends the OS process behind a session.
  *
@@ -203,6 +203,8 @@ export const SessionDumpWriteArgs = Type.Object({
   /** Leave out the machinery of in-process agents, which
    * `["-message.sub", "-tool.Agent"]` also says. */
   no_agent: Type.Optional(Type.Boolean()),
+  /** What the file says about the items selected. Absent is `items`. */
+  format: Type.Optional(SessionDumpFormat),
 });
 export type SessionDumpWriteArgs = Static<typeof SessionDumpWriteArgs>;
 
@@ -210,12 +212,18 @@ export const SessionDumpWriteResult = Type.Object({
   /** Absolute path on the writing instance's host. */
   path: Type.String(),
   instance: InstanceId,
-  /** How many items of each type were written, keyed by type name. A single
+  /** How many items of each type were selected, keyed by type name. A single
    * total leaves the caller unable to tell a dump that kept what it asked for
-   * from one whose selection matched almost nothing. */
+   * from one whose selection matched almost nothing.
+   *
+   * It counts items and not what the file holds, whatever the `format`: the
+   * selection is what a caller asked for and what it reads this against, and a
+   * count that moved with the rendering would answer a different question each
+   * time. */
   entries: Type.Record(TranscriptItemType, Type.Integer({ minimum: 0 })),
   /** The ids those items carried, so the next dump — of an agent named here —
-   * can be asked for without opening the file. */
+   * can be asked for without opening the file. Read off the selection like
+   * `entries`, whatever the `format`. */
   ids: DumpIds,
   bytes: Type.Integer({ minimum: 0 }),
 });

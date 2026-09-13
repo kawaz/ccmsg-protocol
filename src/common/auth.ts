@@ -30,7 +30,7 @@ export const REGISTER_TTL_MS = 10 * 60 * 1000;
  * retention would otherwise carry the removed credential back as news. */
 export const FAMILY_TOMBSTONE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Who a person is to this cluster. Issued when the registration URL is made
+/** Who a person is to this mesh. Issued when the registration URL is made
  * (`<unit>-<counter>` by default) and carried by every record they own. */
 export const Subject = Type.String({ $id: "Subject", minLength: 1, maxLength: 128 });
 export type Subject = Static<typeof Subject>;
@@ -337,11 +337,11 @@ export const AuthRotateResponse = response("auth.rotate", AuthRotateResult);
 
 // --- the replicated records ------------------------------------------------
 
-/** A registered passkey, as every instance in the cluster holds it.
+/** A registered passkey, as every instance in the mesh holds it.
  *
  * Complete once it is written: the instance that registered it is not asked
  * about it again, which is what lets a person authenticate anywhere in the
- * cluster while the instance they registered at is down. */
+ * mesh while the instance they registered at is down. */
 export const CredentialRecord = Type.Object(
   {
     kind: Type.Literal("credential"),
@@ -503,7 +503,7 @@ export type AuthTombstone = Static<typeof AuthTombstone>;
 /** One entry of the replicated set, under the key it is matched by. */
 export const AuthRecord = Type.Object(
   {
-    /** What this entry is, cluster-wide. Two instances writing one key hold the
+    /** What this entry is, mesh-wide. Two instances writing one key hold the
      * same thing, and the later `updated_at` is what stands. */
     key: Type.String({ minLength: 1, maxLength: 256 }),
     updated_at: Timestamp,

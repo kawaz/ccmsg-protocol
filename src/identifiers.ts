@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 
 /** A session id: the uuid Claude Code gives its own session. Globally unique,
- * so it names a session across the whole cluster without an instance prefix. */
+ * so it names a session across the whole mesh without an instance prefix. */
 export const Sid = Type.String({
   $id: "Sid",
   pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",

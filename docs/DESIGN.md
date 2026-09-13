@@ -36,6 +36,8 @@ Messaging has no rooms. A message is addressed to one sid, and the record of a c
 
 A message is addressed to a sid, but **its sender need not be one**. Both the session and the user role may call `message.send`, and a person at the web UI has no sid. So `from` is `Sender`, which is `Sid | "user"`; the literal is spelled out rather than left as an absent field so that "a person sent this" reads apart from "a session sent this and the id was lost". Every sid remains a valid sender. Nothing can be sent back to `user`, so how an answer reaches a person is the instance's to arrange.
 
+A notification may name the `mid` it answers (`reply_to`). One answer reaches a person twice — as the notification, and again in the session's own transcript, which is the record and arrives later — so a reader holding both needs a key saying they are one thing, or it draws the answer twice. It states what was answered and never what kind of line it is: a notification is one thing whoever it came from, and a kind would read as a reason to draw it differently.
+
 A message that was not handed over right away has not failed. The reply says it went to the inbox and why (the recipient is still starting up, paused, gone, unreachable over the mesh, out of inbox room, or not taking anything at the moment), so the sender can choose between waiting and addressing another session.
 
 ## Wording a message handed over directly
@@ -58,7 +60,7 @@ Only when the sender is a person (`from` is `user`) does `--to` drop, leaving `R
 | `roles` | who may call it; anyone else gets `forbidden` |
 | `needs_hello` | whether an identity settled by a greeting is required. On a WebSocket connection the only ops that may arrive before one are `hello.*`: a caller that will not say who it is has nothing to be answered, and that the instance is there is known once the connection was made. The four ops carried over HTTP answer before any connection exists, so there is no greeting for them to have sent |
 | `capability` | the capability it needs; absent from the set a greeting answered with means `capability_unavailable` |
-| `locality` | `instance-local` ops are forwarded to the owning instance, or answer `instance_unreachable` |
+| `locality` | `owner_instance` ops are forwarded to the instance that owns the subject, or answer `instance_unreachable`; `any_instance` ops are answered by whichever instance was asked |
 | `scope` | present when the role changes what the reply may contain rather than whether the call is allowed |
 | `carrier` | present on an op carried over HTTP rather than as a frame on the WebSocket; who may call it is not the carrier's to decide (below) |
 | `errors` | the codes specific to this op |
@@ -85,11 +87,13 @@ Which one a topic takes follows from what its value is. Elements that change ind
 
 Only `event` has no snapshot: nothing is held, so subscribing yields the next occurrence rather than a current state. `session.status` is whole rather than per instance because one session lives on one instance, leaving no other instance's half to preserve.
 
+**A snapshot says what is held now and never that anything is still running.** `transcript:<sid>` answers with where the file ends at the moment of subscribing, for a file nothing will ever be appended to as much as for one being written; a subscriber takes that `size` as where to read from and reads nothing else into it. Whether a session is live is what `peers` says.
+
 ## The shared key-value store
 
 The control plane carries a small store under named namespaces (`kv.read` / `kv.write` / `kv.delete`). All the contract promises is that **a key is unique within its namespace**: a value is any JSON, and what it means belongs to whoever writes and reads it.
 
-The store's ops are the only control ops that are `locality: cluster`. A value is held by the cluster rather than by one instance, so whichever instance is asked can answer. Mirroring between instances is the daemon's job, and two instances that disagree settle it on the later `updated_at`. That is why a write may state its own: a value written while an instance was unreachable can join later without pretending to be newer than it is.
+The store's ops are the only control ops that are `locality: any_instance`. A value is held by the mesh rather than by one instance, so whichever instance is asked can answer. Mirroring between instances is the daemon's job, and two instances that disagree settle it on the later `updated_at`. That is why a write may state its own: a value written while an instance was unreachable can join later without pretending to be newer than it is.
 
 The topic `kv:<ns>` shows one client's save to the others as it happens. The snapshot is every entry in the namespace and each later frame is the entries that changed, with **a removal carried as an entry marked `deleted: true`** — an absence in a list of changes would say nothing. Because the namespace becomes part of a topic name it is kept to an identifier, while a key may hold what a person typed and is bounded only in length and by rejecting control characters.
 
@@ -147,6 +151,8 @@ An element of `types` is a type name, a prefix, either negated with `-`, or `@<p
 
 A dump's reply names a path and carries no items, so **the file is where the items actually travel**. Its shape is therefore the contract's too (`SessionDumpFile`: `sid`, `agent_id?`, `written_at`, the selection as applied, `items`, `ids`, as JSON) — otherwise a successor session handed the path, or a client fetching it, would be reading a format nothing states. The file repeats what was asked for because it outlives the request: it has to say on its own what it is a dump of and what was left out.
 
+`format` decides what that file says about the items, and nothing about which items they are. `items` is `SessionDumpFile`, the shape above, and is what `format` means when it is left out. `records` writes the transcript records the selected items were read from, unchanged, one JSON document per line — for a tool that reads the harness's file already and wants this contract's classifying alone, which is why nothing of ours is wrapped around them; several items out of one record are one record there, so the line count is not the item count. `text` renders the items for a person. The reply's `entries` and `ids` describe the selection in every case: they are what the caller asked for and reads its result against, and a count that moved with the rendering would be answering a different question each time.
+
 ## Limits the sender keeps to
 
 A limit only the sender can keep to is a value the contract holds. A limit only the receiver knows is one the sender cannot read its own refusal against.
@@ -169,7 +175,7 @@ The routes sit **below** the endpoint and are no part of it: `<endpoint>ws` for 
 
 Authentication between instances happens once, at connection time, and a `role: "instance"` `hello.instance` starts it (its `mesh` field is the claim and the location of a single-use key). The mesh has no op of its own: that greeting is its whole entrance, and every op that crosses afterwards is the same op carrying the envelope's mesh fields. The `iss` / `aud` compared there are endpoints — trust is rooted in the URL and nowhere else. The id the peer names travels in the same hello, and the proof landing is what makes everything that hello said trusted, so the receiver keeps an authenticated endpoint-to-id mapping. That mapping is what a later `to_instance` id is dialed through. One id binds to one link: a hello naming an id already bound to another endpoint is the one closed, and the standing binding stays. The procedure of record is the mesh peer authentication decision in the daemon repository.
 
-A forwarded request is authorized again in full at its destination. The envelope's `caller` (a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the forwarder's own verdict is not carried over. What is taken on trust is the claim itself — the forwarder is an authenticated peer, so its word on who called is believed, an assumption that holds inside one deployment and nowhere else. A forwarded request naming no caller is dispatched as the role of the connection it arrived on (`instance`), which the attribute table answers with `forbidden` for every instance-local op. A request that would pass through the same instance twice is dropped on the envelope's `hops` rather than looped.
+A forwarded request is authorized again in full at its destination. The envelope's `caller` (a `role`, and a `sid` when that role is `session`) is the identity it dispatches as, and the forwarder's own verdict is not carried over. What is taken on trust is the claim itself — the forwarder is an authenticated peer, so its word on who called is believed, an assumption that holds inside one deployment and nowhere else. A forwarded request naming no caller is dispatched as the role of the connection it arrived on (`instance`), which the attribute table answers with `forbidden` for every `owner_instance` op. A request that would pass through the same instance twice is dropped on the envelope's `hops` rather than looped.
 
 A broken link is visible from a subscription too. The `instances` topic carries the sending instance's view of the mesh, each entry with `reachable`, so learning that a link went down does not mean greeting again to find out. Reachability is stated from the sender's position, so two instances legitimately disagreeing about one is not a fault.
 
@@ -198,7 +204,7 @@ A credential record also keeps the BE and BS flags of the authenticator data it 
 The other three:
 
 - `auth.extend` is a WebSocket op. It moves a live connection's deadline (a greeting's `auth_expires_at`) rather than closing it
-- `auth.resolve` and `auth.rotate` are between instances (`roles: ["instance"]`, `locality: instance-local`). What only an issuer can answer — checking a registration URL, spending a challenge, rotating a token family — is forwarded to it as `to_instance = iss`. A forwarded rotation carries the `reason`, `ip` and `user_agent` the receiving instance observed, since the person is at the other end of its connection and not the issuer's; the issuer writes them to `last_refresh` unchecked, as it does the ones it observes itself
+- `auth.resolve` and `auth.rotate` are between instances (`roles: ["instance"]`, `locality: owner_instance`). What only an issuer can answer — checking a registration URL, spending a challenge, rotating a token family — is forwarded to it as `to_instance = iss`. A forwarded rotation carries the `reason`, `ip` and `user_agent` the receiving instance observed, since the person is at the other end of its connection and not the issuer's; the issuer writes them to `last_refresh` unchecked, as it does the ones it observes itself
 
 A family remembers the refresh values it retired as digests in `retired`, kept until each value's own expiry — replicating the values themselves would be handing live secrets around, where recognising a replay only asks whether something presented now was once issued here and no longer stands.
 

@@ -45,7 +45,13 @@ export const NOTIFY_FRAME: Static<typeof NotifyFrame> = {
   ev: "topic",
   topic: "notify",
   instance,
-  data: { sid, sid_label: "contract-fixtures", text: "確認して", sent_at: FIXTURE_NOW },
+  data: {
+    sid,
+    sid_label: "contract-fixtures",
+    text: "確認して",
+    reply_to: mid,
+    sent_at: FIXTURE_NOW,
+  },
 };
 
 const PEER = {
