@@ -1,6 +1,6 @@
 ---
 title: SessionStatusSnapshot に fold の可視範囲を示す partial マーカーを足す
-status: open
+status: discarded
 category: design
 created: 2026-09-09T02:32:31+09:00
 last_read:
@@ -8,9 +8,9 @@ open_entered: 2026-09-09T02:32:31+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
-discarded_entered:
+discarded_entered: 2026-09-14T11:54:43+09:00
 resolved_entered:
-discard_reason:
+discard_reason: ["discarded: 契約に印(folded_from/partial)は載せない。kawaz裁定(2026-09-14): 途中から畳んで不完全な状態を作ること自体をやめ、daemonがtranscriptを頭から畳む(性能はversion付きセッション毎キャッシュで担保)。実装はdaemon issue fold-from-head-with-versioned-cache"]
 pending_reason:
 close_reason:
 blocked_by:

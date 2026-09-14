@@ -8,7 +8,6 @@ active な issue の一覧。close 済みは archive/ にあり、ここには�
 | 2026-09-10 | bug | open | [token-family-bound-to-endpoint](./2026-09-10-token-family-bound-to-endpoint.md) | TokenFamily が endpoint を持たず、access token が別 endpoint 登録を跨いで通る |
 | 2026-09-10 | design | open | [schema-library-choice-record](./2026-09-10-schema-library-choice-record.md) | TypeBox (JSON Schema) 採用根拠が記録されていない |
 | 2026-09-09 | design | open | [passkey-list-for-people](./2026-09-09-passkey-list-for-people.md) | 人 (webui) が自分の passkey 一覧を見て保守する op が契約に無い |
-| 2026-09-09 | design | open | [session-status-partial-marker](./2026-09-09-session-status-partial-marker.md) | daemon v2 の fold は末尾 1 MiB seed のため累積フィールドが窓から落ちて消える |
 
 <!--
 INDEX の列構成・canonical 順序・行形式の唯一の正本:
