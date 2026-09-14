@@ -85,6 +85,7 @@ launcher (hyoui 等) が起動した pid は、ハーネスが `sessions/` の�
 
 ## 関連
 
+- [DR-0011](DR-0011-instance-derives-the-classification.md) — 本 DR が置き換えた分類 (`SessionState` / `peers.state`)
 - ccmsg (daemon) `docs/decisions/DR-0015-async-io-principle.md` (fold を頭から畳む、開始応答は畳み終えてから)
 - ccmsg (daemon) `docs/QUESTIONS.md` CT-Q10
 - `docs/DESIGN.md` §Session classification and retention (本 DR で書き換える)
