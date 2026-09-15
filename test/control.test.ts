@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { terminalUrl } from "../src/common/hello.ts";
 import { TopicSubscribeRequest } from "../src/common/topics.ts";
 import { AgentsFrame } from "../src/control/agents.ts";
 import {
@@ -47,7 +48,13 @@ import {
   KvWriteRequest,
   KvWriteResponse,
 } from "../src/control/kv.ts";
-import { PeersFrame } from "../src/control/peers.ts";
+import {
+  GATEWAY_LIVE_WINDOW_MS,
+  liveness,
+  PeersFrame,
+  reachable,
+  waiting,
+} from "../src/control/peers.ts";
 import { SandboxGrantRequest, SandboxGrantResponse } from "../src/control/sandbox.ts";
 import { SessionErrorsFrame } from "../src/control/session-errors.ts";
 import { SessionStatusFrame } from "../src/control/session-status.ts";
@@ -86,13 +93,22 @@ const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
 const NOW = 1_757_300_000_000;
 
 describe("session ops", () => {
-  test("a kill names a session and never a pid", () => {
+  test("a kill names a session, and a run of it where there is more than one", () => {
     expect(isValid(SessionKillRequest, { request_id: "1", op: "session.kill", sid: SID })).toBe(
       true,
     );
     expect(
       isValid(SessionKillRequest, { request_id: "1", op: "session.kill", sid: SID, force: true }),
     ).toBe(true);
+    expect(
+      isValid(SessionKillRequest, { request_id: "1", op: "session.kill", sid: SID, pid: 4821 }),
+    ).toBe(true);
+  });
+
+  test("a kill that names a run still names the session it belongs to", () => {
+    expect(isValid(SessionKillRequest, { request_id: "1", op: "session.kill", pid: 4821 })).toBe(
+      false,
+    );
   });
 
   test("a kill without a session to kill is refused", () => {
@@ -118,7 +134,7 @@ describe("session ops", () => {
       isValid(SessionRenameResponse, {
         ok: true,
         request_id: "2",
-        terminal_id: "hy-3f1c",
+        terminal_id: "hyoui:hy-3f1c",
         instance: INSTANCE,
         title: "pv2 control ops",
       }),
@@ -138,7 +154,7 @@ describe("session ops", () => {
       isValid(SessionRenameResponse, {
         ok: true,
         request_id: "2",
-        terminal_id: "hy-3f1c",
+        terminal_id: "hyoui:hy-3f1c",
         title: "t",
       }),
     ).toBe(false);
@@ -1124,7 +1140,9 @@ describe("session observation topics", () => {
     branch: "main",
     connected_at: NOW,
     last_activity_at: NOW,
-    protocol_version: 3,
+    protocol_version: 4,
+    runs: [{ pid: 4821, started_at: NOW - 60_000, terminal_id: "hyoui:hy-3f1c", connected: true }],
+    session_status: "ready" as const,
   };
 
   test("a connected row and a lost one are the same element space", () => {
@@ -1143,8 +1161,10 @@ describe("session observation topics", () => {
               repo: "kawaz/ccmsg",
               ws: "main",
               cwd: "/Users/x/src/ccmsg/main",
-              state: "paused",
+              runs: [],
+              session_status: "ready",
               last_seen_at: NOW - 3_600_000,
+              stopped_at: NOW - 3_600_000,
               model: "claude-opus-5[1m]",
             },
           ],
@@ -1164,16 +1184,35 @@ describe("session observation topics", () => {
     ).toBe(true);
   });
 
-  test("a live_unmanaged peer with no connection states no generation", () => {
+  test("a peer no client has greeted for states no generation", () => {
     const { protocol_version: _dropped, ...unannounced } = peer;
     expect(
       isValid(PeersFrame, {
         ev: "topic",
         topic: "peers",
         instance: INSTANCE,
-        data: { peers: [{ ...unannounced, state: "live_unmanaged" }] },
+        data: {
+          peers: [
+            {
+              ...unannounced,
+              runs: [{ pid: 4821, started_at: NOW - 60_000, connected: false }],
+            },
+          ],
+        },
       }),
     ).toBe(true);
+  });
+
+  test("a run known only by its connection carries no pid, and a bare terminal handle is refused", () => {
+    const frame = (runs: unknown[]) => ({
+      ev: "topic",
+      topic: "peers",
+      instance: INSTANCE,
+      data: { peers: [{ ...peer, runs }] },
+    });
+    expect(isValid(PeersFrame, frame([{ connected: true }]))).toBe(true);
+    expect(isValid(PeersFrame, frame([{ pid: 4821 }]))).toBe(false);
+    expect(isValid(PeersFrame, frame([{ connected: true, terminal_id: "%17" }]))).toBe(false);
   });
 
   test("the list of changed rows is stated, not omitted", () => {
@@ -1222,7 +1261,16 @@ describe("session observation topics", () => {
               name: "pv2-control-ops",
               status: "running",
               config_dir: "/Users/x/.claude-personal",
-              terminal_id: "hy-3f1c",
+              terminal_id: "hyoui:hy-3f1c",
+            },
+            {
+              instance: INSTANCE,
+              pid: 9022,
+              cwd: "/Users/x/src/p",
+              kind: "interactive",
+              started_at: NOW,
+              config_dir: "/Users/x/.claude-personal",
+              terminal_id: "hyoui:hy-91ab",
             },
           ],
           polled_at: NOW,
@@ -1231,7 +1279,17 @@ describe("session observation topics", () => {
     ).toBe(true);
   });
 
-  test("a session the harness no longer reports leaves as a marked row", () => {
+  test("a process the harness no longer reports leaves as a marked row naming its pid", () => {
+    expect(
+      isValid(AgentsFrame, {
+        ev: "topic",
+        topic: "agents",
+        instance: INSTANCE,
+        data: { agents: [{ instance: INSTANCE, pid: 4821, removed: true }], polled_at: NOW },
+      }),
+    ).toBe(true);
+    // The session may well still be there, run by another process, so a removal
+    // that named the sid would say something else entirely.
     expect(
       isValid(AgentsFrame, {
         ev: "topic",
@@ -1239,7 +1297,7 @@ describe("session observation topics", () => {
         instance: INSTANCE,
         data: { agents: [{ sid: SID, instance: INSTANCE, removed: true }], polled_at: NOW },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("the harness's camelCase does not reach the wire", () => {
@@ -1480,5 +1538,59 @@ describe("the shared key-value store", () => {
         data: { entries: [{ key: "default", value: 1 }] },
       }),
     ).toBe(false);
+  });
+});
+
+describe("what a session's standing is read off", () => {
+  const RUN = { pid: 4821, started_at: NOW - 60_000, connected: true };
+
+  test("a run of its own, or inference still in flight, is what says it is alive", () => {
+    expect(liveness({ runs: [RUN] }, NOW)).toBe("alive");
+    expect(liveness({ runs: [], gateway_active_at: NOW - 1_000 }, NOW)).toBe("alive");
+    expect(liveness({ runs: [], gateway_active_at: NOW - GATEWAY_LIVE_WINDOW_MS }, NOW)).toBe(
+      "alive",
+    );
+    expect(liveness({ runs: [], gateway_active_at: NOW - GATEWAY_LIVE_WINDOW_MS - 1 }, NOW)).toBe(
+      "disappeared",
+    );
+  });
+
+  test("the declaration is what separates a pause from a disappearance", () => {
+    expect(liveness({ runs: [] }, NOW)).toBe("disappeared");
+    expect(liveness({ runs: [], stopped_at: NOW - 10_000 }, NOW)).toBe("paused");
+    // A stamp older than the run it is beside says nothing: the session is
+    // running again.
+    expect(liveness({ runs: [RUN], stopped_at: NOW - 10_000, gateway_active_at: NOW }, NOW)).toBe(
+      "alive",
+    );
+  });
+
+  test("two runs win over everything else — how many processes is another question", () => {
+    expect(liveness({ runs: [RUN, { ...RUN, pid: 9022 }] }, NOW)).toBe("duplicated");
+    expect(liveness({ runs: [RUN, { ...RUN, pid: 9022 }], stopped_at: NOW - 10_000 }, NOW)).toBe(
+      "duplicated",
+    );
+  });
+
+  test("a session is reachable through a connection or a terminal, and otherwise not", () => {
+    expect(reachable({ runs: [RUN] })).toBe(true);
+    expect(reachable({ runs: [{ connected: false, terminal_id: "hyoui:%17" }] })).toBe(true);
+    expect(reachable({ runs: [{ connected: false }] })).toBe(false);
+    expect(reachable({ runs: [] })).toBe(false);
+  });
+
+  test("what a person has to answer comes from the harness's word or the upstream error", () => {
+    expect(waiting({ waiting_for: "trust" }, undefined)).toBe(true);
+    expect(waiting(undefined, { api_error: { text: "overloaded", occurred_at: NOW } })).toBe(true);
+    expect(waiting({}, {})).toBe(false);
+    expect(waiting(undefined, undefined)).toBe(false);
+  });
+
+  test("a terminal URL is composed only for the scheme the gateway serves", () => {
+    const gateway = "https://mba.example.ts.net/hyoui";
+    expect(terminalUrl(gateway, "hyoui:%17")).toBe("https://mba.example.ts.net/hyoui/sessions/%17");
+    expect(terminalUrl(gateway, "tmux:%17")).toBeUndefined();
+    expect(terminalUrl(undefined, "hyoui:%17")).toBeUndefined();
+    expect(terminalUrl(gateway, undefined)).toBeUndefined();
   });
 });

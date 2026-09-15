@@ -41,8 +41,9 @@ const { sid, instance, other_instance, endpoint, other_endpoint, request_id } = 
 export const HELLO_SESSION_REQUEST: Static<typeof HelloSessionRequest> = {
   request_id,
   op: "hello.session",
-  protocol_version: 3,
+  protocol_version: 4,
   sid,
+  pid: 4821,
   client_version: "0.1.0",
   repo: "ccmsg-protocol",
   ws: "main",
@@ -59,7 +60,7 @@ export const HELLO_SESSION_REQUEST: Static<typeof HelloSessionRequest> = {
 export const HELLO_USER_REQUEST: Static<typeof HelloUserRequest> = {
   request_id,
   op: "hello.user",
-  protocol_version: 3,
+  protocol_version: 4,
   client_version: "0.1.0",
 };
 
@@ -68,7 +69,7 @@ export const HELLO_USER_REQUEST: Static<typeof HelloUserRequest> = {
 export const HELLO_INSTANCE_REQUEST: Static<typeof HelloInstanceRequest> = {
   request_id,
   op: "hello.instance",
-  protocol_version: 3,
+  protocol_version: 4,
   mesh: {
     ver: 1,
     iss: other_endpoint,
@@ -83,7 +84,7 @@ export const HELLO_INSTANCE_REQUEST: Static<typeof HelloInstanceRequest> = {
 export const HELLO_RESPONSE: Static<typeof HelloSessionResponse> = {
   ok: true,
   request_id,
-  protocol_version: 3,
+  protocol_version: 4,
   instance,
   endpoint,
   auth_expires_at: FIXTURE_NOW + 10_000_000,

@@ -74,7 +74,7 @@ const PEER = {
   repo: "ccmsg-protocol",
   ws: "main",
   cwd: WORKSPACE,
-  protocol_version: 3,
+  protocol_version: 4,
 };
 
 export const PEERS_FRAME: Static<typeof PeersFrame> = {
@@ -90,7 +90,15 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
         repo_root: "/repos/kawaz/ccmsg-protocol",
         branch: "main",
         title: "contract fixtures",
-        state: "live",
+        runs: [
+          {
+            pid: 4821,
+            started_at: FIXTURE_NOW - 600_000,
+            terminal_id: "hyoui:%17",
+            connected: true,
+          },
+        ],
+        session_status: "ready",
         pinned: true,
         connected_at: FIXTURE_NOW - 600_000,
         last_activity_at: FIXTURE_NOW,
@@ -102,7 +110,8 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
       {
         ...PEER,
         sid: other_sid,
-        state: "live_unmanaged",
+        runs: [{ pid: 7314, started_at: FIXTURE_NOW - 120_000, connected: false }],
+        session_status: "folding",
         stale_client: {
           last_seen_at: FIXTURE_NOW - 300_000,
           version: "0.0.9",
@@ -115,7 +124,8 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
         repo: "ccmsg",
         ws: "daemon-v2",
         cwd: "/repos/kawaz/ccmsg/daemon-v2",
-        state: "paused",
+        runs: [],
+        session_status: "ready",
         last_seen_at: FIXTURE_NOW - 1_200_000,
         stopped_at: FIXTURE_NOW - 1_000_000,
         model: "claude-opus-5",
@@ -125,14 +135,33 @@ export const PEERS_FRAME: Static<typeof PeersFrame> = {
   },
 };
 
-/** A later frame: one row moved on, and one the instance forgot. */
+/** A later frame: one row is being run by two processes at once, and one the
+ * instance forgot. */
 export const PEERS_CHANGE_FRAME: Static<typeof PeersFrame> = {
   ev: "topic",
   topic: "peers",
   instance,
   data: {
     peers: [
-      { ...PEER, state: "live", gateway_active_at: FIXTURE_NOW + 1_000 },
+      {
+        ...PEER,
+        runs: [
+          {
+            pid: 4821,
+            started_at: FIXTURE_NOW - 600_000,
+            terminal_id: "hyoui:%17",
+            connected: true,
+          },
+          {
+            pid: 9022,
+            started_at: FIXTURE_NOW - 30_000,
+            terminal_id: "hyoui:%23",
+            connected: true,
+          },
+        ],
+        session_status: "frozen",
+        gateway_active_at: FIXTURE_NOW + 1_000,
+      },
       { sid: "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f", instance, removed: true },
     ],
   },
@@ -169,8 +198,17 @@ export const AGENTS_FRAME: Static<typeof AgentsFrame> = {
         status: "working",
         state: "busy",
         config_dir: "/config/claude-personal",
-        terminal_id: "%17",
+        terminal_id: "hyoui:%17",
         terminal_namespace: "personal",
+      },
+      {
+        instance,
+        pid: 9022,
+        cwd: WORKSPACE,
+        kind: "claude",
+        started_at: FIXTURE_NOW - 30_000,
+        config_dir: "/config/claude-personal",
+        terminal_id: "hyoui:%23",
       },
     ],
     polled_at: FIXTURE_NOW,
@@ -182,7 +220,7 @@ export const AGENTS_CHANGE_FRAME: Static<typeof AgentsFrame> = {
   ev: "topic",
   topic: "agents",
   instance,
-  data: { agents: [{ sid: other_sid, instance, removed: true }], polled_at: FIXTURE_NOW + 5_000 },
+  data: { agents: [{ instance, pid: 7314, removed: true }], polled_at: FIXTURE_NOW + 5_000 },
 };
 
 export const SESSION_STATUS_FRAME: Static<typeof SessionStatusFrame> = {

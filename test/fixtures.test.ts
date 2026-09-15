@@ -21,7 +21,12 @@ import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
 import { InstancesFrame } from "../src/control/instances.ts";
-import { LAST_LIVE_RETENTION_MS, type PeerInfo, PeersFrame } from "../src/control/peers.ts";
+import {
+  LAST_LIVE_RETENTION_MS,
+  liveness,
+  type PeerInfo,
+  PeersFrame,
+} from "../src/control/peers.ts";
 import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
 import {
   AUTH_RECORDS_FAMILY_FRAME,
@@ -31,6 +36,7 @@ import {
   ERROR_RESPONSE,
   ERROR_RESPONSE_UNIDENTIFIED,
   FIXTURE_IDS,
+  FIXTURE_NOW,
   HELLO_INSTANCE_REQUEST,
   HELLO_USER_REQUEST,
   INBOX_REMOVED_FRAME,
@@ -280,15 +286,15 @@ describe("the peers topic", () => {
 
   test("a session gone without a word carries no stopped_at", () => {
     const { stopped_at: _dropped, ...rest } = lost;
-    expect(
-      isValid(PeersFrame, { ...peersFrame, data: { peers: [{ ...rest, state: "disappeared" }] } }),
-    ).toBe(true);
+    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest] } })).toBe(true);
+    expect(liveness({ ...rest }, FIXTURE_NOW)).toBe("disappeared");
   });
 
   test("a lost session is a row of the same list, matched by the same pair", () => {
-    // What moves it there is its own field, so a client that already holds the
-    // row updates it rather than moving it between two lists.
-    expect(lost.state).toBe("paused");
+    // What moves it there are its own fields, so a client that already holds
+    // the row updates it rather than moving it between two lists.
+    expect(lost.runs).toEqual([]);
+    expect(liveness(lost, FIXTURE_NOW)).toBe("paused");
     expect(typeof lost.last_seen_at).toBe("number");
     expect(lost.sid).not.toBe(peer.sid);
   });
@@ -308,23 +314,36 @@ describe("the peers topic", () => {
     ).toBe(false);
   });
 
-  test("an entry that states no classification passes", () => {
-    const { state: _dropped, ...rest } = peer;
-    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest] } })).toBe(true);
+  test("an entry that states no runs at all is refused", () => {
+    // Empty is how a row says nothing is running it; absent would leave a
+    // reader unable to tell that from an instance that did not look.
+    const { runs: _dropped, ...rest } = peer;
+    expect(isValid(PeersFrame, { ...peersFrame, data: { peers: [rest] } })).toBe(false);
   });
 
-  test("a classification outside the list is refused", () => {
+  test("a standing for the fold outside the list is refused", () => {
     expect(
-      isValid(PeersFrame, { ...peersFrame, data: { peers: [{ ...peer, state: "busy" }] } }),
+      isValid(PeersFrame, {
+        ...peersFrame,
+        data: { peers: [{ ...peer, session_status: "stale" }] },
+      }),
     ).toBe(false);
   });
 
   test("a busy session carries when inference last ran, not a flag", () => {
-    // Busy is an attribute of the row: the session is `live` and busy at once,
+    // Busy is an attribute of the row: the session is running and busy at once,
     // and a client reads recency against its own threshold.
     expect(isValid(PeersFrame, peersFrame)).toBe(true);
-    expect(peer.state).toBe("live");
+    expect(liveness(peer, FIXTURE_NOW)).toBe("alive");
     expect(typeof peer.gateway_active_at).toBe("number");
+  });
+
+  test("two runs of one session freeze its fold and are told apart by their pids", () => {
+    const [duplicated] = PEERS_CHANGE_FRAME.data.peers;
+    if ("removed" in duplicated) throw new Error("the first changed row is a row, not a removal");
+    expect(duplicated.runs.map((run) => run.pid)).toEqual([4821, 9022]);
+    expect(duplicated.session_status).toBe("frozen");
+    expect(liveness(duplicated, FIXTURE_NOW)).toBe("duplicated");
   });
 
   test("a boolean in place of the instant is refused", () => {

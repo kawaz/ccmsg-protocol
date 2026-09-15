@@ -37,6 +37,29 @@ describe("op attribute table", () => {
     expect(queueing.sort()).toEqual(["notify.send", "say.post"]);
   });
 
+  test("a session two processes are running is refused by the ops that act on one", () => {
+    const refusing = OP_NAMES.filter((op) =>
+      (OP_ATTRIBUTES[op].errors as readonly string[]).includes("session_duplicated"),
+    );
+    expect(refusing.sort()).toEqual([
+      "dir.list",
+      "file.create",
+      "file.delete",
+      "file.edit",
+      "file.find",
+      "file.read",
+      "file.stat",
+      "file.write",
+      "message.send",
+      "notify.send",
+      "session.dump.write",
+    ]);
+    // A kill is the way out of that state rather than one more thing refused by
+    // it, so it answers which run it could not pick instead.
+    expect(OP_ATTRIBUTES["session.kill"].errors).toContain("ambiguous_run");
+    expect(OP_ATTRIBUTES["session.kill"].errors).not.toContain("session_duplicated");
+  });
+
   test("attributes decide the derived codes", () => {
     expect(opErrors("hello.user")).toEqual(["invalid_args"]);
     expect(opErrors("session.rename")).toEqual([
@@ -50,6 +73,7 @@ describe("op attribute table", () => {
     expect(opErrors("message.send")).toEqual([
       "invalid_args",
       "session_not_found",
+      "session_duplicated",
       "hello_required",
       "forbidden",
     ]);

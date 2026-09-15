@@ -105,7 +105,7 @@ export const SESSION_RENAME_REQUEST: Static<typeof SessionRenameRequest> = {
 export const SESSION_RENAME_RESPONSE: Static<typeof SessionRenameResponse> = {
   ok: true,
   request_id,
-  terminal_id: "%17",
+  terminal_id: "hyoui:%17",
   instance,
   title: "contract fixtures",
 };
