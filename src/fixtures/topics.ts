@@ -7,6 +7,7 @@ import type { LlmRequestsFrame, LlmStatusFrame } from "../control/llm.ts";
 import type { PeersFrame } from "../control/peers.ts";
 import type { SessionErrorsFrame } from "../control/session-errors.ts";
 import type { SessionStatusFrame } from "../control/session-status.ts";
+import type { TerminalsFrame } from "../control/terminals.ts";
 import type { TranscriptFrame, TranscriptItemsFrame } from "../control/transcript.ts";
 import { TRANSCRIPT_ITEMS } from "./control.ts";
 import type { InboxFrame } from "../messaging/message.ts";
@@ -221,6 +222,47 @@ export const AGENTS_CHANGE_FRAME: Static<typeof AgentsFrame> = {
   topic: "agents",
   instance,
   data: { agents: [{ instance, pid: 7314, removed: true }], polled_at: FIXTURE_NOW + 5_000 },
+};
+
+export const TERMINALS_FRAME: Static<typeof TerminalsFrame> = {
+  ev: "topic",
+  topic: "terminals",
+  snapshot: true,
+  instance,
+  data: {
+    terminals: [
+      {
+        instance,
+        id: "hyoui:%17",
+        state: "running",
+        command: ["claude", "--continue"],
+        cwd: WORKSPACE,
+        pid: 4821,
+        started_at: FIXTURE_NOW - 600_000,
+      },
+      {
+        instance,
+        id: "hyoui:%31",
+        state: "running",
+        command: ["zsh", "-i"],
+        cwd: WORKSPACE,
+        pid: 5177,
+        started_at: FIXTURE_NOW - 120_000,
+      },
+    ],
+    polled_at: FIXTURE_NOW,
+  },
+};
+
+/** A later frame: one terminal was closed. */
+export const TERMINALS_CHANGE_FRAME: Static<typeof TerminalsFrame> = {
+  ev: "topic",
+  topic: "terminals",
+  instance,
+  data: {
+    terminals: [{ instance, id: "hyoui:%31", removed: true }],
+    polled_at: FIXTURE_NOW + 5_000,
+  },
 };
 
 export const SESSION_STATUS_FRAME: Static<typeof SessionStatusFrame> = {

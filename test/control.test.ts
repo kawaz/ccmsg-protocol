@@ -59,6 +59,12 @@ import { SandboxGrantRequest, SandboxGrantResponse } from "../src/control/sandbo
 import { SessionErrorsFrame } from "../src/control/session-errors.ts";
 import { SessionStatusFrame } from "../src/control/session-status.ts";
 import {
+  starting,
+  TerminalsFrame,
+  terminalsOf,
+  unattachedTerminals,
+} from "../src/control/terminals.ts";
+import {
   SessionDumpWriteRequest,
   SessionEnvReadResponse,
   SessionForkOriginReadResponse,
@@ -90,6 +96,7 @@ import { isValid } from "../src/schemas.ts";
 const SID = "6f1a2b3c-4d5e-4f60-8a91-b2c3d4e5f607";
 const OTHER_SID = "0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b";
 const INSTANCE = "3f9c1a7b5e2d48069c1a7b5e2d480691";
+const OTHER_INSTANCE = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
 const NOW = 1_757_300_000_000;
 
 describe("session ops", () => {
@@ -1592,5 +1599,106 @@ describe("what a session's standing is read off", () => {
     expect(terminalUrl(gateway, "tmux:%17")).toBeUndefined();
     expect(terminalUrl(undefined, "hyoui:%17")).toBeUndefined();
     expect(terminalUrl(gateway, undefined)).toBeUndefined();
+  });
+});
+
+describe("the terminals topic", () => {
+  const TERMINALS = [
+    // The terminal the session below is running in.
+    { instance: INSTANCE, id: "hyoui:%17", state: "running", command: ["claude"], pid: 4821 },
+    // A shell a person opened for themselves.
+    { instance: INSTANCE, id: "hyoui:%31", state: "running", command: ["zsh", "-i"], pid: 5177 },
+    // The same pid on another host, which is another terminal entirely.
+    { instance: OTHER_INSTANCE, id: "hyoui:%4", state: "running", command: ["zsh"], pid: 4821 },
+    // A terminal whose manager reports no process in it.
+    { instance: INSTANCE, id: "tmux:%9", state: "dead", command: [] },
+  ];
+  const AGENTS = [
+    { instance: INSTANCE, pid: 4821, sid: SID },
+    { instance: INSTANCE, pid: 9022, sid: OTHER_SID },
+  ];
+  const ids = (rows: { id: string }[]): string[] => rows.map((row) => row.id);
+
+  test("a frame carries the rows that changed, matched by the instance and the id", () => {
+    expect(
+      isValid(TerminalsFrame, {
+        ev: "topic",
+        topic: "terminals",
+        snapshot: true,
+        instance: INSTANCE,
+        data: {
+          terminals: [
+            {
+              instance: INSTANCE,
+              id: "hyoui:%17",
+              state: "running",
+              command: ["claude", "--continue"],
+              cwd: "/Users/x/src/p",
+              pid: 4821,
+              started_at: NOW,
+            },
+          ],
+          polled_at: NOW,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isValid(TerminalsFrame, {
+        ev: "topic",
+        topic: "terminals",
+        instance: INSTANCE,
+        data: { terminals: [{ instance: INSTANCE, id: "hyoui:%31", removed: true }] },
+      }),
+    ).toBe(true);
+  });
+
+  test("a terminal whose id names no scheme is refused", () => {
+    // The scheme is what says which manager observed it, so a bare handle
+    // could not be opened by anything.
+    expect(
+      isValid(TerminalsFrame, {
+        ev: "topic",
+        topic: "terminals",
+        instance: INSTANCE,
+        data: { terminals: [{ instance: INSTANCE, id: "%17", state: "running", command: [] }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("a terminal with no command at all is refused — empty is how it says none", () => {
+    expect(
+      isValid(TerminalsFrame, {
+        ev: "topic",
+        topic: "terminals",
+        instance: INSTANCE,
+        data: { terminals: [{ instance: INSTANCE, id: "tmux:%9", state: "dead" }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("a session's terminals are those holding a process of its runs", () => {
+    expect(ids(terminalsOf(SID, AGENTS, TERMINALS))).toEqual(["hyoui:%17"]);
+    // The pid belongs to a host, so the same number elsewhere is another
+    // terminal and not this session's.
+    expect(ids(terminalsOf(OTHER_SID, AGENTS, TERMINALS))).toEqual([]);
+  });
+
+  test("a terminal no run is in is unattached, whether or not anything runs in it", () => {
+    expect(ids(unattachedTerminals(AGENTS, TERMINALS))).toEqual([
+      "hyoui:%31",
+      "hyoui:%4",
+      "tmux:%9",
+    ]);
+  });
+
+  test("what is starting is a process the harness does not account for", () => {
+    // The same list less the terminals with no process: an empty terminal is
+    // one nothing can be starting in.
+    expect(ids(starting(TERMINALS, AGENTS))).toEqual(["hyoui:%31", "hyoui:%4"]);
+    // Once the harness reports it, the terminal leaves this list for the
+    // session's own.
+    const seen = [...AGENTS, { instance: INSTANCE, pid: 5177, sid: OTHER_SID }];
+    expect(ids(starting(TERMINALS, seen))).toEqual(["hyoui:%4"]);
+    expect(ids(terminalsOf(OTHER_SID, seen, TERMINALS))).toEqual(["hyoui:%31"]);
   });
 });

@@ -179,6 +179,7 @@ export const TOPIC_FIXTURES = {
   peers: topics.PEERS_FRAME,
   instances: topics.INSTANCES_FRAME,
   agents: topics.AGENTS_FRAME,
+  terminals: topics.TERMINALS_FRAME,
   "session.status": topics.SESSION_STATUS_FRAME,
   transcript: topics.TRANSCRIPT_FRAME,
   "transcript.items": topics.TRANSCRIPT_ITEMS_FRAME,

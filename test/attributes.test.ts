@@ -111,7 +111,7 @@ describe("op attribute table", () => {
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
     expect(OP_NAMES).toHaveLength(48);
-    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(13);
+    expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(14);
   });
 
   test("the store's ops are the only control ops answerable anywhere", () => {
