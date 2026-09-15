@@ -40,8 +40,9 @@ export type SessionRun = Static<typeof SessionRun>;
  * whether anything it says can still be trusted. */
 export const SessionStatusStanding = Type.Union(
   [
-    /** No transcript, so there is nothing to fold. A session that has just
-     * started stands here until the harness writes its first record. */
+    /** Nothing is folded: there is no transcript yet (a session that has just
+     * started stands here until the harness writes its first record), or this
+     * instance holds no fold of it because nothing has asked for one. */
     Type.Literal("absent"),
     /** The transcript is being read from the top; what the fold says so far is
      * incomplete. */
@@ -236,10 +237,16 @@ export function liveness(
   now: number,
 ): Liveness {
   if (row.runs.length >= 2) return "duplicated";
-  const running =
-    (row.runs.length > 0 && row.stopped_at === undefined) ||
-    (row.gateway_active_at !== undefined && now - row.gateway_active_at <= GATEWAY_LIVE_WINDOW_MS);
-  if (running) return "alive";
+  if (row.runs.length === 1) return "alive";
+  // No run is seen, so the declaration and the gateway are all there is to go
+  // on: inference still running for it is a session that is alive somewhere
+  // this instance cannot see the process of.
+  if (
+    row.gateway_active_at !== undefined &&
+    now - row.gateway_active_at <= GATEWAY_LIVE_WINDOW_MS
+  ) {
+    return "alive";
+  }
   return row.stopped_at === undefined ? "disappeared" : "paused";
 }
 
