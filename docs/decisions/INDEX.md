@@ -32,6 +32,7 @@ Status は各 DR ファイルの `Status:` 行が正本。
 | [DR-0023](DR-0023-naming-rules-machine-checked.md) | 名前の規則を決め、全 schema を歩いて機械検査する |
 | [DR-0024](DR-0024-executable-contract-and-fixtures.md) | 契約は実行可能で、線上の代表例 (fixtures) も契約が持つ |
 | [DR-0025](DR-0025-upstream-marked-types.md) | 上流の語彙を持つ型に mark を付け、綴りだけはこの契約に揃える |
+| [DR-0026](DR-0026-terminals-are-their-own-list.md) | 端末は端末の一覧 (`terminals` topic) として述べ、セッションとは pid の一致で結ぶ。起動直後のハーネスは 2 つの一覧の差として導出する |
 
 ## Superseded
 
