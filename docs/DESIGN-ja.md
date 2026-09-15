@@ -89,7 +89,7 @@ payload 型が同じであるぶん、「後続の frame が手元の値に対�
 | `append` | 前回以降に増えた分 | 末尾に足すだけで、既にあるものは書き換えない | 有 | `transcript:<sid>` `transcript.items:<sid>` |
 | `event` | 発生そのもの (値ではない) | 保持しない | 無 | `notify` |
 
-どれを取るかは、その値が何であるかから決まる。要素が独立して変化する (行の出入り・更新が別々の時刻に起きる) なら `element`。値が 1 つの塊として意味を持ち、一部だけが単独で更新されることが無いなら `whole`、その塊を instance ごとに持つなら `per_instance_whole`。増える一方なら `append`、値でなく出来事なら `event`。迷ったら「1 つの要素の変化で他の要素を送り直す理由があるか」を問う。`peers` と `agents` はセッションの行の集まりで各行が別々に動くので、frame は変化した行だけを運ぶ。`instances` は 1 つの instance が自分の全リンクをまとめて読んだ結果なので、`peers` の行ではなく独立した topic にする。`session.errors` は instance が 1 つの error パターンを全セッションに畳んで導く集合、`llm.status` は 1 つの報告文書で、どちらも「一部だけが変わった」と分かる作りになっていない。
+どれを取るかは、その値が何であるかから決まる。要素が独立して変化する (行の出入り・更新が別々の時刻に起きる) なら `element`。値が 1 つの塊として意味を持ち、一部だけが単独で更新されることが無いなら `whole`、その塊を instance ごとに持つなら `per_instance_whole`。増える一方なら `append`、値でなく出来事なら `event`。迷ったら「1 つの要素の変化で他の要素を送り直す理由があるか」を問う。`peers` はセッションの行、`agents` はそれを走らせているプロセスの行の集まりで、各行が別々に動くので、frame は変化した行だけを運ぶ。`instances` は 1 つの instance が自分の全リンクをまとめて読んだ結果なので、`peers` の行ではなく独立した topic にする。`session.errors` は instance が 1 つの error パターンを全セッションに畳んで導く集合、`llm.status` は 1 つの報告文書で、どちらも「一部だけが変わった」と分かる作りになっていない。
 
 `event` だけが snapshot を持たない。保持するものが無いので購読しても現在値は来ず、次の発生から届く。`session.status` が instance ごとでなく全体置換なのは、1 セッションが 1 instance にしか居らず、他 instance の分を残す必要が無いため。
 
@@ -107,13 +107,19 @@ topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapsho
 
 セッションの居場所と実行条件 (`repo` / `ws` / `cwd` / `repo_root` / `branch` / `transcript_path` / `title` / `model` / `effort`) はセッション自身が `hello.session` で名乗り、instance が `peers` の各行でそのまま返す。名前と型は 1 箇所 (`src/session-meta.ts`) に置き、名乗る側と返す側で綴りが分かれないようにする。名乗られなかったものは省略される (instance が導けるものは導く)。名乗りはフィールド単位で取り込まれ、名乗らないことは撤回ではなく不変を意味する (1 セッションは短命プロセスの連なりとして届き、どのプロセスも全フィールドを知らない)。
 
-一覧の分類 (`state`) は **instance が導いて行に載せる**。生の入力を返して client 側で組み立てると、instance ごとに解釈がずれる。語彙は接続中の 3 つ (`waiting` / `live` / `live_unmanaged`) と、失われた側の 2 つ (`paused` / `disappeared`) で、両者を分けるのは `stopped_at` の有無ひとつ。接続中と失われた側は 2 つの一覧ではなく同じ 1 種類の行で、セッションの登録や消失は同一性を保ったままの更新として、client が既に持つ行に届く。Pinned は人が付けた印であって分類ではないので、`pinned` として分類の隣に置く。
+**セッションと、その run は別のもの** (DR-0001。DR-0011 の単一の分類を置き換える)。セッションは transcript と畳んだ状態と履歴で、鍵は `instance` + `sid`、プロセスが 0 個でも 2 個でも 1 つであり、`peers` の行になる。run は 1 つのプロセスで、鍵は `instance` + `pid`、プロセスだけが持つもの (生きていること、どの端末に居るか、接続しているか) を載せ、挨拶の前後を通じて `agents` の行になる。`agents` の行は `sid` を持つなら名乗る (launcher が起動しただけで、ハーネスがまだセッションを名付けていないプロセスは持たない)。接続中と失われた側が 2 つの一覧ではなく同じ 1 種類の行であることは変わらず、セッションの起動や消失は同一性を保ったままの更新として client が既に持つ行に届く。Pinned は人が付けた印で、これら全ての隣に `pinned` として並ぶ。
 
-`peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、`live_unmanaged` の行では欠ける。この行は client が greet して拒まれたのではなく、instance の状態ファイルがそのセッションを接続なしで生きていると名乗っているだけだからだ。
+**人が判断するための材料は 1 語に押し込めず、行にそのまま載せる**。`runs` はこのセッションを走らせている全プロセスで、各要素が `pid` と `started_at` (再利用された pid を弾く鍵)、`terminal_id`、接続の有無を持つ。`session_status` はこのセッションの `session.status` の畳みがどれだけ信用できるかを述べる: `absent` (transcript がまだ無い) / `folding` / `ready` / `frozen`。`stopped_at` は停止の宣言で、意味を持つのは `runs` が空の間だけ。`gateway_active_at` は最後に推論が走った時刻で、run が 1 つも無いセッションを生きていると言えるのもこれ (リクエストはプロセスより長生きする)。人が答えるべきものが出ているかは `agents.waiting_for` と `session.status` の `api_error` が述べる。これらから導く判断は契約が export する関数 (`liveness` / `reachable` / `waiting`、窓は `GATEWAY_LIVE_WINDOW_MS`) が行うので、instance と client が同じ行を同じ規則で読む。
 
-`stopped_at` が付く入口は `session.stopping` ひとつ。セッションが自分で「これから止まる」と宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは `disappeared` になる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の CLI がその代理になる。
+**同じセッションの run が 2 つある状態は、隠さず、解決もしない**。ハーネスは走行中のセッションの resume を許し、その瞬間から両プロセスが同じ transcript を書くので、読みは信用できず offset もずれる。そこで `session_status` を `frozen` にし、畳みの更新と transcript の追記配信を止め、最後に信用できた値をそのまま述べる。`message.send` / `notify.send` / `session.dump.write` と file / dir 系の op は `session_duplicated` で断り、保留はしない (下書きは呼び出し側にある)。`session.kill` は任意の `pid` を受け、run が 2 つ以上で pid が無ければ `ambiguous_run` で断り、pid があればそれがそのセッションの `runs` に有ることを確かめてから signal する。片方を勝手に止めることも、どちらが正しいかを推定することもしない。守るのは「重複を隠さない」「壊れた読みを正として述べない」の 2 つ。run が 2 未満に戻ったら畳みは頭からやり直す (cache した offset が信用できない)。run が 0 でも transcript は残るので `folding` であって `absent` にはならない。
 
-**忙しさも分類ではなく行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として載せる。接続中のどの分類であっても忙しくはなり得るので、`state` に畳むと片方が失われる。真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、ではなく観測手段が無い)。
+run の `terminal_id` は `<scheme>:<id>` で、scheme はその handle が誰のものかを名乗る。`terminalUrl` が gateway の URL を組み立てるのは `hyoui` scheme の時だけで、他の scheme の handle はその系を知る client が開くか、開かれないままになる。
+
+`peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、どの client も greet していない行では欠ける。この行は client が greet して拒まれたのではなく、instance の状態ファイルがそのセッションを接続なしで走っていると名乗っているだけだからだ。
+
+`stopped_at` が付く入口は `session.stopping` ひとつ。セッションが自分で「これから止まる」と宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは「落ちた」と読まれる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の CLI がその代理になる。
+
+**忙しさも行の属性**で、`gateway_active_at` (最後に推論が走った時刻) として載せる。プロセスが 1 つでも 0 個でも忙しくはなり得るので、両者を畳むと片方が失われる。真偽値でなく時刻なのは「リクエストが飛び終わった瞬間」を観測するものが無いため — client が新しさを見て自分の閾値で判断する。gateway を持たない instance では欠ける (= 静か、ではなく観測手段が無い)。
 
 未配送メッセージと、失われたセッションの行の保持窓は契約が値として持つ (`INBOX_RETENTION_MS` / `LAST_LIVE_RETENTION_MS` = 7 日、`INBOX_MAX_PER_SID` = 256)。戻ってきた人が見るのは「セッションと、そこへ言われたこと」のひと組なので、2 つが別の時刻で消えることはない。件数上限は受け手が 1 セッションぶん保持できる量に合わせ、契約が受け取ったものは受け手に渡しうるものに保つ。
 
@@ -177,7 +183,7 @@ dump の返答は path を返すだけで item を運ばないので、**item �
 
 **identity は `instance` (id)、dial 先と TLS の照合先は `endpoint` (URL)** で、2 つは別の型。id は instance が自分に 1 度だけ発行する不透明な乱数で、引っ越しても変わらない。endpoint は instance の公開 base URL (`http(s)://<host>[/<prefix>]/`、末尾 `/` 必須、query/fragment 無し) で、同一 origin に複数 instance が相乗りするため比較は origin ではなく URL 全体で行う (末尾 `/` を必須にするのは `/ccmsg` と `/ccmsg/` が同じ instance の 2 通りの綴りにならないため)。
 
-route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws`、mesh は `<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は `<endpoint>webhook/*`。どれも endpoint の scheme のままで、`ws(s)://` への書き換えは無い (WS も HTTP request として始まり upgrade するので、URL の綴りは 1 つで足りる)。こう切っておくと、transport が `/ws` 以外に移っても「instance がどこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は endpoint が変わっても無効にならない。挨拶の応答は自 instance の id と endpoint、および mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない段階から分かっており、link が落ちている相手こそ一覧から消してはならない。`endpoint` は一覧の各行でも自 instance の行でも任意で、mesh に参加しない instance は peer に渡す URL を持たない。自 instance のセッションが動く端末の前に gateway が居る場合は `terminal_gateway` も返る。人がセッションの端末を開く base URL で、開く先は `agents` topic が名乗る handle を使って `<terminal_gateway>/sessions/<terminal_id>`。端末に届かない instance では省かれ、それは `capabilities` から `terminal` が落ちるのと同じ条件。
+route は endpoint の**下**にあり、endpoint の一部ではない: WS は `<endpoint>ws`、mesh は `<endpoint>mesh/*`、認証は `<endpoint>auth/*`、webhook は `<endpoint>webhook/*`。どれも endpoint の scheme のままで、`ws(s)://` への書き換えは無い (WS も HTTP request として始まり upgrade するので、URL の綴りは 1 つで足りる)。こう切っておくと、transport が `/ws` 以外に移っても「instance がどこに居るか」を表す値は変わらない。id で参照されるもの (`mid`、kv の鍵、record と token の発行者) は endpoint が変わっても無効にならない。挨拶の応答は自 instance の id と endpoint、および mesh で見えている instance の一覧 (各 id + endpoint + 可達性) を返す。一覧の `id` は handshake が成立するまで分からないので任意 — 設定に書かれた endpoint はまだ何も答えていない段階から分かっており、link が落ちている相手こそ一覧から消してはならない。`endpoint` は一覧の各行でも自 instance の行でも任意で、mesh に参加しない instance は peer に渡す URL を持たない。自 instance のセッションが動く端末の前に gateway が居る場合は `terminal_gateway` も返る。人がセッションの端末を開く base URL で、開く先は `agents` topic が名乗る `hyoui:<id>` の id を使って `<terminal_gateway>/sessions/<id>`。端末に届かない instance では省かれ、それは `capabilities` から `terminal` が落ちるのと同じ条件。
 
 instance 間の認証は接続確立時 1 回で、`hello.instance` がその起点になる。mesh は自分の op を持たず、入口はこの挨拶ひとつで、以降 instance をまたぐのは封筒の mesh フィールドを載せた同じ op である (`mesh` フィールド = 名乗りと使い捨て鍵の在り処)。`iss` / `aud` の照合値は endpoint — 信頼の根は URL にしかない。名乗る `id` は同じ hello に載り、proof が通った時点で hello の内容ごと信頼されるので、受け側は「認証済み endpoint ↔ id」の対応表を持つ。以後 `to_instance` の id から dial 先を引くのはこの表。1 つの id が束縛できる link は 1 本で、既に別 endpoint に束縛済みの id を名乗る hello は新しく来た側を閉じる (既存の束縛を優先する)。手順の正本は daemon リポの decisions にある mesh peer 認証の項。
 
