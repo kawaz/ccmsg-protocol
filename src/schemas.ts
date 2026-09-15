@@ -94,6 +94,7 @@ import {
 } from "./control/sandbox.ts";
 import { SessionErrorsFrame } from "./control/session-errors.ts";
 import { SessionStatusFrame } from "./control/session-status.ts";
+import { TerminalsFrame } from "./control/terminals.ts";
 import {
   SessionDumpWriteRequest,
   SessionDumpWriteResponse,
@@ -216,6 +217,7 @@ export const TOPIC_SCHEMAS = {
   peers: PeersFrame,
   instances: InstancesFrame,
   agents: AgentsFrame,
+  terminals: TerminalsFrame,
   "session.status": SessionStatusFrame,
   transcript: TranscriptFrame,
   "transcript.items": TranscriptItemsFrame,

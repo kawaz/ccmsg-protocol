@@ -45,7 +45,11 @@ export const AgentInfo = Type.Object(
     /** The terminal the session runs in, which is the handle a rename types
      * into. Absent when the process does not name one or its environment could
      * not be read. Read from the running process rather than remembered from
-     * when it started, since resuming a session gives it a new process. */
+     * when it started, since resuming a session gives it a new process.
+     *
+     * Where the instance states `terminals` as well, the match of the pids
+     * there is what says which terminal this run is in; this field is what an
+     * instance with no terminal manager has to go on. */
     terminal_id: Type.Optional(TerminalId),
     /** Which namespace that terminal lives in. Absent means the process set
      * none, which the multiplexer treats as its default — not the instance's

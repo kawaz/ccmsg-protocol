@@ -9,6 +9,7 @@ export const PLAIN_TOPICS = [
   "peers",
   "instances",
   "agents",
+  "terminals",
   "session.errors",
   "llm.requests",
   "llm.status",
@@ -109,6 +110,9 @@ export const TOPIC_ATTRIBUTES = {
   // is apart from the rows of `peers`.
   instances: { roles: ["session", "user"], granularity: "per_instance_whole" },
   agents: { roles: ["user"], granularity: "element" },
+  // The host's terminals, which exist whether a session is in them or not, so
+  // they are a list of their own rather than a field of a session's row.
+  terminals: { roles: ["user"], granularity: "element" },
   // A set the instance derives whole, by folding one error pattern over its
   // sessions: it learns which sessions are stopped, not that one of them
   // changed, so each frame is that reading entire.
