@@ -1,34 +1,60 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { topicFrame } from "../envelope.ts";
-import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
+import { InstanceId, Sid, TerminalId, Timestamp } from "../identifiers.ts";
 import { SessionMetaFields } from "../session-meta.ts";
 
-/** How a session stands, as the instance holding it derives it.
+/** How recently the gateway must have seen inference for a session for that
+ * alone to say the session is alive. A session whose processes are all gone but
+ * whose inference is still running is alive: the request outlives the terminal
+ * it was typed in. */
+export const GATEWAY_LIVE_WINDOW_MS = 5 * 60 * 1000;
+
+/** One process running a session.
  *
- * The instance states the classification rather than the raw inputs it read,
- * so every client shows the same session the same way. The first three appear
- * on connected sessions, the last two on sessions the instance has lost; a
- * client that groups its list groups on this field alone.
- *
- * Being pinned is not one of these: a person pins a session, and the mark
- * travels beside the classification rather than replacing it. */
-export const SessionState = Type.Union(
-  [
-    /** Stopped at something a person has to answer: a dialog it opened, or a
-     * turn that ended in an upstream error. */
-    Type.Literal("waiting"),
-    Type.Literal("live"),
-    /** Alive, but reachable through neither a client connection nor a
-     * terminal, so nothing here can act on it. */
-    Type.Literal("live_unmanaged"),
-    /** Gone, having said it was stopping. */
-    Type.Literal("paused"),
-    /** Gone without saying so. */
-    Type.Literal("disappeared"),
-  ],
-  { $id: "SessionState" },
+ * A session and a run of it are two things: the session is the transcript and
+ * the folded state, and lives whether nothing or two processes are running it.
+ * This is the process — what a signal reaches, what a terminal shows, what a
+ * connection speaks over. */
+export const SessionRun = Type.Object(
+  {
+    /** The harness process. Present when the harness's state file names one or
+     * a launcher started it; a run known only by its connection has none, and
+     * nothing in this contract can signal such a run. */
+    pid: Type.Optional(Type.Integer({ minimum: 1 })),
+    /** When that process started, which is what tells a pid the OS has handed
+     * to something else from the run it was read for. Stated wherever `pid`
+     * is. */
+    started_at: Type.Optional(Timestamp),
+    terminal_id: Type.Optional(TerminalId),
+    /** Whether a connection of this run is open to the instance right now. */
+    connected: Type.Boolean(),
+  },
+  { $id: "SessionRun" },
 );
-export type SessionState = Static<typeof SessionState>;
+export type SessionRun = Static<typeof SessionRun>;
+
+/** What the `session.status` fold for this session is worth.
+ *
+ * A client reads this before it reads the fold: the values below say whether
+ * there is a transcript at all, whether the instance has caught up with it, and
+ * whether anything it says can still be trusted. */
+export const SessionStatusStanding = Type.Union(
+  [
+    /** No transcript, so there is nothing to fold. A session that has just
+     * started stands here until the harness writes its first record. */
+    Type.Literal("absent"),
+    /** The transcript is being read from the top; what the fold says so far is
+     * incomplete. */
+    Type.Literal("folding"),
+    Type.Literal("ready"),
+    /** Two or more runs are writing the same transcript, so the instance stops
+     * updating the fold and stops carrying the transcript's additions. What it
+     * states is the last value it could trust. */
+    Type.Literal("frozen"),
+  ],
+  { $id: "SessionStatusStanding" },
+);
+export type SessionStatusStanding = Static<typeof SessionStatusStanding>;
 
 /** How long a lost session's row is kept after it was last seen, before the
  * instance forgets it and the row leaves as a removal. The same window the inbox
@@ -68,9 +94,9 @@ export type StaleClientInfo = Static<typeof StaleClientInfo>;
  * Connected and lost sessions are one kind of row rather than two lists: a
  * session registering or going quiet moves it between the two, and a row that
  * changed lists while keeping its identity is an update of that row. Which it
- * is now is the `state` below, and the fields that only a lost session has
- * (`last_seen_at`, `stopped_at`, and what it must resume as) are stated
- * alongside the connection fields it kept. */
+ * is now is read off `runs` and `stopped_at` by `liveness` below, and the
+ * fields that only a lost session has (`last_seen_at`, `stopped_at`, and what
+ * it must resume as) are stated alongside the connection fields it kept. */
 export const PeerInfo = Type.Object(
   {
     sid: Sid,
@@ -90,11 +116,19 @@ export const PeerInfo = Type.Object(
      * notification's `sid_label` — so the material for those is on the row that
      * every client already holds. */
     title: Type.Optional(SessionMetaFields.title),
-    /** How this session stands, which is also what separates a connected row
-     * from one its instance has lost. Absent from an instance that states no
-     * classification, and a client then shows the session without grouping it
-     * rather than guessing one. */
-    state: Type.Optional(SessionState),
+    /** Every process the instance can see running this session, which is also
+     * what separates a connected row from one its instance has lost. Empty
+     * means none is running, which is a row a person can still resume; two or
+     * more mean the harness let the same session be resumed while it was
+     * running, and nothing here picks one of them.
+     *
+     * The observation itself rather than a count or a verdict: which process,
+     * where it can be opened, and whether it is connected are each what a
+     * person decides on, and a session role holds this row without ever seeing
+     * the `agents` topic. */
+    runs: Type.Array(SessionRun),
+    /** What this session's `session.status` fold is worth just now. */
+    session_status: SessionStatusStanding,
     /** Set while a person has pinned this session. Absent means not pinned. */
     pinned: Type.Optional(Type.Boolean()),
     /** When this session first registered with the instance. Stable across its
@@ -112,9 +146,10 @@ export const PeerInfo = Type.Object(
     /** When inference last ran for this session, as the gateway saw it.
      *
      * How busy a session is, carried as an attribute of the row rather than
-     * folded into `state`: a session is busy while it stands in any of the
-     * connected classifications, so the two answer different questions and
-     * collapsing them would lose one. It is an instant rather than a flag
+     * folded into how it stands: a session is busy whether one process or none
+     * is running it, so the two answer different questions and collapsing them
+     * would lose one. It is also what says a session with no run left is still
+     * alive, the request outliving the process. It is an instant rather than a flag
      * because there is no moment a request stops being in flight that anything
      * observes — a client reads recency and decides its own threshold.
      *
@@ -144,7 +179,9 @@ export const PeerInfo = Type.Object(
     last_seen_at: Type.Optional(Timestamp),
     /** When the session said it was stopping. Its presence is what makes a lost
      * session a pause rather than a disappearance: one that goes without a word
-     * leaves nothing to stamp here. */
+     * leaves nothing to stamp here. It says something only while `runs` is
+     * empty — a session that declared it was stopping and is running again has
+     * a stamp older than the run. */
     stopped_at: Type.Optional(Timestamp),
     /** What its last turn ran as, in the transcript's own spelling, read back
      * from the transcript rather than copied from the connection: what a lost
@@ -176,6 +213,59 @@ export type PeerRemoved = Static<typeof PeerRemoved>;
 
 export const PeerElement = Type.Union([PeerInfo, PeerRemoved], { $id: "PeerElement" });
 export type PeerElement = Static<typeof PeerElement>;
+
+/** Where a session stands as a thing that is or is not running.
+ *
+ * `duplicated` is not a degree of aliveness but the answer to a different
+ * question — how many processes — which is why it wins over the rest: a session
+ * two processes are writing is one nothing should be read from, however alive
+ * it looks. */
+export type Liveness = "alive" | "duplicated" | "paused" | "disappeared";
+
+/** How a session stands, read off the row.
+ *
+ * Derived here rather than stated on the wire, and here rather than once per
+ * side: an instance and a client that each wrote this arithmetic would show the
+ * same row two ways. */
+export function liveness(
+  row: {
+    runs: readonly { connected: boolean }[];
+    stopped_at?: number;
+    gateway_active_at?: number;
+  },
+  now: number,
+): Liveness {
+  if (row.runs.length >= 2) return "duplicated";
+  const running =
+    (row.runs.length > 0 && row.stopped_at === undefined) ||
+    (row.gateway_active_at !== undefined && now - row.gateway_active_at <= GATEWAY_LIVE_WINDOW_MS);
+  if (running) return "alive";
+  return row.stopped_at === undefined ? "disappeared" : "paused";
+}
+
+/** Whether anything here can act on the session: some run of it is connected or
+ * names a terminal. A session alive with neither is one nothing can be handed
+ * to and nothing can be typed into. */
+export function reachable(row: {
+  runs: readonly { connected: boolean; terminal_id?: string }[];
+}): boolean {
+  return row.runs.some((run) => run.connected || run.terminal_id !== undefined);
+}
+
+/** Whether something is out that a person has to answer: a dialog the harness
+ * is holding open, or a turn that ended on an upstream error.
+ *
+ * Both materials belong to the `user` role — the `agents` row and the status
+ * fold — which is why this takes them rather than a `peers` row: a session role
+ * asking how another session stands has `runs` and `stopped_at` and no way to
+ * see this one. Either argument may be missing, which says only that its
+ * material was not there to read. */
+export function waiting(
+  agentsRow: { waiting_for?: string } | undefined,
+  status: { api_error?: unknown } | undefined,
+): boolean {
+  return agentsRow?.waiting_for !== undefined || status?.api_error !== undefined;
+}
 
 /** The `peers` topic.
  *

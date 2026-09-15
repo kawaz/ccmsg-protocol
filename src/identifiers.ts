@@ -81,6 +81,21 @@ export const Mid = Type.String({
 });
 export type Mid = Static<typeof Mid>;
 
+/** A terminal a run lives in: `<scheme>:<id>`, where the scheme says whose
+ * handle the id is and the id is that system's own spelling.
+ *
+ * The scheme is what lets a client tell a handle it can open from one it
+ * cannot: `hyoui:<id>` is a terminal the gateway named in `terminal_gateway`
+ * serves, and `terminalUrl` composes the URL for it. A handle under any other
+ * scheme travels unchanged and is opened only by a client that knows that
+ * system — which is the point of naming the scheme rather than leaving a bare
+ * id every reader would have to guess the owner of. */
+export const TerminalId = Type.String({
+  $id: "TerminalId",
+  pattern: "^[a-z][a-z0-9_-]*:[^\\s]+$",
+});
+export type TerminalId = Static<typeof TerminalId>;
+
 /** Who a connection speaks as. Settled once by the greeting that opened it —
  * `hello.session`, `hello.user` or `hello.instance`, the op being what says
  * which — and fixed for the connection's life; the op attribute table's
