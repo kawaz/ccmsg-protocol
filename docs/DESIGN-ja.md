@@ -115,6 +115,10 @@ topic `kv:<ns>` が他クライアントの保存を即時に見せる。snapsho
 
 run の `terminal_id` は `<scheme>:<id>` で、scheme はその handle が誰のものかを名乗る。`terminalUrl` が gateway の URL を組み立てるのは `hyoui` scheme の時だけで、他の scheme の handle はその系を知る client が開くか、開かれないままになる。
 
+**端末はセッションのフィールドではなく、それ自体が独立したもの** (DR-0026)。人が shell だけを入れて開いた端末もあるし、端末はそこで走っていたセッションより長生きする。だから `terminals` topic がホストの端末を独立した一覧の行として述べる (鍵は `instance` + `id`)。行が載せるのは端末管理が見ているもの: `state`、走っている `command`、`cwd`、中の `pid`、開始時刻。`id` の scheme がどの端末管理が観測したかを名乗るので、別の端末管理の端末も同じ一覧の行になる。この一覧は `user` role だけのもの — 端末はホストの資源で、あるセッションが別のセッションの端末を知る理由が無い。
+
+どのセッションがどの端末に居るかは、2 つの一覧が共有する pid から導出する。導出は契約が export する関数が行う: `terminalsOf(sid, agents, terminals)` はそのセッションの run が居る端末、`unattachedTerminals(agents, terminals)` はどの run も居ない端末 (人が開いた shell、起動してまだ観測されていないハーネス)、`starting(terminals, agents)` はそのうちプロセスが居るものだけ — 状態ファイルより前の run はこれで言い、`sid` を持たない `agents` の行としては言わない。`agents.terminal_id` は端末管理を読めない instance のために残り、`terminals` がある時は pid の一致が決める。
+
 `peers` の行の `protocol_version` は、その行自身の接続が名乗った世代なので、どの client も greet していない行では欠ける。この行は client が greet して拒まれたのではなく、instance の状態ファイルがそのセッションを接続なしで走っていると名乗っているだけだからだ。
 
 `stopped_at` が付く入口は `session.stopping` ひとつ。セッションが自分で「これから止まる」と宣言し、その後に切断が来る、という順序を instance が守る。宣言せずに消えたセッションは「落ちた」と読まれる — つまり「意図して止まった」と「落ちた」の差は観測ではなく宣言の有無で決まる。呼ぶのはセッション自身 (role は session のみ) で、ハーネスの終了フックや `ccmsg` の CLI がその代理になる。
