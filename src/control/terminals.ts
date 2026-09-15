@@ -50,11 +50,22 @@ export const TerminalElement = Type.Union([TerminalInfo, TerminalRemoved], {
 });
 export type TerminalElement = Static<typeof TerminalElement>;
 
+/** The commands a harness is started as, by the name its binary is installed
+ * under. What `starting` below reads a terminal's `command` against, so that a
+ * shell a person opened is not read as a session on its way up.
+ *
+ * Names rather than paths: the same harness is installed under a dozen
+ * prefixes and run through as many wrappers, and none of that changes what it
+ * is. A harness outside this list is one nothing here claims to recognise — its
+ * terminal is unattached until the harness reports the run itself. */
+export const HARNESS_COMMANDS = ["claude", "codex"] as const;
+
 /** What a derivation below reads off a terminal: where it is and what is
  * running in it. */
 interface TerminalRow {
   readonly instance: string;
   readonly pid?: number;
+  readonly command?: readonly string[];
 }
 
 /** What it reads off an `agents` row: where the process is, and whose session
@@ -67,6 +78,15 @@ interface AgentRow {
 
 const held = (agents: readonly AgentRow[]): Set<string> =>
   new Set(agents.map((agent) => `${agent.instance}/${agent.pid}`));
+
+/** Whether a terminal is running a harness, read off the name its command was
+ * invoked under. */
+const isHarness = (command: readonly string[] | undefined): boolean => {
+  const argv0 = command?.[0];
+  if (argv0 === undefined) return false;
+  const name = argv0.slice(argv0.lastIndexOf("/") + 1);
+  return (HARNESS_COMMANDS as readonly string[]).includes(name);
+};
 
 const key = (terminal: TerminalRow): string | undefined =>
   terminal.pid === undefined ? undefined : `${terminal.instance}/${terminal.pid}`;
@@ -110,15 +130,16 @@ export function unattachedTerminals<T extends TerminalRow>(
   });
 }
 
-/** The terminals holding a process the harness has not reported — which is
- * where a harness that has started and has neither written a state file nor
- * greeted yet is said, rather than as an `agents` row without a `sid`.
+/** The terminals a harness is running in that the harness has not reported: one
+ * that has started and has neither written a state file nor greeted yet. This
+ * is where a run before its state file is said, rather than as an `agents` row
+ * without a `sid`.
  *
- * It is `unattachedTerminals` less the terminals with no process at all: an
- * empty terminal is one nothing can be starting in. A person's own shell is
- * here as well, this having no way to tell a shell from a harness that has not
- * announced itself — what the list says is that something is running there
- * that the harness does not account for. */
+ * Narrower than `unattachedTerminals` in both ways it can be: a terminal with
+ * no process is one nothing can be starting in, and a terminal running
+ * something that is not a harness is a person's own and is not on its way to
+ * becoming a session. The `command` is what says which — a pid alone cannot
+ * tell a shell from a harness — so a row that states none is not here. */
 export function starting<T extends TerminalRow>(
   terminals: readonly T[],
   agents: readonly AgentRow[],
@@ -126,7 +147,7 @@ export function starting<T extends TerminalRow>(
   const pids = held(agents);
   return terminals.filter((terminal) => {
     const at = key(terminal);
-    return at !== undefined && !pids.has(at);
+    return at !== undefined && !pids.has(at) && isHarness(terminal.command);
   });
 }
 

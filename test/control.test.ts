@@ -59,6 +59,7 @@ import { SandboxGrantRequest, SandboxGrantResponse } from "../src/control/sandbo
 import { SessionErrorsFrame } from "../src/control/session-errors.ts";
 import { SessionStatusFrame } from "../src/control/session-status.ts";
 import {
+  HARNESS_COMMANDS,
   starting,
   TerminalsFrame,
   terminalsOf,
@@ -1612,6 +1613,15 @@ describe("the terminals topic", () => {
     { instance: OTHER_INSTANCE, id: "hyoui:%4", state: "running", command: ["zsh"], pid: 4821 },
     // A terminal whose manager reports no process in it.
     { instance: INSTANCE, id: "tmux:%9", state: "dead", command: [] },
+    // A harness the harness's own list has not caught up with yet, invoked
+    // through the path it is installed at.
+    {
+      instance: INSTANCE,
+      id: "hyoui:%44",
+      state: "running",
+      command: ["/opt/homebrew/bin/claude", "--continue"],
+      pid: 6120,
+    },
   ];
   const AGENTS = [
     { instance: INSTANCE, pid: 4821, sid: SID },
@@ -1688,17 +1698,27 @@ describe("the terminals topic", () => {
       "hyoui:%31",
       "hyoui:%4",
       "tmux:%9",
+      "hyoui:%44",
     ]);
   });
 
-  test("what is starting is a process the harness does not account for", () => {
-    // The same list less the terminals with no process: an empty terminal is
-    // one nothing can be starting in.
-    expect(ids(starting(TERMINALS, AGENTS))).toEqual(["hyoui:%31", "hyoui:%4"]);
+  test("what is starting is a harness the harness's own list does not account for", () => {
+    // The name it was invoked under is what says so, whatever path it was
+    // installed at.
+    expect(ids(starting(TERMINALS, AGENTS))).toEqual(["hyoui:%44"]);
     // Once the harness reports it, the terminal leaves this list for the
     // session's own.
-    const seen = [...AGENTS, { instance: INSTANCE, pid: 5177, sid: OTHER_SID }];
-    expect(ids(starting(TERMINALS, seen))).toEqual(["hyoui:%4"]);
-    expect(ids(terminalsOf(OTHER_SID, seen, TERMINALS))).toEqual(["hyoui:%31"]);
+    const seen = [...AGENTS, { instance: INSTANCE, pid: 6120, sid: OTHER_SID }];
+    expect(ids(starting(TERMINALS, seen))).toEqual([]);
+    expect(ids(terminalsOf(OTHER_SID, seen, TERMINALS))).toEqual(["hyoui:%44"]);
+  });
+
+  test("a shell a person opened is unattached and is not starting", () => {
+    // Nothing is on its way to becoming a session there, so calling it
+    // starting would have a client wait for one that never arrives.
+    const shell = TERMINALS.filter((row) => row.id === "hyoui:%31");
+    expect(ids(unattachedTerminals(AGENTS, shell))).toEqual(["hyoui:%31"]);
+    expect(starting(shell, AGENTS)).toEqual([]);
+    expect(HARNESS_COMMANDS).toContain("claude");
   });
 });
