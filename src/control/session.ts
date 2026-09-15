@@ -1,15 +1,22 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response } from "../envelope.ts";
-import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
+import { InstanceId, Sid, TerminalId, Timestamp } from "../identifiers.ts";
 import { DumpIds, SessionDumpFormat, TranscriptItemSelector, TranscriptItemType } from "./dump.ts";
 
 /** Ends the OS process behind a session.
  *
- * The request names a session, never a pid: the instance resolves sid to pid
- * itself at the moment it signals, and a pid the caller asserted would be a
- * weaker basis for killing something than that. */
+ * A session with one run is named by its sid alone: the instance resolves it to
+ * a pid at the moment it signals, which is a better basis than anything a
+ * caller asserts. A session with two is not resolvable that way, and a kill
+ * that named only the sid is refused with `ambiguous_run` — the caller picks a
+ * run from `peers.runs` and names it below. */
 export const SessionKillArgs = Type.Object({
   sid: Sid,
+  /** Which run to end, where the session has more than one. The instance
+   * signals it only after finding it in the session's own runs, pid and start
+   * together, so a pid the caller got wrong ends nothing rather than ending
+   * whatever the OS has since given that number to. */
+  pid: Type.Optional(Type.Integer({ minimum: 1 })),
   /** Escalate to an unconditional kill. The instance never chooses this on its
    * own, because it forfeits the session's chance to flush its transcript; a
    * caller asks for it after watching a graceful attempt go unconfirmed. */
@@ -55,7 +62,7 @@ export type SessionRenameArgs = Static<typeof SessionRenameArgs>;
 export const SessionRenameResult = Type.Object({
   /** The terminal handle the keystrokes went to. A host-local handle, so it
    * travels with the instance that owns it. */
-  terminal_id: Type.String(),
+  terminal_id: TerminalId,
   instance: InstanceId,
   /** The trimmed title actually typed, which is what a caller should report
    * rather than the draft it sent. */

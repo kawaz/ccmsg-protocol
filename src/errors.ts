@@ -46,6 +46,16 @@ export const ERROR_CODES = [
   "session_not_found",
   /** The path, transcript, or record named by the arguments does not exist. */
   "not_found",
+  // --- a session two processes are running ---
+  /** Two or more processes are running the session the call names, so what it
+   * would act on cannot be settled and what the transcript says cannot be
+   * trusted. Nothing is held back for later: what was to be sent is still with
+   * the caller, and a person decides which run to end before anything here
+   * resumes. */
+  "session_duplicated",
+  /** The session has more than one run and the call named none. The caller
+   * picks one from `peers.runs` and asks again naming its pid. */
+  "ambiguous_run",
   // --- file access ---
   "path_forbidden",
   "path_not_writable",
