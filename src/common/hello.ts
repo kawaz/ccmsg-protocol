@@ -66,6 +66,16 @@ export const HelloSessionArgs = Type.Object({
   ...GREETING_FIELDS,
   /** The session the connection speaks for. */
   sid: Sid,
+  /** The harness process running this session. Where the greeting is carried by
+   * something standing in for the session — a hook, the CLI — it is the parent
+   * harness process's pid and not the helper's: what this names is the run, and
+   * the helper is not one.
+   *
+   * It is what ties this session to a process a launcher started before the
+   * harness had written anything of its own, and what lets two runs of one
+   * session be told apart. Optional: a session that cannot read it is greeted
+   * anyway, and the instance then knows the run by its connection alone. */
+  pid: Type.Optional(Type.Integer({ minimum: 1 })),
   /** What the session says about itself. All optional: a session states what it
    * knows, and the instance derives or leaves unknown what it is not told. The
    * instance repeats these on the `peers` topic, so they are the same fields
@@ -141,11 +151,11 @@ export const HelloResult = Type.Object({
   version: Type.String(),
   started_at: Timestamp,
   /** Where a person opens the terminal a session runs in: the base URL of the
-   * gateway that fronts this instance's terminals. A session's terminal names
-   * itself in `terminal_id` on the `agents` topic, and the gateway's URL for it
-   * is `<terminal_gateway>/sessions/<terminal_id>` — so the base URL carries no
-   * trailing slash, the path below it being the gateway's spelling and not this
-   * contract's.
+   * gateway that fronts this instance's terminals. A run's terminal names
+   * itself in `terminal_id`, and `terminalUrl` below composes the URL from the
+   * two — only for a handle under the `hyoui` scheme, this gateway serving no
+   * other. The base URL carries no trailing slash, the path below it being the
+   * gateway's spelling and not this contract's.
    *
    * Stated by the instance because only it knows which gateway stands in front
    * of the machine its sessions run on; a client has no way to derive one from
@@ -163,6 +173,29 @@ export const HelloResult = Type.Object({
   auth_expires_at: Type.Optional(Timestamp),
 });
 export type HelloResult = Static<typeof HelloResult>;
+
+/** The terminal scheme the gateway in `terminal_gateway` serves. */
+export const HYOUI_TERMINAL_SCHEME = "hyoui";
+
+/** Where a person opens a run's terminal, or nothing.
+ *
+ * Nothing when the gateway is absent, and nothing when the handle is under
+ * another scheme: a handle names whose terminal it is, and composing this URL
+ * for one the gateway does not serve would hand a person a link to a page that
+ * is not there. A client holding such a handle opens it the way that system
+ * does, or leaves it unopened.
+ *
+ * Composed here rather than once per client, so the one place that knows both
+ * the scheme and the gateway's path is this contract. */
+export function terminalUrl(
+  gateway: string | undefined,
+  terminalId: string | undefined,
+): string | undefined {
+  if (gateway === undefined || terminalId === undefined) return undefined;
+  const prefix = `${HYOUI_TERMINAL_SCHEME}:`;
+  if (!terminalId.startsWith(prefix)) return undefined;
+  return `${gateway}/sessions/${terminalId.slice(prefix.length)}`;
+}
 
 export const HelloSessionRequest = request("hello.session", HelloSessionArgs);
 export const HelloSessionResponse = response("hello.session", HelloResult);

@@ -1,19 +1,26 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { topicFrame } from "../envelope.ts";
-import { InstanceId, Sid, Timestamp } from "../identifiers.ts";
+import { InstanceId, Sid, TerminalId, Timestamp } from "../identifiers.ts";
 import { upstream } from "../upstream.ts";
 
-/** One session as the harness itself reports it, noted with which config home
- * it was found under.
+/** One run of a session — one process — as the harness itself reports it, noted
+ * with which config home it was found under.
  *
  * This is the harness's view rather than the instance's: it covers sessions
  * that never connected here, and it carries what only the process knows — its
  * pid, its terminal, the title the session gave itself. The instance renames
  * the fields as it copies them in; the words inside them stay the harness's,
- * which is why the status-like fields are open sets. */
+ * which is why the status-like fields are open sets.
+ *
+ * A row is one process and is matched by `instance` and `pid`, never by `sid`:
+ * two processes may be running one session, and a launcher's process is here
+ * before it has a session at all. */
 export const AgentInfo = Type.Object(
   {
-    sid: Sid,
+    /** The session this process is running. Absent on a process a launcher
+     * started that the harness has not yet named a session for — it has a
+     * terminal and a start, and nothing to attach them to yet. */
+    sid: Type.Optional(Sid),
     /** The instance that polled it, and whose host the pid belongs to. */
     instance: InstanceId,
     pid: Type.Integer({ minimum: 1 }),
@@ -39,7 +46,7 @@ export const AgentInfo = Type.Object(
      * into. Absent when the process does not name one or its environment could
      * not be read. Read from the running process rather than remembered from
      * when it started, since resuming a session gives it a new process. */
-    terminal_id: Type.Optional(Type.String()),
+    terminal_id: Type.Optional(TerminalId),
     /** Which namespace that terminal lives in. Absent means the process set
      * none, which the multiplexer treats as its default — not the instance's
      * own namespace, which can differ. Typing into the wrong namespace reports a
@@ -50,13 +57,15 @@ export const AgentInfo = Type.Object(
 );
 export type AgentInfo = Static<typeof AgentInfo>;
 
-/** A row that is gone: the harness no longer reports this session, or the
- * instance that polled it stopped. Marked rather than absent, since a frame
- * carries only what changed. */
+/** A row that is gone: the process ended, or the instance that polled it
+ * stopped. Marked rather than absent, since a frame carries only what changed.
+ *
+ * It names the pid and not the session: the session may well still be there,
+ * with another process running it. */
 export const AgentRemoved = Type.Object(
   {
-    sid: Sid,
     instance: InstanceId,
+    pid: Type.Integer({ minimum: 1 }),
     removed: Type.Literal(true),
   },
   { $id: "AgentRemoved" },
@@ -67,7 +76,7 @@ export const AgentElement = Type.Union([AgentInfo, AgentRemoved], { $id: "AgentE
 export type AgentElement = Static<typeof AgentElement>;
 
 /** The `agents` topic. Elements, like `peers`: the rows that changed since the
- * last frame, matched by their `instance` and `sid`.
+ * last frame, matched by their `instance` and `pid`.
  *
  * The instance polls the harness only while somebody is listening here, so the
  * list is as fresh as the subscription is old — and a poll that finds one
