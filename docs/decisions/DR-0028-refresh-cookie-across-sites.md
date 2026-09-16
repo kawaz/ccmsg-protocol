@@ -11,8 +11,9 @@ refresh token は `<endpoint>auth/*` が Set-Cookie する HttpOnly cookie で�
 
 - refresh token は `<endpoint>auth/*` の HttpOnly cookie で、応答の本文には現れない
 - **前提**: site をまたいで cookie を送るには、分割された cookie (CHIPS) に対応した browser が要る。それがこの契約の前提であり、**対応しない browser は対象外** — 信頼しない環境として扱い、そこでの振る舞いを設計しない
-- cookie の属性は、credential の webui と endpoint が **same-site (scheme と registrable domain が同じ) か**で決まる。cross-site では **分割された cookie** (top-level site ごとに別々) としてしか渡らず、これは **credential が webui の origin ごとに 1 つという形とそのまま重なる** — 1 つの site から取った session が別の site に持ち越されることは、どちらの層でも起こらない。属性の綴りは daemon の持ち物で、ここには書かない
-- `auth/*` のうち **identity を決める 3 op** (`auth.register` / `auth.assert` / `auth.token.refresh`) は 2 つのヘッダを見る。`Origin` が origin と一致すること (register では登録 URL の claims、他の 2 つは token family および credential record が持つ webui から導いた origin)、そして `Sec-Fetch-Site` が **`none` でない**こと。`none` は「人がアドレスバーに打って開いた」で、page から呼ばれていないという意味であり、認証 op にそれが要る場面は無い。どちらのヘッダも、不在は不一致として扱う (省かれた物を一致と読めば、ヘッダを付けない呼び手が検査を素通りする)
+- cookie の属性は、credential の webui と endpoint が **same-site (scheme と registrable domain が同じ) か**で決まる。cross-site では **分割された cookie** としてしか渡らない。属性の綴りは daemon の持ち物で、ここには書かない。
+- **cookie の分割と credential の束縛は粒度が違う**。分割の単位は top-level **site** で、credential の単位は webui の **origin**。同じ site の別 origin にある webui は同じ分割 cookie を共有しうるので、両者は重ならない。session をその origin に留めるのは cookie の分割ではなく、**token family の webui から導いた origin と `Origin` の照合** ([DR-0029](DR-0029-what-a-credential-is-bound-to.md))。cookie の分割が引き受けるのは site をまたぐ持ち越しだけ
+- `auth/*` のうち **identity を決める 3 op** (`auth.register` / `auth.assert` / `auth.token.refresh`) は 2 つのヘッダを見る。`Origin` が origin と一致すること (register では登録 URL の claims、他の 2 つは token family および credential record が持つ webui から導いた origin)、そして `Sec-Fetch-Site` が **`same-origin` / `same-site` / `cross-site` のいずれか**であること。この 3 つが「page から呼ばれた」の全体で、残りは通さない — `none` (initiator が無い要求。人が URL を直に開いた場合を含む)、ヘッダの不在、そして知らない値。**列挙で受けるのであって、`none` だけを弾くのではない**。`Origin` も同じく、不在は不一致として扱う (省かれた物を一致と読めば、ヘッダを付けない呼び手が検査を素通りする)
 - `auth.challenge` はこの 2 つの検査を受けない。照らす相手 — credential も登録 URL も — がまだ無い段階の op であり、challenge 自体は誰が取っても、それを使い切れるのは発行者だけ ([DR-0021](DR-0021-registration-in-two-halves.md))。CORS の許可集合には他の 3 つと同じく従う
 - 断るときの応答は既存の `auth_invalid` で、どのヘッダで落ちたかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ)
 - 契約が持つのはここまで — **どの op がどのヘッダを見るか、断り方、そして下の境界**。cookie の属性をどう組み立て、ヘッダをどう検査するかの手順は daemon の判断で、ここには複製しない ([DR-0020](DR-0020-auth-shape-on-the-wire.md))
@@ -32,5 +33,5 @@ refresh token は `<endpoint>auth/*` が Set-Cookie する HttpOnly cookie で�
 
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — 4 op の carrier と、手順を契約に写さない境界
 - [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — credential の 2 つの束縛と、webui から導く origin が CORS の許可集合であること
-- ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — 手順の正本。cookie の属性を 1 通りに決めている §54 と、`Origin` を見ない理由を述べる §90 は本 DR が置き換える (daemon 側の DR 更新が要る)
+- ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — cookie の属性と、ヘッダ検査の手順の正本
 - `docs/DESIGN.md` §Authenticating a person

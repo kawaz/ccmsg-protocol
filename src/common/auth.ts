@@ -200,8 +200,10 @@ export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
  * the cookie exists to have. That holds however far the page is from the
  * endpoint: a cookie the page's own site cannot reach is sent from a site it
  * does not own only as a partitioned one, which keeps a session taken at one
- * site from being carried to another — the same shape one credential per web UI
- * already has. Sending it at all across sites takes a browser that partitions
+ * site from being carried to another. That partition is by site, where a
+ * credential is by origin, so it is the `Origin` held against this family's
+ * `webui` that keeps a session to the one place it was made — the cookie's
+ * partition answers for sites and nothing finer. Sending it at all across sites takes a browser that partitions
  * cookies, which is a premise of this contract rather than a case it
  * accommodates: one that does not is not an environment this is spoken over. */
 export const AuthSession = Type.Object(

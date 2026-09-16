@@ -42,10 +42,12 @@ export interface OpAttributes {
    * Being reachable from a page is also what gives the three that settle an
    * identity the only headers this contract reads over HTTP: the `Origin` a
    * browser states, held to the origin of the web UI the credential or the
-   * registration names, and `Sec-Fetch-Site`, which has to say the call came
-   * from a page at all — a navigation typed into the address bar is not how
-   * anyone authenticates. A missing header is a failure like a wrong one, and either
-   * answers `auth_invalid` without saying which. `auth.challenge` is checked
+   * registration names, and `Sec-Fetch-Site`, which has to be one of
+   * `same-origin`, `same-site` or `cross-site` — the three that say a page made
+   * the call. Anything else fails: `none`, which is a request with no initiator
+   * at all, a header that is absent, and a value this contract does not know.
+   * Both headers are read as an allowlist rather than a blocklist, and either
+   * failing answers `auth_invalid` without saying which. `auth.challenge` is checked
    * against neither, having nothing yet to be checked against; what it hands
    * out is spendable only at its issuer. */
   readonly carrier?: "http";

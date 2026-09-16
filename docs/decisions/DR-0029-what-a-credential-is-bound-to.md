@@ -25,7 +25,7 @@ browser が述べる `Origin` は **その page がどの site から来たか**
 
 - **保持する単位は URL、比べる単位は origin**。webui は base URL (path 込み、末尾スラッシュ必須) として持つ — それが **人を送る先** (登録 URL) であり、**運用者が設定する形**であり、**人が自分の一覧で見分ける形**だから。一方この契約が行う照合は `clientDataJSON.origin` / `Origin` ヘッダ / CORS の許可集合 / `rpIdHash` の 4 つで、**どれも origin か host の粒度**でしか比べられない (browser は `Origin` にも `clientDataJSON` にも path を書かない)。**同じ origin に載る別 path の webui は、ここでは区別されない**
 - origin (`originOf`) と relying party (`rpIdOf` = その host) は **URL から毎回導き、record にも claims にも併記しない**。同じ URL から決まる値を別に持てば、食い違いうる写しが増えるだけ。導出の正規化 (小文字、既定 port の省略、address literal) は契約の関数 1 つが正本
-- `Endpoint` と `WebUi` はどちらも base URL で、**1 つの場所に綴り方が 1 つ**になるよう型で縛る (末尾スラッシュ必須、host は小文字、既定 port は綴らない、punycode 済み)。`WebUi` はさらに **origin を必ず導ける**ことが型の責務 — 導出が例外になる値や、導いた結果が `Origin` の外に出る値を通せば、record を受理した後で読み出しが壊れる
+- `Endpoint` と `WebUi` はどちらも base URL で、**1 つの場所に綴り方が 1 つ**になるよう型で縛る (末尾スラッシュ必須、host は小文字、既定 port は綴らない、punycode 済み)。`WebUi` はさらに **origin と relying party を必ず導ける**ことが型の責務 — 導出が例外になる値や、導いた結果が `Origin` の外に出る値を通せば、record を受理した後で読み出しが壊れる。そのため `WebUi` は **ceremony が成立しうる URL だけ**を通す (`https`、または browser が信頼する loopback 名の `http`。host に address literal は取れない — secure context と「relying party は domain」という authenticator 側の条件で、ここを通る値が「どの credential も作れなかった URL」にならないようにする)。`Endpoint` は relying party ではないので、この制限は掛けない
 - **relying party は record にも claims にも持たず、webui の host に固定する** (`rpIdOf`)。`rpId` は host の suffix でもよい (それが WebAuthn の許す幅) が、広く取れば `a.example.com` の credential が `b.example.com` から出せることになる。**1 つの origin に縛るのは WebAuthn が強いる形ではなく契約の方針**であり、host に固定するのは認証器側の束縛を同じ幅に揃えて、片方だけを見た実装が緩い方に倒れないようにするため。daemon は authenticator data の `rpIdHash` を「webui の host の SHA-256」と比べ、**到達した endpoint の host は一切関与しない**
 
 ### いつ照らすか
@@ -72,5 +72,5 @@ browser が述べる `Origin` は **その page がどの site から来たか**
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — HTTP で運ぶ 4 op と record の複製経路
 - [DR-0021](DR-0021-registration-in-two-halves.md) — 登録の 2 経路と、発行者だけが判定すること
 - [DR-0028](DR-0028-refresh-cookie-across-sites.md) — site をまたいだときの refresh cookie と、認証 op が見るヘッダ
-- ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — 手順の正本。`rp_id` と `clientDataJSON.origin` を endpoint から導く §42 と、webui を endpoint と別 site に置く構成を非対応とする §55 は本 DR が置き換える (daemon 側の DR 更新が要る)
+- ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — WebAuthn の検証と cookie / carrier の手順の正本
 - `docs/DESIGN.md` §Authenticating a person
