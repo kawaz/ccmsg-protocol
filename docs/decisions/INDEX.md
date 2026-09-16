@@ -41,15 +41,6 @@ Status は各 DR ファイルの `Status:` 行が正本。
 |---|---|
 | [DR-0011](DR-0011-instance-derives-the-classification.md) | セッションの分類は instance が導出し `state` として行に載せる (Superseded by [DR-0001](DR-0001-session-and-run.md)) |
 
-## Archived
-
-現役の文脈を汚す古い DR は `decisions/archive/` に退避し、ここに記載する。
-
-| DR | 要旨 |
-|---|---|
-| [DR-0022](archive/DR-0022-credential-bound-to-an-endpoint.md) | credential は endpoint に束縛。住所や BE/BS は見分けるための物で何も決めない (Superseded by [DR-0029](DR-0029-what-a-credential-is-bound-to.md)) |
-| [DR-0027](archive/DR-0027-webui-apart-from-endpoint.md) | webui の URL は endpoint と別物で、credential は作られた 1 つの webui を持つ (Superseded by [DR-0029](DR-0029-what-a-credential-is-bound-to.md)) |
-
 ## Moved to research/
 
 <!-- 判断記録の体を成さなくなり research/ に降格した DR -->
