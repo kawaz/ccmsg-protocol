@@ -43,6 +43,30 @@ export const InstanceId = Type.String({
 });
 export type InstanceId = Static<typeof InstanceId>;
 
+/** A host as a browser serializes one: lowercase labels, or an address literal
+ * in its brackets. No uppercase, no userinfo, no empty label and no zone id —
+ * every one of those is either a second spelling of one host or a string no URL
+ * parser will take. */
+const HOST =
+  "(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*|\\[[0-9a-f:.]+\\])";
+
+/** A port in range, 1 to 65535. */
+const PORT =
+  "(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])";
+
+/** A scheme and authority, with the scheme's own port left unspelled — a
+ * browser omits it, so writing it would be a second name for one place. `tail`
+ * closes the pattern: the end of the string for an origin, a path for a base
+ * URL, and it is what the lookaheads read to know a port ended. */
+function authority(tail: string): string {
+  const port = (its: string) => `(?::(?!${its}(?:/|$))${PORT})?`;
+  return `^(?:https://${HOST}${port("443")}|http://${HOST}${port("80")})${tail}`;
+}
+
+/** A base URL: an authority as above, then a path that ends in a slash and
+ * carries no query or fragment. */
+const BASE_URL = authority("(?:/[^?#\\s]*)?/$");
+
 /** Where an instance is published: the base URL everything it serves hangs
  * under, ending in a slash and naming no route of its own.
  *
@@ -57,8 +81,11 @@ export type InstanceId = Static<typeof InstanceId>;
  *
  * Compared as a whole string, path included (one origin
  * may host several instances, so an origin-level comparison would confuse
- * them). The trailing slash is required so that comparison is exact: `/ccmsg`
- * and `/ccmsg/` would otherwise be two spellings of one instance.
+ * them). Every part of it is held to one spelling for that comparison's sake:
+ * the trailing slash is required, so `/ccmsg` and `/ccmsg/` are not two
+ * endpoints; the host is lowercase and the scheme's own port is left out, as a
+ * browser would write them; an internationalized host is spelled in punycode,
+ * which is what the wire carries anyway.
  *
  * Apart from `InstanceId` because the two answer different questions and change
  * on different occasions. This is what a peer dials, what the TLS certificate
@@ -66,10 +93,7 @@ export type InstanceId = Static<typeof InstanceId>;
  * as — trust is rooted in the URL and nowhere else. Which instance answers
  * there is the id, which the handshake states and which an alias or a move does
  * not alter. */
-export const Endpoint = Type.String({
-  $id: "Endpoint",
-  pattern: "^https?://[^/?#\\s]+(/[^?#\\s]*)?/$",
-});
+export const Endpoint = Type.String({ $id: "Endpoint", pattern: BASE_URL });
 export type Endpoint = Static<typeof Endpoint>;
 
 /** Where the web UI is published: the base URL a person opens it at, ending in
@@ -87,10 +111,7 @@ export type Endpoint = Static<typeof Endpoint>;
  * stored because it is what a person is sent to and what an operator
  * configures; the origin is read off it whenever a header has to be matched,
  * rather than being kept beside it as a second field that could disagree. */
-export const WebUi = Type.String({
-  $id: "WebUi",
-  pattern: "^https?://[^/?#\\s]+(/[^?#\\s]*)?/$",
-});
+export const WebUi = Type.String({ $id: "WebUi", pattern: BASE_URL });
 export type WebUi = Static<typeof WebUi>;
 
 /** Where a page was served from: a scheme and an authority and nothing else,
@@ -114,11 +135,7 @@ export type WebUi = Static<typeof WebUi>;
  * `clientDataJSON.origin`, against the members of a CORS answer — so a second
  * spelling of one site would be a record that never matches the site it names,
  * or an allowed origin that quietly admits nothing. */
-export const Origin = Type.String({
-  $id: "Origin",
-  pattern:
-    "^(?=https://(?![^/]*:443$)|http://(?![^/]*:80$))https?://(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*|\\[[0-9a-f:.]+\\])(?::(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
-});
+export const Origin = Type.String({ $id: "Origin", pattern: authority("$") });
 export type Origin = Static<typeof Origin>;
 
 /** A delivery-frame id: `<instance id>/<counter>`, numbered by the instance

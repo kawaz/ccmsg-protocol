@@ -20,7 +20,7 @@ import {
   HelloSessionResponse,
   HelloUserRequest,
 } from "../src/common/hello.ts";
-import { Origin } from "../src/identifiers.ts";
+import { Endpoint, Origin, WebUi } from "../src/identifiers.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
@@ -530,6 +530,45 @@ describe("authenticating a person", () => {
           data: { records: [{ ...record, body: { ...record.body, webui } }] },
         }),
       ).toBe(false);
+    }
+  });
+
+  test("a web UI a URL parser would refuse, or that spells one site twice, is refused", () => {
+    // The derivations are total over this type: anything that passes here has
+    // an origin and a relying party, and the origin is one the `Origin` schema
+    // takes. A value the parser throws on, or a second spelling of one site,
+    // would break that on a record that had already been accepted and
+    // replicated.
+    for (const webui of [
+      "https://ui.example.test:99999/ccmsg/",
+      "https://[fe80::1%25en0]/ccmsg/",
+      "https://-bad.example/ccmsg/",
+      "https://bad-.example/ccmsg/",
+      "https://a..example/ccmsg/",
+      "https://example.test./",
+      "https://user@ui.example.test/ccmsg/",
+      "https://UI.EXAMPLE.TEST/ccmsg/",
+      "https://ui.example.test:443/ccmsg/",
+      "http://ui.example.test:80/",
+    ]) {
+      expect(isValid(WebUi, webui)).toBe(false);
+      expect(isValid(Endpoint, webui)).toBe(false);
+    }
+  });
+
+  test("every web UI this contract takes has an origin and a relying party", () => {
+    for (const webui of [
+      FIXTURE_IDS.webui,
+      FIXTURE_IDS.same_site_webui,
+      "http://localhost/",
+      "http://127.0.0.1:3000/",
+      "http://[::1]:8080/x/",
+      "https://xn--r8jz45g.xn--zckzah/ccmsg/",
+      "https://ui.example.test:8443/a/b/",
+    ]) {
+      expect(isValid(WebUi, webui)).toBe(true);
+      expect(isValid(Origin, originOf(webui))).toBe(true);
+      expect(rpIdOf(webui).length).toBeGreaterThan(0);
     }
   });
 
