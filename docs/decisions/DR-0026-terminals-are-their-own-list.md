@@ -1,6 +1,6 @@
 # DR-0026: 端末は端末の一覧として述べ、セッションとはマッピングで結ぶ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-15
 
 ## Context

@@ -1,6 +1,6 @@
 # DR-0018: 識別は `instance` id、ダイヤル先は `endpoint` URL
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

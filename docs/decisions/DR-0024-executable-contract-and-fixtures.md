@@ -1,6 +1,6 @@
 # DR-0024: 契約は実行可能で、線上の代表例 (fixtures) も契約が持つ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

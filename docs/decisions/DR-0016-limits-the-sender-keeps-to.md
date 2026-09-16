@@ -1,6 +1,6 @@
 # DR-0016: 送り手が守れる上限だけを契約が持つ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

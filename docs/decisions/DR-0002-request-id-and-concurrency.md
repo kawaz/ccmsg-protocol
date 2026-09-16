@@ -1,6 +1,6 @@
 # DR-0002: 全ての Request が `request_id` を持ち、1 接続の要求は並行に走る
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

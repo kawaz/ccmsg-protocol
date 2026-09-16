@@ -1,6 +1,6 @@
 # DR-0021: 登録は URL と 6 桁を別経路で要求し、判定は発行者だけが行う
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

@@ -1,6 +1,6 @@
 # DR-0009: 共有 kv が約束するのは namespace 内の key の一意性だけ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

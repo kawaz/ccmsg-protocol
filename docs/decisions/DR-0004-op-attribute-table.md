@@ -1,6 +1,6 @@
 # DR-0004: 認可・capability・配置は op 属性表 1 枚から読む
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

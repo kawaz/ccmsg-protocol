@@ -1,6 +1,6 @@
 # DR-0025: 上流の語彙を持つ型に mark を付け、綴りだけは揃える
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

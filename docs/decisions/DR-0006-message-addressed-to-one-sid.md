@@ -1,6 +1,6 @@
 # DR-0006: メッセージは 1 つの sid 宛、送り主は sid とは限らない
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

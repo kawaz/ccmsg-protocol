@@ -1,6 +1,6 @@
 # DR-0014: 呼び出しと結果は 2 つの item で、id で互いを指す
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

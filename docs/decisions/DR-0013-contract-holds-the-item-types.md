@@ -1,6 +1,6 @@
 # DR-0013: 契約が持つのは transcript の語彙だけで、行を読む物は持たない
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

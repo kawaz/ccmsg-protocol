@@ -1,6 +1,6 @@
 # DR-0008: 直送メッセージの本文の語彙は契約が持つ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

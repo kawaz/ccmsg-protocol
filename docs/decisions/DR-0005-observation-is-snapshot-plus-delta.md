@@ -1,6 +1,6 @@
 # DR-0005: 観測は購読 1 つ、snapshot と delta が同じ型で届く
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

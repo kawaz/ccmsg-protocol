@@ -1,6 +1,6 @@
 # DR-0028: refresh token は endpoint の cookie のままで、site をまたぐときだけ分割された cookie として渡る
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-16
 
 ## Context

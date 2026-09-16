@@ -1,6 +1,6 @@
 # DR-0019: mesh は専用 op を持たず、転送された要求は宛先で認可し直す
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

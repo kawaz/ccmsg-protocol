@@ -1,6 +1,6 @@
 # DR-0017: `PROTOCOL_VERSION` は世代を表し、互換経路を持たない
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

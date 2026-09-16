@@ -1,6 +1,6 @@
 # DR-0012: 未配送メッセージと失われた行の保持期限を契約が持つ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

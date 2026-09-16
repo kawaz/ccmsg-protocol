@@ -1,6 +1,6 @@
 # DR-0029: credential は endpoint と webui の 2 つに縛られ、比べる値はどちらも URL から導く
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-16
 
 ## Context

@@ -1,6 +1,6 @@
 # DR-0007: 渡らなかったメッセージは inbox で待ち、人が読んでも消費されない
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

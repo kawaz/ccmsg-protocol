@@ -1,6 +1,6 @@
 # DR-0003: 接続直後に通るのは `hello.*` だけで、identity は挨拶が束縛する
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

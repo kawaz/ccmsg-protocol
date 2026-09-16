@@ -1,6 +1,6 @@
 # DR-0010: セッションの素性は 1 箇所で述べ、挨拶はフィールド単位に取る
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

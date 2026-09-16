@@ -1,6 +1,6 @@
 # DR-0001: セッションと run を分け、`SessionState` を観測されるフィールドに置き換える
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context

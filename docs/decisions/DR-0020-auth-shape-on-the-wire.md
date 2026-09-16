@@ -1,6 +1,6 @@
 # DR-0020: 人の認証は線上の形だけを契約が持ち、4 つの op は HTTP で運ぶ
 
-- Status: Active
+- Status: Active — ✅ 実装済
 - Date: 2026-09-14
 
 ## Context
