@@ -34,7 +34,7 @@ browser が述べる `Origin` は **その page がどの origin から来たか
 
 - **登録 URL は 2 つを名指す**。人を送る先の webui (名指さない URL は誰も開けない) と、**発行者自身の endpoint**。URL の secret も 6 桁の試行回数も発行者にしかないので、**登録が成立するのは発行者に届いた時だけ** ([DR-0021](DR-0021-registration-in-two-halves.md))
 - **token family は認証された credential の webui を引き継ぐ**。WS の handshake は、その webui から導いた origin と `Origin` ヘッダの一致で通す。読むのは「この token を作った page と同じ origin から来たか」の 1 点。**WS で `Origin` を読むのはこの handshake だけ** — upgrade に CORS は効かず browser は `Origin` を送るだけなので、契約が自分で見る。接続が立った後の frame 上の op では見ない。CORS が効く HTTP 側で何を見るかは [DR-0028](DR-0028-refresh-cookie-across-sites.md)
-- **`Origin` の不在は不一致**。WS の upgrade でも、HTTP で identity を決める 3 op でも同じで、ヘッダを付けない呼び手を通す例外を置かない。**全てのゲートを通ることが条件**であり、比べる物が無い呼び手は条件を満たしていない。person の token を提示する接続は browser の page からしか来ない (CLI は到達そのものが権限の Unix socket を使う)
+- **`Origin` の不在は不一致**。WS の upgrade でも、HTTP で identity を決める 3 op でも同じで、ヘッダを付けない呼び手を通す例外を置かない。**全てのゲートを通ることが条件**であり、比べる物が無い呼び手は条件を満たしていない。「person の token を提示する接続は browser の page からしか来ない」は **観測ではなく契約が置く前提** — CLI は到達そのものが権限の Unix socket を使うので、person の token を要る場面がそもそも無い。前提である以上、それを満たさない呼び手を見分けて通す仕組みは用意せず、ヘッダが無ければ断る
 - 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
 - HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**と、**その instance 自身が発行してまだ生きている登録 URL の webui から導いた origin** で CORS に答える。後者は **複製しない** — 発行者の手元にしかなく、発行者だけが答えればよい。許可一覧を設定にも管理 UI にも持たない (登録した場所がそのまま許可) 形はこれで保たれ、新しい webui での最初の 1 件も発行者に届けば通る。どのヘッダを見るかと断り方は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
 - どの束縛で落ちても、HTTP の答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ理由)
