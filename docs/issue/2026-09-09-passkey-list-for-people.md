@@ -33,6 +33,10 @@ DR-0001 §2.2 の「利用者が複数端末を持つ場合にどの端末の pa
 2. 消した後の family / 接続の扱い (その credential で始まった family だけ失効するか、sub の全 family か) を DR §2.5 の `passkey remove` と揃えて決める
 3. 位置情報など「記憶の手がかり」の任意フィールドを record に増やす余地
 
+## 追記
+
+kawaz 2026-09-16: list だけでなく、確立済みの認証済みチャンネル経由で passkey の add / remove もできてよい (CLI 以外の経路)。条件: add / remove は直前に既存 credential での assert (user verification) を要求する 2 段にする (登録 ceremony 自体の UV は新しい認証器の持ち主を確かめるだけで既存の持ち主を確かめないため)。token 単体では add / remove できない = 離席中に第三者が add できない。今使っている credential は自分では remove できない。add でできるのは同じ origin での追加だけ (登録 ceremony の rpId はそのページの origin なので、2 つ目の hosting site の bootstrap は CLI か CLI が出す一回限りの登録 URL の責務のまま)。CT-Q11 (DR-0027) と CT-Q12 の後に DR 1 本で扱う。
+
 ## 受け入れ条件
 
 - [ ] 論点 1-3 について方針を決定し、契約 (op 定義 / DR) に反映する
