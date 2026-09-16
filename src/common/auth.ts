@@ -198,9 +198,9 @@ export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
  * endpoint: a cookie the page's own site cannot reach is sent from a site it
  * does not own only as a partitioned one, which keeps a session taken at one
  * site from being carried to another — the same shape one credential per web UI
- * already has. A browser without that partitioning sends nothing across
- * sites, and the client falls back to asserting the passkey again, which costs
- * a user verification and no function. */
+ * already has. Sending it at all across sites takes a browser that partitions
+ * cookies, which is a premise of this contract rather than a case it
+ * accommodates: one that does not is not an environment this is spoken over. */
 export const AuthSession = Type.Object(
   {
     sub: Subject,
