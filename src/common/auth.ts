@@ -378,7 +378,10 @@ export const CredentialRecord = Type.Object(
      * claims stated it.
      *
      * Which instance the credential admits its holder to: an assertion is
-     * accepted only where the request's path falls under this base URL.
+     * accepted only where the request arrived at this base URL — the same
+     * scheme and authority, and a path below it. (The authority the request
+     * reached, which is a property of the connection; what site the page asking
+     * came from is `origin` below and a separate question.)
      * `https://h.example/` and `https://h.example/personal/` are
      * two endpoints and take two registrations, even on one host and one
      * relying party — the RP ID says which domain an authenticator will answer
@@ -477,7 +480,9 @@ export const TokenFamily = Type.Object(
      *
      * What a connection presenting one of these tokens is held to: the
      * handshake compares this with the `Origin` the browser states, and a page
-     * from anywhere else is refused however good the token is. Without it a
+     * from anywhere else is refused however good the token is — refused as an
+     * upgrade that does not happen, there being no connection yet to answer an
+     * error on. Without it a
      * token that leaked would be usable from any page at all — it says who the
      * person is and nothing about what is holding it. It lives on the family
      * rather than inside the token's own spelling because every instance has

@@ -39,12 +39,15 @@ export interface OpAttributes {
    * cannot, and they answer before any identity is settled. The route each is
    * published at belongs to the instance, not here.
    *
-   * Being reachable from a page is also what gives these three the only headers
-   * this contract reads: the `Origin` a browser states, held to the origin the
-   * credential or the registration names, and `Sec-Fetch-Site`, which has to
-   * say the call came from a page at all — a navigation typed into the address
-   * bar is not how anyone authenticates. Either one failing answers
-   * `auth_invalid` without saying which. */
+   * Being reachable from a page is also what gives the three that settle an
+   * identity the only headers this contract reads over HTTP: the `Origin` a
+   * browser states, held to the origin the credential or the registration
+   * names, and `Sec-Fetch-Site`, which has to say the call came from a page at
+   * all — a navigation typed into the address bar is not how anyone
+   * authenticates. A missing header is a failure like a wrong one, and either
+   * answers `auth_invalid` without saying which. `auth.challenge` is checked
+   * against neither, having nothing yet to be checked against; what it hands
+   * out is spendable only at its issuer. */
   readonly carrier?: "http";
   /** Present when the role changes what the reply may contain rather than
    * whether the call is allowed. */

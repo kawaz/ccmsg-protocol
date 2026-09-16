@@ -477,13 +477,21 @@ describe("authenticating a person", () => {
     // other, and the fixture is written at a site that is nobody's endpoint.
     const [record] = TOPIC_FIXTURES["auth.records"].data.records;
     expect(record.body.endpoint.startsWith(`${record.body.origin}/`)).toBe(false);
-    expect(record.body.rp_id).toBe(new URL(record.body.origin).host);
+    // The relying party is a registrable suffix of the origin's host, which the
+    // host itself is the shortest of.
+    const host = new URL(record.body.origin).host;
+    expect(host === record.body.rp_id || host.endsWith(`.${record.body.rp_id}`)).toBe(true);
   });
 
   test("an origin is a site and not a URL with a path", () => {
     const frame = TOPIC_FIXTURES["auth.records"];
     const [record] = frame.data.records;
-    for (const origin of ["https://ui.example.ts.net/", "https://ui.example.ts.net/webui"]) {
+    for (const origin of [
+      "https://ui.example.ts.net/",
+      "https://ui.example.ts.net/webui",
+      "https://someone@ui.example.ts.net",
+      "HTTPS://UI.example.ts.net",
+    ]) {
       expect(
         isValid(AuthRecordsFrame, {
           ...frame,

@@ -82,10 +82,15 @@ export type Endpoint = Static<typeof Endpoint>;
  * them came from, which is all the browser's same-origin rules know about and
  * all a page's own script cannot lie about. One site may be the page for many
  * endpoints, and one origin may carry many instances, so neither is derivable
- * from the other. */
+ * from the other.
+ *
+ * Spelled as a browser serializes one and no wider: lowercase scheme and host,
+ * an optional port, no userinfo and no credentials of any kind. Comparison is
+ * of whole strings, so a value written any other way would simply never match
+ * the header it is meant to be held to. */
 export const Origin = Type.String({
   $id: "Origin",
-  pattern: "^https?://[^/?#\\s]+$",
+  pattern: "^https?://([a-z0-9-]+(\\.[a-z0-9-]+)*|\\[[0-9a-f:.]+\\])(:[0-9]+)?$",
 });
 export type Origin = Static<typeof Origin>;
 
