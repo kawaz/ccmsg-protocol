@@ -411,10 +411,10 @@ export const CredentialRecord = Type.Object(
      * admitted to. Binding to the base URL rather than the origin is what keeps
      * one instance's credential from being a way into its neighbour. */
     endpoint: Endpoint,
-    /** The web UI the page that created this credential was served from, which
-     * is the one place it may ever be used from.
+    /** The web UI the page that created this credential was served from, whose
+     * origin is the one it may ever be used from.
      *
-     * Holding it to one place is this contract's rule rather than WebAuthn's. A
+     * Holding it to one origin is this contract's rule rather than WebAuthn's. A
      * passkey is bound to its relying party, which may be a suffix of the host,
      * so the authenticator alone would answer for every origin under that
      * suffix. What holds a credential to one is the check made against
@@ -428,8 +428,10 @@ export const CredentialRecord = Type.Object(
      * `Origin` is held to the origin of it, and the origins of an endpoint's
      * credentials are the set the HTTP auth ops answer CORS for. Keeping the
      * origin alongside instead would be a second copy of one fact, able to
-     * disagree with the URL a person is actually sent to. A person using two
-     * web UIs holds two credentials, one per UI.
+     * disagree with the URL a person is actually sent to. A person using web
+     * UIs at two origins holds two credentials, one per origin; two UIs under
+     * one origin are one place to every check here, there being no path in an
+     * `Origin` header to tell them apart by.
      *
      * Apart from `endpoint` because the two answer different questions: which
      * page may speak, and which instance it may speak to. */

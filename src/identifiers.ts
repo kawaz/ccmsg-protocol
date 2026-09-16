@@ -103,14 +103,17 @@ export type Endpoint = Static<typeof Endpoint>;
  * where an instance is dialed; this says where the page doing the dialing came
  * from, and one of each is what a credential is made against. Spelled to the
  * same rule as an endpoint, path and trailing slash included, because it is the
- * same kind of value: a base URL that something is published under, of which
- * several may share one host.
+ * same kind of value: a base URL that something is published under.
  *
- * What is compared against a browser's `Origin` is narrower than this — the
- * scheme and authority alone, which `originOf` derives. The URL is what is
- * stored because it is what a person is sent to and what an operator
- * configures; the origin is read off it whenever a header has to be matched,
- * rather than being kept beside it as a second field that could disagree. */
+ * **What is kept and what is compared are different sizes.** The whole URL is
+ * kept: it is where a person is sent, what an operator configures, and what
+ * they read back in a list of their own credentials. Every comparison this
+ * contract makes is of the origin (`originOf`) or the host (`rpIdOf`), because
+ * a browser writes neither a path in an `Origin` header nor one in a
+ * `clientDataJSON` — there is nothing finer on the wire to compare. Two web UIs
+ * under one origin are therefore one place to everything here. The origin is
+ * read off the URL where a header has to be matched rather than kept beside it
+ * as a second field that could disagree. */
 export const WebUi = Type.String({ $id: "WebUi", pattern: BASE_URL });
 export type WebUi = Static<typeof WebUi>;
 

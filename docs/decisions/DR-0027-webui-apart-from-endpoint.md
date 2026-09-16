@@ -13,9 +13,10 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 
 ## Decision
 
-- **webui の URL と endpoint は別の値**で、どちらも base URL。`WebUi` は webui が mount されている URL (path まで含み、末尾スラッシュ必須)、`Endpoint` は instance のそれ ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。1 つの host に複数の webui が載りうるので、endpoint と同じく path まで含めて比べる。どちらも **1 つの場所に綴り方が 1 つ**になるよう型で縛る (末尾スラッシュ必須、host は小文字、既定 port は綴らない、punycode 済み)。`WebUi` はさらに **origin を必ず導ける**ことが型の責務 — 導出が例外になる値や、導いた結果が `Origin` の外に出る値を通せば、「URL を正本に毎回導く」形が record を受理した後で破れる
+- **webui の URL と endpoint は別の値**で、どちらも base URL。`WebUi` は webui が mount されている URL (path まで含み、末尾スラッシュ必須)、`Endpoint` は instance のそれ ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。どちらも **1 つの場所に綴り方が 1 つ**になるよう型で縛る (末尾スラッシュ必須、host は小文字、既定 port は綴らない、punycode 済み)。`WebUi` はさらに **origin を必ず導ける**ことが型の責務 — 導出が例外になる値や、導いた結果が `Origin` の外に出る値を通せば、「URL を正本に毎回導く」形が record を受理した後で破れる
+- **保持する単位は URL、比べる単位は origin**。この 2 つは違う。path まで持つのは、それが **人を送る先** (登録 URL) であり、**運用者が設定する形**であり、**人が自分の一覧で見分ける形**だから。一方、契約が行う照合は `clientDataJSON.origin` / `Origin` ヘッダ / CORS の許可集合 / `rpIdHash` の 4 つで、**どれも origin (または host) 粒度**でしか比べられない — browser は `Origin` にも `clientDataJSON` にも path を書かないので、path で比べる材料が線上に無い。**同じ origin に載る別 path の webui は、この契約では区別されない**
 - **`Origin` と比べる値は URL から導く** (`originOf`)。origin は URL の scheme + authority で、browser が `Origin` ヘッダと `clientDataJSON.origin` に綴る形。record が持つのは **URL の側**で、origin を隣に併記しない — 人を送る先は URL であって、2 つ持てば食い違いうる 1 つの事実になる。導出の正規化 (小文字、既定 port の省略、address literal) は契約の関数 1 つが正本
-- **credential record は作られた webui を 1 つ持ち、その 1 つでしか使えない**。これは WebAuthn が強いる形ではなく **契約が定める方針**で、認可の実体は「ceremony の `clientDataJSON.origin` が record (登録では登録 URL の claims) の webui から導いた origin と一致すること」。WebAuthn の `rpId` 束縛だけなら同じドメインの下の別 origin からも使えてしまうので、それに任せず契約が 1 つに絞る。2 つの webui を使う人は credential を 2 つ持つ
+- **credential record は作られた webui を 1 つ持ち、その origin でしか使えない**。これは WebAuthn が強いる形ではなく **契約が定める方針**で、認可の実体は「ceremony の `clientDataJSON.origin` が record (登録では登録 URL の claims) の webui から導いた origin と一致すること」。WebAuthn の `rpId` 束縛だけなら同じドメインの下の別 origin からも使えてしまうので、それに任せず契約が 1 つの origin に絞る。別の origin の webui を使う人は credential を 2 つ持つ
 - **relying party も webui の URL から導く** (`rpIdOf` = その host)。origin と同じ理由で record にも claims にも持たない — 同じ URL から決まる値を別に持てば、食い違いうる写しが増えるだけ。client は rpId を page の origin に照らす (effective domain かその registrable suffix) ので、host と一致させておけば契約の照合 (`clientDataJSON.origin`) と認証器の束縛 (`rpIdHash`) が同じ 1 つの site を指す。daemon は authenticator data の `rpIdHash` を「webui の host の SHA-256」と比べる。endpoint の host は一切関与しない
 - 登録 URL の claims も webui を運ぶ。**登録 URL は webui を名指して発行される** — 人をどこへ送るかがまさにその URL であり、名指さない登録 URL は誰も開けない
 - token family は認証された webui を持ち、**WS の handshake は token の webui から導いた origin と `Origin` ヘッダの一致で通す**。読むのは「この token を作った page と同じ site から来たか」の 1 点。WS で `Origin` を読むのはここだけで、HTTP の認証 op が読む分は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
@@ -40,7 +41,7 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 
 ## Consequences
 
-- 2 つの webui から使う人は、webui ごとに登録する。webui を配る場所を変えることは、全員の登録をやり直すこと
+- 別の origin の webui から使う人は、origin ごとに登録する。webui を別の origin へ移すことは、全員の登録をやり直すこと (同じ origin の中で path を動かすだけなら、契約は何も見ていないので登録は生きたまま)
 - instance が答える CORS の集合は、人が登録するたびに増える。これは設定の変更ではなく登録の結果なので、増やす操作も減らす操作も credential の追加と削除しかない
 - `Origin` を送らない client (非 browser) は、この束縛の対象ではない — token の origin と比べる物が無い経路は、そもそも browser の同一生成元規則の外にある
 
