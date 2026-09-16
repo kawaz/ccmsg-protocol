@@ -16,9 +16,10 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 - **page の origin と endpoint は別の値**で、別の型を持つ。`Origin` は scheme と authority だけ (path も末尾スラッシュも持たない)、`Endpoint` は path まで含む base URL ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。比較の単位が違う物を 1 つの型で綴らない
 - **credential record は作られた origin を 1 つ持つ**。passkey は `rpId` に束縛され、登録も認証も `rpId` が page の origin のドメインと一致する page でしか走らない — つまり credential ごとに origin は 1 つしかありえない。2 つの hosting site を使う人は credential も 2 つ持つ。`clientDataJSON.origin` は ceremony のたびに検証されるので、record に origin を書くのは **WebAuthn が既に持っている束縛を索引に写すだけ**であり、新しい判定を足してはいない
 - 登録 URL の claims も origin を運ぶ。URL は hosting site を指して作られるので、`rp_id` はその **origin の host の登録可能な suffix** であって、endpoint の host からは導かない
-- token family は認証された origin を持ち、**WS の handshake は token の origin と `Origin` ヘッダの一致で通す**。契約が `Origin` を読むのはここだけで、読むのは「この token を作った page と同じ site から来たか」の 1 点
+- token family は認証された origin を持ち、**WS の handshake は token の origin と `Origin` ヘッダの一致で通す**。読むのは「この token を作った page と同じ site から来たか」の 1 点。WS で `Origin` を読むのはここだけで、HTTP の認証 op が読む分は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
+- 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
 - HTTP の認証 op は、**その endpoint に登録済みの credential の origin と、まだ生きている登録 URL が名指す origin** で CORS に答える。許可一覧を設定にも管理 UI にも持たない — 登録した場所がそのまま許可であり、登録 URL が origin を運ぶことで最初の 1 つも同じ規則で答えられる
-- どの束縛で落ちても答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ理由)
+- HTTP の認証 op がどの束縛で落ちても、答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ理由)
 - credential の **endpoint 束縛はそのまま残る** ([DR-0022](DR-0022-credential-bound-to-an-endpoint.md))。origin は「どの page から来てよいか」、endpoint は「どの instance に入ってよいか」で、答えている問いが違う
 - 契約が持たないもの: webui 自身の `connect-src` allowlist。「この page がどの instance に繋いでよいか」は page を配る側の宣言であって線上の形ではなく、webui リポの責務
 
@@ -46,4 +47,5 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 - [DR-0021](DR-0021-registration-in-two-halves.md) — 登録 URL の claims と、失敗の述べ方
 - [DR-0022](DR-0022-credential-bound-to-an-endpoint.md) — credential の endpoint 束縛
 - [DR-0028](DR-0028-refresh-cookie-across-sites.md) — site をまたいだときの refresh cookie
+- ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — 手順の正本。`rp_id` と `clientDataJSON.origin` を endpoint から導く §42 と、webui を endpoint と別 site に置く構成を非対応とする §55 は本 DR が置き換える (daemon 側の DR 更新が要る)
 - `docs/DESIGN.md` §Authenticating a person

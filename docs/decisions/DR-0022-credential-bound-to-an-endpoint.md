@@ -9,7 +9,7 @@
 
 ## Decision
 
-- credential record は登録された `endpoint` を保持し、assertion は **そこでだけ**受ける。origin が一致し、要求の path がその base URL の下にあること。`https://h/` と `https://h/personal/` は 2 つの endpoint で、1 つの host・1 つの RP ID であっても 2 つの登録を要する。**base URL に束縛することが、隣の instance への入口を塞ぐ**
+- credential record は登録された `endpoint` を保持し、assertion は **そこでだけ**受ける。要求が届いた URL の scheme + authority が endpoint のそれと一致し、path がその base URL の下にあること。`https://h/` と `https://h/personal/` は 2 つの endpoint で、1 つの host・1 つの RP ID であっても 2 つの登録を要する。**base URL に束縛することが、隣の instance への入口を塞ぐ**
 - credential record は登録時の `rp_id` も保持する。passkey は作られたドメインにしか答えないので、assertion の `rpIdHash` は **それ**と比べる (到達した endpoint の host とではなく)
 - 2 つの名前が登録と一緒に旅をする。`RegisterClaims.issued_label` は管理者が「誰のための URL か」を書いた物、`auth.register` の `device_label` は本人が「どの端末か」を書いた物。record は両方と、登録時および最終使用時の住所と user agent を保つ
 - authenticator data の BE / BS (`backup_eligible` / `backup_state`) と、token family の直近の rotate (`last_refresh`: いつ・どこから・client が述べた `reason`) も同じ種類の物
@@ -17,8 +17,8 @@
 
 ## Alternatives Considered
 
-- 案 A: origin に束縛する
-  - 不採用理由: 同じ origin に同居する隣の instance への入口になる
+- 案 A: endpoint から path を落とした scheme + authority に束縛する
+  - 不採用理由: そこに同居する隣の instance への入口になる
 - 案 B: 到達した endpoint の host で `rpIdHash` を比べる
   - 不採用理由: passkey は作られたドメインにしか答えない。到達先の host と一致する保証が無い
 - 案 C: 手掛かりを持たない
