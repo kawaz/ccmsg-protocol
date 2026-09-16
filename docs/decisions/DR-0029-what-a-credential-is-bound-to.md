@@ -7,11 +7,11 @@
 
 passkey は人の identity を決める。では、登録された 1 つの credential は **何に対して**有効なのか。
 
-3 つの単位が絡む。**authenticator が知る単位**は `rpId` = ドメインで、これが一番粗い。**instance の単位**は endpoint で、1 つの host に複数の instance が同居しうるから host より細かい ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。**page の単位**は webui が publish されている場所で、webui は endpoint と別の site から配られてよい。
+3 つの単位が絡む。**authenticator が知る単位**は `rpId` = ドメインで、これが一番粗い。**instance の単位**は endpoint で、1 つの host に複数の instance が同居しうるから host より細かい ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。**page の単位**は webui が publish されている origin で、webui は endpoint と別の origin から配られてよい。
 
 authenticator の言い分だけに従うと、粗い方に合わせて受け入れることになる: ある instance に登録した鍵が隣の instance への入口になり、同じドメインの下の任意の page が ceremony を走らせられる。さらに、認証の後に残る token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token はどの page からでも使える。
 
-browser が述べる `Origin` は **その page がどの site から来たか**を偽装なしに言う (page の script には書き換えられない)。言えないのは、その site が本人の webui かどうか。だから `Origin` は、**こちらが先に「どこで作られた credential か」を覚えている時だけ**意味を持つ。
+browser が述べる `Origin` は **その page がどの origin から来たか**を偽装なしに言う (page の script には書き換えられない)。言えないのは、その origin が本人の webui かどうか。だから `Origin` は、**こちらが先に「どこで作られた credential か」を覚えている時だけ**意味を持つ。
 
 ## Decision
 
@@ -31,7 +31,7 @@ browser が述べる `Origin` は **その page がどの site から来たか**
 ### いつ照らすか
 
 - **登録 URL は 2 つを名指す**。人を送る先の webui (名指さない URL は誰も開けない) と、**発行者自身の endpoint**。URL の secret も 6 桁の試行回数も発行者にしかないので、**登録が成立するのは発行者に届いた時だけ** ([DR-0021](DR-0021-registration-in-two-halves.md))
-- **token family は認証された credential の webui を引き継ぐ**。WS の handshake は、その webui から導いた origin と `Origin` ヘッダの一致で通す。読むのは「この token を作った page と同じ site から来たか」の 1 点。**WS で `Origin` を読むのはこの handshake だけ** — upgrade に CORS は効かず browser は `Origin` を送るだけなので、契約が自分で見る。接続が立った後の frame 上の op では見ない。CORS が効く HTTP 側で何を見るかは [DR-0028](DR-0028-refresh-cookie-across-sites.md)
+- **token family は認証された credential の webui を引き継ぐ**。WS の handshake は、その webui から導いた origin と `Origin` ヘッダの一致で通す。読むのは「この token を作った page と同じ origin から来たか」の 1 点。**WS で `Origin` を読むのはこの handshake だけ** — upgrade に CORS は効かず browser は `Origin` を送るだけなので、契約が自分で見る。接続が立った後の frame 上の op では見ない。CORS が効く HTTP 側で何を見るかは [DR-0028](DR-0028-refresh-cookie-across-sites.md)
 - **`Origin` の不在は不一致**。WS の upgrade でも、HTTP で identity を決める 3 op でも同じで、ヘッダを付けない呼び手を通す例外を置かない。**全てのゲートを通ることが条件**であり、比べる物が無い呼び手は条件を満たしていない。person の token を提示する接続は browser の page からしか来ない (CLI は到達そのものが権限の Unix socket を使う)
 - 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
 - HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**と、**その instance 自身が発行してまだ生きている登録 URL の webui から導いた origin** で CORS に答える。後者は **複製しない** — 発行者の手元にしかなく、発行者だけが答えればよい。許可一覧を設定にも管理 UI にも持たない (登録した場所がそのまま許可) 形はこれで保たれ、新しい webui での最初の 1 件も発行者に届けば通る。どのヘッダを見るかと断り方は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
@@ -48,7 +48,7 @@ browser が述べる `Origin` は **その page がどの site から来たか**
 |---|---|---|
 | A | endpoint から path を落とした scheme + authority に縛る | そこに同居する隣の instance への入口になる |
 | B | 到達した endpoint の host で `rpIdHash` を比べる | passkey は作られたドメインにしか答えない。到達先の host と一致する保証が無い |
-| C | webui と endpoint を分けない (endpoint が配る webui だけを認める) | instance ごとに webui を配る以外の運用ができない。1 つの site から複数 instance を見る形が、線上の形を変えずに済むのに閉じたままになる |
+| C | webui と endpoint を分けない (endpoint が配る webui だけを認める) | instance ごとに webui を配る以外の運用ができない。1 つの origin の webui から複数 instance を見る形が、線上の形を変えずに済むのに閉じたままになる |
 | D | 分けるが webui を縛らず token だけで認める | 漏れた token を別 origin の page から使える経路が残る。token は人を識別するだけで、どの page が持っているかを言わない |
 | E | 許可する origin の一覧を instance の設定に持たせる | credential が既に webui を持つので、一覧はその写しにしかならない。同じ事実が 2 箇所に綴られ、食い違えば設定の側が入口を増やす |
 | F | `rpId` に host の suffix を許し、登録時に決めた値を record / claims に固定して持つ | WebAuthn は suffix を許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。値を持たせること自体がこの案の帰結でもある — host に固定するなら URL から毎回導けるので、持つ意味があるのは「URL から導けない値を選べる」時だけであり、それはまさに緩める時。導出にすれば、両者が食い違う状態をそもそも表現できない |
