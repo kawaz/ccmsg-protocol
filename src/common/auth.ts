@@ -99,10 +99,12 @@ export const RegisterClaims = Type.Object(
      * registration has no credential yet — the outstanding URL naming its
      * origin is what stands in for one until it does. */
     origin: Origin,
-    /** The WebAuthn relying party: a domain, not an origin. A registrable
-     * suffix of the `origin`'s host — a passkey answers only for the domain the
-     * page creating it was at, which has nothing to do with the endpoint's
-     * host. */
+    /** The WebAuthn relying party: a domain, not an origin. The `origin`'s host
+     * itself, and nothing shorter. A relying party may be any suffix of the
+     * host the page is at, but every origin under that suffix would then share
+     * one credential — the host is the value that makes the authenticator's own
+     * binding name the single site this credential is for. Nothing about it
+     * comes from the endpoint's host. */
     rp_id: Type.String({ minLength: 1 }),
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
@@ -390,32 +392,31 @@ export const CredentialRecord = Type.Object(
      * one instance's credential from being a way into its neighbour. */
     endpoint: Endpoint,
     /** The site the page that created this credential was served from, which is
-     * the one site it can ever be used from.
+     * the one site it may ever be used from.
      *
-     * Not a second rule beside the relying party but the same one written down:
-     * a passkey is bound to its `rp_id`, and a browser runs neither a creation
-     * nor an assertion unless the page's own origin is under that domain. The
-     * origin is settled by `clientDataJSON`, which is verified at every
-     * ceremony — so writing it here copies a binding WebAuthn already enforces
-     * into somewhere an instance can read it without a ceremony in hand.
+     * This contract's own rule rather than WebAuthn's. A passkey is bound to
+     * its `rp_id`, and a relying party may be a suffix of the host, so the
+     * authenticator alone would answer for every origin under that suffix. What
+     * holds a credential to one site is the check made here: the
+     * `clientDataJSON.origin` of every ceremony, registration and assertion
+     * alike, has to equal this. Keeping `rp_id` at the origin's host is what
+     * makes the authenticator's binding say the same thing rather than
+     * something wider.
      *
-     * That reading is what the rest of the origin's work rests on: a token
+     * The value written down is what the rest of the origin's work rests on: a token
      * minted here carries this value and its connection's `Origin` header is
      * held to it, and the set of these across an endpoint's credentials is the
      * set of origins the HTTP auth ops answer CORS for. A person using two
-     * hosting sites holds two credentials, one per site, which is not a
-     * restriction this contract adds — the authenticator would not answer for
-     * the second site with the first site's key either.
+     * hosting sites holds two credentials, one per site.
      *
      * Apart from `endpoint` because the two answer different questions: which
      * page may speak, and which instance it may speak to. */
     origin: Origin,
     /** The relying party this credential was created under, as the claims of
-     * the registration that made it stated. Written by the registration and not
-     * derived later: a passkey only answers for the domain it was made under,
-     * so an assertion's `rpIdHash` is checked against this and not against
-     * whatever the endpoint being reached happens to be. Absent only on a
-     * record written before the field existed. */
+     * the registration that made it stated: the `origin`'s host. Written by the
+     * registration and not derived later, and an assertion's `rpIdHash` is
+     * checked against it rather than against whatever endpoint was reached.
+     * Absent only on a record written before the field existed. */
     rp_id: Type.Optional(Type.String({ minLength: 1 })),
     /** The authenticator's counter, when it keeps one. Synced passkeys report
      * zero forever, so only a pair of non-zero readings says anything, and a

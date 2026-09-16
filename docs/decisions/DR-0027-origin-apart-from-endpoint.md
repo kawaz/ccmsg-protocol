@@ -14,8 +14,8 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 ## Decision
 
 - **page の origin と endpoint は別の値**で、別の型を持つ。`Origin` は scheme と authority だけ (path も末尾スラッシュも持たない)、`Endpoint` は path まで含む base URL ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。比較の単位が違う物を 1 つの型で綴らない
-- **credential record は作られた origin を 1 つ持つ**。passkey は `rpId` に束縛され、登録も認証も `rpId` が page の origin のドメインと一致する page でしか走らない — つまり credential ごとに origin は 1 つしかありえない。2 つの hosting site を使う人は credential も 2 つ持つ。`clientDataJSON.origin` は ceremony のたびに検証されるので、record に origin を書くのは **WebAuthn が既に持っている束縛を索引に写すだけ**であり、新しい判定を足してはいない
-- 登録 URL の claims も origin を運ぶ。URL は hosting site を指して作られるので、`rp_id` はその **origin の host の登録可能な suffix** であって、endpoint の host からは導かない
+- **credential record は作られた origin を 1 つ持ち、その 1 つでしか使えない**。これは WebAuthn が強いる形ではなく **契約が定める方針**で、認可の実体は「ceremony の `clientDataJSON.origin` が record (登録では登録 URL の claims) の origin と一致すること」。WebAuthn の `rpId` 束縛だけなら同じドメインの下の別 origin からも使えてしまうので、それに任せず契約が 1 つに絞る。2 つの hosting site を使う人は credential を 2 つ持つ
+- **`rp_id` は origin の host そのもの**に固定する。`rpId` は host の suffix でもよい (それが WebAuthn の許す幅) が、広く取れば `a.example.com` の credential が `b.example.com` から出せることになり、上の方針を認証器の側が支えなくなる。host に固定すれば、契約の照合 (`clientDataJSON.origin`) と認証器の束縛 (`rpIdHash`) が同じ 1 つの site を指す。値は endpoint の host からは導かない — 登録 URL は hosting site を指して作られ、その origin の host がこれになる
 - token family は認証された origin を持ち、**WS の handshake は token の origin と `Origin` ヘッダの一致で通す**。読むのは「この token を作った page と同じ site から来たか」の 1 点。WS で `Origin` を読むのはここだけで、HTTP の認証 op が読む分は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
 - 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
 - HTTP の認証 op は、**その endpoint に登録済みの credential の origin と、まだ生きている登録 URL が名指す origin** で CORS に答える。許可一覧を設定にも管理 UI にも持たない — 登録した場所がそのまま許可であり、登録 URL が origin を運ぶことで最初の 1 つも同じ規則で答えられる
@@ -31,6 +31,8 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
   - 不採用理由: 漏れた token を別 origin の page から使える経路が残る。token は人を識別するだけで、どの page が持っているかを言わない
 - 案 D: 許可する origin の一覧を instance の設定に持たせる
   - 不採用理由: credential が既に 1 つの origin を持つので、一覧はその写しにしかならない。同じ事実が 2 箇所に綴られ、食い違えば設定の側が入口を増やす
+- 案 F: `rp_id` に host の suffix (`a.example.com` の credential に `example.com`) を許す
+  - 不採用理由: WebAuthn はそれを許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。契約の側で `clientDataJSON.origin` を照合すれば断れるものの、認証器の束縛と契約の方針が食い違ったまま並ぶことになり、片方だけを見た実装が緩い方に倒れる
 - 案 E: endpoint 束縛をやめて origin 束縛に置き換える
   - 不採用理由: 1 つの origin に同居する隣の instance への入口になる ([DR-0022](DR-0022-credential-bound-to-an-endpoint.md) 案 A と同じ)
 
