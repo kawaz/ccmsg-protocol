@@ -45,4 +45,5 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — HTTP で運ぶ 4 op と record の複製経路
 - [DR-0021](DR-0021-registration-in-two-halves.md) — 登録 URL の claims と、失敗の述べ方
 - [DR-0022](DR-0022-credential-bound-to-an-endpoint.md) — credential の endpoint 束縛
+- [DR-0028](DR-0028-refresh-cookie-across-sites.md) — site をまたいだときの refresh cookie
 - `docs/DESIGN.md` §Authenticating a person
