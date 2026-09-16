@@ -36,5 +36,5 @@
 ## 関連
 
 - [DR-0001](DR-0001-session-and-run.md) — セッションと run の分離
-- [DR-0011](DR-0011-instance-derives-the-classification.md) — 分類の導出 (DR-0001 が置き換えた)
+- [DR-0011](archive/DR-0011-instance-derives-the-classification.md) — 分類の導出 (DR-0001 が置き換えた)
 - `docs/DESIGN.md` §Session classification and retention

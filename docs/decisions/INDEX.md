@@ -2,7 +2,7 @@
 
 このリポの判断記録 (DR) の索引。**なぜそう決めたか / 何を捨てたか**はここにあり、[docs/DESIGN.md](../DESIGN.md) / [DESIGN-ja.md](../DESIGN-ja.md) は今の姿だけを述べる。
 
-Status は各 DR ファイルの `Status:` 行が正本。
+Status は各 DR ファイルの `Status:` 行が正本。ここに載るのは**今立っている DR だけ**で、置き換えられた物は `archive/` に居る (どれに置き換えられたかは、その file の `Status:` 行が名指す)。
 
 ## Active
 
@@ -34,13 +34,3 @@ Status は各 DR ファイルの `Status:` 行が正本。
 | [DR-0026](DR-0026-terminals-are-their-own-list.md) | 端末は端末の一覧 (`terminals` topic) として述べ、セッションとは pid の一致で結ぶ。起動直後のハーネスは 2 つの一覧の差として導出する |
 | [DR-0028](DR-0028-refresh-cookie-across-sites.md) | refresh token は endpoint の HttpOnly cookie のまま。site をまたぐ時だけ分割された cookie として渡り、identity を決める 3 op は `Origin` と `Sec-Fetch-Site` を見る |
 | [DR-0029](DR-0029-what-a-credential-is-bound-to.md) | credential は endpoint (どの instance に入れるか) と webui (どの page から来てよいか) の 2 つに縛られ、origin と rpId はその URL から導く |
-
-## Superseded
-
-| DR | 要旨 |
-|---|---|
-| [DR-0011](DR-0011-instance-derives-the-classification.md) | セッションの分類は instance が導出し `state` として行に載せる (Superseded by [DR-0001](DR-0001-session-and-run.md)) |
-
-## Moved to research/
-
-<!-- 判断記録の体を成さなくなり research/ に降格した DR -->

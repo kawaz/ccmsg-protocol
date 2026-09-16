@@ -22,11 +22,11 @@
 
 ## Consequences
 
-この判断は [DR-0001](DR-0001-session-and-run.md) が置き換えた。`SessionState` と `peers.state` は削除され、分類が 1 語に押し込めていた軸 (プロセスの数、畳みの進行、人が答えるべきものの有無、停止の宣言) は、それぞれに答えるフィールドに分かれた。「instance が導出して行に載せる」という本 DR の姿勢のうち、観測されたフィールドを行に載せる部分は残り、導出そのものは契約が export する関数に移った。
+この判断は [DR-0001](../DR-0001-session-and-run.md) が置き換えた。`SessionState` と `peers.state` は削除され、分類が 1 語に押し込めていた軸 (プロセスの数、畳みの進行、人が答えるべきものの有無、停止の宣言) は、それぞれに答えるフィールドに分かれた。「instance が導出して行に載せる」という本 DR の姿勢のうち、観測されたフィールドを行に載せる部分は残り、導出そのものは契約が export する関数に移った。
 
 ## 関連
 
-- [DR-0001](DR-0001-session-and-run.md) — 本 DR を置き換えた判断
-- [DR-0010](DR-0010-session-meta-and-the-greeting.md) — 素性と停止の宣言 (置き換えの対象外)
+- [DR-0001](../DR-0001-session-and-run.md) — 本 DR を置き換えた判断
+- [DR-0010](../DR-0010-session-meta-and-the-greeting.md) — 素性と停止の宣言 (置き換えの対象外)
 - ccmsg (daemon) `docs/decisions/DR-0009-daemon-derives-session-state.md`
 - `docs/DESIGN.md` §Session classification and retention
