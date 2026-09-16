@@ -16,6 +16,20 @@ export function originOf(webui: string): Origin {
   return new URL(webui).origin;
 }
 
+/** The WebAuthn relying party a credential made at a web UI is created under:
+ * the host of its URL, port and scheme left off, as a relying party is a domain
+ * and not an origin.
+ *
+ * Derived for the same reason as the origin, and held to the host exactly. A
+ * client will accept a relying party that is the page's effective domain or a
+ * registrable suffix of it, so anything shorter than the host would be one
+ * credential several sites could answer with — which is the single thing
+ * binding a credential to one web UI rules out. An assertion's `rpIdHash` is
+ * the SHA-256 of what this returns. */
+export function rpIdOf(webui: string): string {
+  return new URL(webui).hostname;
+}
+
 /** A value that is nothing but bytes to everyone who handles it: a token, a
  * challenge, a credential id, a signature. Spelled base64url without padding so
  * one encoding covers the values this contract issues and the ones the browser
@@ -112,13 +126,6 @@ export const RegisterClaims = Type.Object(
      * instance answers CORS for the origins its credentials name, and the first
      * registration at a new UI has no credential yet. */
     webui: WebUi,
-    /** The WebAuthn relying party: a domain, not an origin. The host of
-     * `webui`, and nothing shorter. A relying party may be any suffix of the
-     * host the page is at, but every origin under that suffix would then share
-     * one credential — the host is the value that makes the authenticator's own
-     * binding name the single site this credential is for. Nothing about it
-     * comes from the endpoint's host. */
-    rp_id: Type.String({ minLength: 1 }),
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
     jti: Type.String({ minLength: 1 }),
@@ -412,9 +419,9 @@ export const CredentialRecord = Type.Object(
      * the host, so the authenticator alone would answer for every origin under
      * that suffix. What holds a credential to one is the check made against
      * this: the `clientDataJSON.origin` of every ceremony, registration and
-     * assertion alike, has to equal `originOf` this URL. Keeping `rp_id` at
-     * that host is what makes the authenticator's binding say the same thing
-     * rather than something wider.
+     * assertion alike, has to equal `originOf` this URL. The relying party is
+     * `rpIdOf` the same URL, which is what makes the authenticator's own
+     * binding say the same thing rather than something wider.
      *
      * The URL is what is kept, and the origin read off it where a header is
      * matched — a token minted here carries the same URL and its connection's
@@ -427,12 +434,6 @@ export const CredentialRecord = Type.Object(
      * Apart from `endpoint` because the two answer different questions: which
      * page may speak, and which instance it may speak to. */
     webui: WebUi,
-    /** The relying party this credential was created under, as the claims of
-     * the registration that made it stated: the host of `webui`. Written by the
-     * registration and not derived later, and an assertion's `rpIdHash` is
-     * checked against it rather than against whatever endpoint was reached.
-     * Absent only on a record written before the field existed. */
-    rp_id: Type.Optional(Type.String({ minLength: 1 })),
     /** The authenticator's counter, when it keeps one. Synced passkeys report
      * zero forever, so only a pair of non-zero readings says anything, and a
      * reading below the last one is a refusal. */

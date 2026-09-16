@@ -10,6 +10,7 @@ import {
   AuthResolveRequest,
   AuthResolveResponse,
   originOf,
+  rpIdOf,
   FAMILY_TOMBSTONE_RETENTION_MS,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
@@ -498,12 +499,17 @@ describe("authenticating a person", () => {
     expect(crossSite.body.credential_id).not.toBe(sameSite.body.credential_id);
   });
 
-  test("the relying party is the UI's host, so neither is wider than the other", () => {
+  test("the relying party is derived from the UI's URL and is never a field", () => {
     // A suffix would be a relying party several origins share, which is the one
-    // thing holding a credential to a single UI rules out.
+    // thing holding a credential to a single UI rules out — so it is read off
+    // the URL rather than written down where it could say something else.
+    expect(rpIdOf(FIXTURE_IDS.webui)).toBe("ui.example.test");
+    expect(rpIdOf("https://UI.Example.Test:8443/ccmsg/")).toBe("ui.example.test");
     for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(body.rp_id).toBe(new URL(body.webui).host);
+      expect(rpIdOf(body.webui)).toBe(new URL(body.webui).hostname);
+      expect(body).not.toHaveProperty("rp_id");
     }
+    expect(AUTH_RESOLVE_RESPONSE.claims).not.toHaveProperty("rp_id");
   });
 
   test("a web UI is a base URL, spelled as an endpoint is", () => {

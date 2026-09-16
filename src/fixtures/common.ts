@@ -278,7 +278,6 @@ export const AUTH_RESOLVE_RESPONSE = {
     unit: "personal",
     endpoint,
     webui,
-    rp_id: "ui.example.test",
     expires_at: FIXTURE_NOW + 600_000,
     jti: "01J9Z3W2Q",
     user_id: "dXNlci1oYW5kbGU",

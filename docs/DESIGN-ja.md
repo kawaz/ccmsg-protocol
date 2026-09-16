@@ -211,7 +211,7 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 credential record は登録時の `endpoint` を持ち、assertion はその endpoint に届いた要求 (scheme + authority が一致し、パスがその下にあること) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が答えるか」までで、「どの instance に入ってよいか」より粗いため。base URL 全体に束ねるのは、隣の instance への入口を兼ねさせないため。
 
-**webui が配られている URL と instance の endpoint は別物**で、credential record は両方を持つ。`webui` は credential を作った page が配られた base URL で、endpoint と同じ綴り方 (path まで含み末尾スラッシュ必須) をする — これも「何かが publish されている base URL」で、1 つの host に複数載りうるため。endpoint である必要は無い (webui はどこから配ってもよく、繋ぐ先は別の場所でよい)。**credential をその 1 箇所に縛るのは WebAuthn ではなくこの契約の規則**。passkey は `rp_id` に束縛されるが、relying party は page の host の suffix でもよいので、authenticator だけに任せるとその suffix の下の全 origin で答えてしまう。1 つに留めているのは record 側の照合 — 登録でも assertion でも、ceremony の `clientDataJSON.origin` がこの URL の origin と一致すること。`rp_id` をその host に保つことで、authenticator の束縛も同じ 1 つの site を指し、広い方に倒れない。2 つの webui を使う人は credential を 2 つ持つ。
+**webui が配られている URL と instance の endpoint は別物**で、credential record は両方を持つ。`webui` は credential を作った page が配られた base URL で、endpoint と同じ綴り方 (path まで含み末尾スラッシュ必須) をする — これも「何かが publish されている base URL」で、1 つの host に複数載りうるため。endpoint である必要は無い (webui はどこから配ってもよく、繋ぐ先は別の場所でよい)。**credential をその 1 箇所に縛るのは WebAuthn ではなくこの契約の規則**。passkey は relying party に束縛されるが、それは page の host の suffix でもよいので、authenticator だけに任せるとその suffix の下の全 origin で答えてしまう。1 つに留めているのは record 側の照合 — 登録でも assertion でも、ceremony の `clientDataJSON.origin` がこの URL の origin と一致すること。relying party をその URL の host に保つことで、authenticator の束縛も同じ 1 つの site を指し、広い方に倒れない。2 つの webui を使う人は credential を 2 つ持つ。
 
 **ヘッダと比べる値は、その URL から導く origin** (`originOf`) で、record の隣には持たない。origin は URL の scheme + authority で、browser が `Origin` や `clientDataJSON` に綴るのはこの形。record が URL の側を持つのは、人を送る先も運用者が設定するのも URL だから — origin を別フィールドで併記すれば 1 つの事実が 2 箇所になり、食い違いうる。比較が成り立つための正規化 (小文字の scheme と host、既定でない port だけを綴る、address literal は角括弧のまま) は導出が引き受け、契約は実装ごとに書かせず 1 つの関数で述べる。
 
@@ -219,7 +219,7 @@ credential record は登録時の `endpoint` を持ち、assertion はその end
 
 refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の本文には現れない。page が別の site になる場合、その cookie が site をまたいで送られるのは分割された cookie としてだけで、1 つの site で取った session が別の site に持ち越されることはない — credential が webui ごとに 1 つという形とそのまま重なる。identity を決める 3 op は 2 つのヘッダに照らされ、これが契約が HTTP で読む唯一のヘッダになる: `Origin` を credential (register では登録 URL) が名乗る webui の origin と比べること、そして `Sec-Fetch-Site` が「page から来た」と言っていること (アドレスバーに打たれたナビゲーションで認証する場面は無い)。ヘッダの不在は値が違うのと同じく失敗で、どちらで落ちても `auth_invalid`、どちらかは述べない。`auth.challenge` はどちらにも照らされない — 照らす相手がまだ無い段階の op で、配る challenge は発行者でしか使い切れない。**cookie の分割に対応しない browser では site をまたいだ cookie は送られない** — access token が切れた時点で refresh が失敗し、client は passkey の assert に戻る。増えるのは user verification の回数だけで、機能は落ちない。cookie の属性の組み立て方とヘッダの検査手順は、他の手順と同じく daemon の持ち物。
 
-credential record は登録時の `rp_id` (その webui の host そのもので、それより短くはしない) を持つ。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
+relying party も同じ URL から導く (`rpIdOf` = その host) もので、record の隣には持たない。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はその host の SHA-256 — 到達した endpoint のホストではない。
 
 登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。
 
