@@ -215,6 +215,8 @@ credential record は登録時の `endpoint` を持ち、assertion はその end
 
 origin の残り 2 つの使い道はこの読み出しの上に乗る。token family は認証した credential の `origin` を持ち、WS の handshake は接続の `Origin` ヘッダをそれと照合する — token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。そして HTTP の認証 op は、その endpoint の credential が名乗る origin 集合と、まだ生きている登録 URL が名指す origin (`RegisterClaims.origin`) で CORS に答える。後者があることで、新しい site での最初の登録も同じ規則で答えられる。管理すべき一覧は無い — 登録することが site を許すことで、最後の credential を消すことが外すこと。page がどの instance に繋いでよいかは page 側の宣言で、この契約ではなく webui の持ち物。
 
+refresh token は今までどおり `<endpoint>auth/*` が置く HttpOnly cookie で、応答の本文には現れない。page が別の site になる場合、その cookie が site をまたいで送られるのは分割された cookie としてだけで、1 つの site で取った session が別の site に持ち越されることはない — credential が origin ごとに 1 つという形とそのまま重なる。browser から呼ばれるこの 3 op は 2 つのヘッダに照らされ、これが契約の読む唯一のヘッダになる: `Origin` を credential (register では登録 URL) が名乗る origin と比べること、そして `Sec-Fetch-Site` が「page から来た」と言っていること (アドレスバーに打たれたナビゲーションで認証する場面は無い)。どちらで落ちても `auth_invalid` で、どちらかは述べない。**cookie の分割に対応しない browser では site をまたいだ cookie は送られない** — access token が切れた時点で refresh が失敗し、client は passkey の assert に戻る。増えるのは user verification の回数だけで、機能は落ちない。cookie の属性の組み立て方とヘッダの検査手順は、他の手順と同じく daemon の持ち物。
+
 credential record は登録時の `rp_id` (その origin の host の登録可能な suffix) を持つ。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
 
 登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。

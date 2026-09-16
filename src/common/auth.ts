@@ -172,7 +172,13 @@ export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
  * Only the access token is stated. The refresh token is set as a cookie by the
  * carrier that ran the op, so putting it here too would be a second copy of a
  * secret in a place the browser's script can read — which is the one property
- * the cookie exists to have. */
+ * the cookie exists to have. That holds however far the page is from the
+ * endpoint: a cookie the page's own site cannot reach is sent from a site it
+ * does not own only as a partitioned one, which keeps a session taken at one
+ * site from being carried to another — the same shape the credential's single
+ * origin already has. A browser without that partitioning sends nothing across
+ * sites, and the client falls back to asserting the passkey again, which costs
+ * a user verification and no function. */
 export const AuthSession = Type.Object(
   {
     sub: Subject,

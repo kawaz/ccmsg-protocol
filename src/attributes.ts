@@ -37,7 +37,14 @@ export interface OpAttributes {
    * What the carrier decides is not authorization but what the op can do: these
    * are the ops that set or read a cookie, which a frame on an open connection
    * cannot, and they answer before any identity is settled. The route each is
-   * published at belongs to the instance, not here. */
+   * published at belongs to the instance, not here.
+   *
+   * Being reachable from a page is also what gives these three the only headers
+   * this contract reads: the `Origin` a browser states, held to the origin the
+   * credential or the registration names, and `Sec-Fetch-Site`, which has to
+   * say the call came from a page at all — a navigation typed into the address
+   * bar is not how anyone authenticates. Either one failing answers
+   * `auth_invalid` without saying which. */
   readonly carrier?: "http";
   /** Present when the role changes what the reply may contain rather than
    * whether the call is allowed. */
