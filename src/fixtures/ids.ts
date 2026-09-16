@@ -10,8 +10,15 @@ export const FIXTURE_IDS = {
   endpoint: "https://mba.example.ts.net/ccmsg/personal/",
   other_endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
   /** The site the web UI is served from, which is nobody's endpoint: a
-   * credential is made here and used against the endpoints above. */
-  origin: "https://ui.example.ts.net",
+   * credential is made here and used against the endpoints above. Its
+   * registrable domain is not the endpoints', so the two are cross-site and a
+   * refresh cookie between them is a partitioned one. */
+  origin: "https://ui.example.test",
+  /** A second site, sharing the endpoints' registrable domain: same-site, and
+   * still an origin of its own. A credential made here is a separate
+   * credential, and the cookie between it and an endpoint is not partitioned —
+   * one contract, two shapes, which is why both sites are written down. */
+  same_site_origin: "https://ui.example.ts.net",
   mid: "3f9c1a7b5e2d48069c1a7b5e2d480691/1841",
   request_id: "1",
 } as const;

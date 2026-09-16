@@ -84,13 +84,19 @@ export type Endpoint = Static<typeof Endpoint>;
  * endpoints, and one origin may carry many instances, so neither is derivable
  * from the other.
  *
- * Spelled as a browser serializes one and no wider: lowercase scheme and host,
- * an optional port, no userinfo and no credentials of any kind. Comparison is
- * of whole strings, so a value written any other way would simply never match
- * the header it is meant to be held to. */
+ * Held to the one spelling a browser serializes: a lowercase scheme, a
+ * lowercase host, and a port only where it is not the scheme's own. No
+ * userinfo, no path, no trailing slash, nothing else a URL may carry.
+ *
+ * The narrowness is the point rather than pedantry. Every use of this value is
+ * a whole-string comparison — against an `Origin` header, against a
+ * `clientDataJSON.origin`, against the members of a CORS answer — so a second
+ * spelling of one site would be a record that never matches the site it names,
+ * or an allowed origin that quietly admits nothing. */
 export const Origin = Type.String({
   $id: "Origin",
-  pattern: "^https?://([a-z0-9-]+(\\.[a-z0-9-]+)*|\\[[0-9a-f:.]+\\])(:[0-9]+)?$",
+  pattern:
+    "^(?=https://(?![^/]*:443$)|http://(?![^/]*:80$))https?://(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*|\\[[0-9a-f:.]+\\])(?::(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?$",
 });
 export type Origin = Static<typeof Origin>;
 

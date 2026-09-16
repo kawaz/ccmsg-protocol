@@ -474,23 +474,52 @@ describe("authenticating a person", () => {
 
   test("the site a credential was made at is no part of the endpoint it admits to", () => {
     // The page may be served from anywhere; neither value is read off the
-    // other, and the fixture is written at a site that is nobody's endpoint.
-    const [record] = TOPIC_FIXTURES["auth.records"].data.records;
-    expect(record.body.endpoint.startsWith(`${record.body.origin}/`)).toBe(false);
-    // The relying party is a registrable suffix of the origin's host, which the
-    // host itself is the shortest of.
-    const host = new URL(record.body.origin).host;
-    expect(host === record.body.rp_id || host.endsWith(`.${record.body.rp_id}`)).toBe(true);
+    // other, and the fixtures are written at sites that are nobody's endpoint.
+    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
+      expect(body.endpoint.startsWith(`${body.origin}/`)).toBe(false);
+    }
   });
 
-  test("an origin is a site and not a URL with a path", () => {
+  test("the two credentials differ in whether their site is the endpoint's", () => {
+    // What decides the shape of the refresh cookie, so the fixtures carry one
+    // of each: a site that shares the endpoint's registrable domain, and one
+    // that does not.
+    const [crossSite, sameSite] = TOPIC_FIXTURES["auth.records"].data.records;
+    // The endpoints are published under one registrable domain; a site is
+    // theirs when its host ends there. (Spelled out rather than computed: the
+    // rule is the public suffix list, which this contract does not carry.)
+    const endpointSite = "example.ts.net";
+    expect(new URL(crossSite.body.endpoint).host.endsWith(`.${endpointSite}`)).toBe(true);
+    expect(new URL(crossSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(false);
+    expect(new URL(sameSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(true);
+    expect(crossSite.body.credential_id).not.toBe(sameSite.body.credential_id);
+  });
+
+  test("the relying party is the origin's host, so neither is wider than the other", () => {
+    // A suffix would be a relying party several origins share, which is the one
+    // thing holding a credential to a single site rules out.
+    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
+      expect(body.rp_id).toBe(new URL(body.origin).host);
+    }
+  });
+
+  test("an origin is a site, spelled the one way a browser serializes it", () => {
     const frame = TOPIC_FIXTURES["auth.records"];
     const [record] = frame.data.records;
     for (const origin of [
-      "https://ui.example.ts.net/",
-      "https://ui.example.ts.net/webui",
-      "https://someone@ui.example.ts.net",
-      "HTTPS://UI.example.ts.net",
+      "https://ui.example.test/",
+      "https://ui.example.test/webui",
+      "https://ui.example.test?x=1",
+      "https://someone@ui.example.test",
+      "https://UI.example.test",
+      "HTTPS://ui.example.test",
+      // A default port is left out of the serialization, so spelling it would
+      // be a second name for the same site.
+      "https://ui.example.test:443",
+      "http://ui.example.test:80",
+      "https://ui.example.test:99999",
+      "https://ui.example.test:0",
+      "wss://ui.example.test",
     ]) {
       expect(
         isValid(AuthRecordsFrame, {
@@ -498,6 +527,19 @@ describe("authenticating a person", () => {
           data: { records: [{ ...record, body: { ...record.body, origin } }] },
         }),
       ).toBe(false);
+    }
+    for (const origin of [
+      "https://ui.example.test:8443",
+      "http://localhost",
+      "http://127.0.0.1:3000",
+      "http://[::1]:8080",
+    ]) {
+      expect(
+        isValid(AuthRecordsFrame, {
+          ...frame,
+          data: { records: [{ ...record, body: { ...record.body, origin } }] },
+        }),
+      ).toBe(true);
     }
   });
 

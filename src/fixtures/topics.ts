@@ -14,8 +14,17 @@ import type { InboxFrame } from "../messaging/message.ts";
 import type { NotifyFrame } from "../messaging/notify.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
-const { sid, other_sid, instance, other_instance, endpoint, other_endpoint, origin, mid } =
-  FIXTURE_IDS;
+const {
+  sid,
+  other_sid,
+  instance,
+  other_instance,
+  endpoint,
+  other_endpoint,
+  origin,
+  same_site_origin,
+  mid,
+} = FIXTURE_IDS;
 
 const WORKSPACE = "/repos/kawaz/ccmsg-protocol/main";
 
@@ -513,7 +522,7 @@ export const AUTH_RECORDS_FRAME = {
           user_handle: "dXNlci1oYW5kbGU",
           endpoint,
           origin,
-          rp_id: "ui.example.ts.net",
+          rp_id: "ui.example.test",
           sign_count: 0,
           issued_label: "for kawaz",
           device_label: "work laptop",
@@ -523,6 +532,26 @@ export const AUTH_RECORDS_FRAME = {
           last_used_at: FIXTURE_NOW,
           last_used_ip: "203.0.113.7",
           last_used_user_agent: "Mozilla/5.0",
+        },
+      },
+      {
+        // The same person at a second site, which shares the endpoint's
+        // registrable domain where the first does not. One credential per site,
+        // and the difference between the two is what decides whether the
+        // refresh cookie for a session made here is a partitioned one.
+        key: "credential/personal-1/Y3JlZC1pZC0y",
+        updated_at: FIXTURE_NOW,
+        body: {
+          kind: "credential",
+          sub: "personal-1",
+          credential_id: "Y3JlZC1pZC0y",
+          public_key: "pQECAyYgASFYIB",
+          user_handle: "dXNlci1oYW5kbGU",
+          endpoint,
+          origin: same_site_origin,
+          rp_id: "ui.example.ts.net",
+          device_label: "phone",
+          registered_at: FIXTURE_NOW - 300_000,
         },
       },
     ],
