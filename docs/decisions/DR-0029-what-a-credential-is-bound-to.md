@@ -13,6 +13,8 @@ authenticator の言い分だけに従うと、粗い方に合わせて受け入
 
 browser が述べる `Origin` は **その page がどの origin から来たか**を偽装なしに言う (page の script には書き換えられない)。言えないのは、その origin が本人の webui かどうか。だから `Origin` は、**こちらが先に「どこで作られた credential か」を覚えている時だけ**意味を持つ。
 
+そして `Origin` が効く範囲は **browser の中だけ**。ヘッダを付けるのは browser であって、browser の外の呼び手は任意のヘッダを組み立てられる。つまりここで閉じられるのは「**同じ browser の中で、別 origin の page が token を使う**」経路であって、token が機械の外に持ち出された後ではない。後者に対しては、この契約のどの束縛も何もしない。
+
 ## Decision
 
 ### 何に縛るか
@@ -49,7 +51,7 @@ browser が述べる `Origin` は **その page がどの origin から来たか
 | A | endpoint から path を落とした scheme + authority に縛る | そこに同居する隣の instance への入口になる |
 | B | 到達した endpoint の host で `rpIdHash` を比べる | passkey は作られたドメインにしか答えない。到達先の host と一致する保証が無い |
 | C | webui と endpoint を分けない (endpoint が配る webui だけを認める) | instance ごとに webui を配る以外の運用ができない。1 つの origin の webui から複数 instance を見る形が、線上の形を変えずに済むのに閉じたままになる |
-| D | 分けるが webui を縛らず token だけで認める | 漏れた token を別 origin の page から使える経路が残る。token は人を識別するだけで、どの page が持っているかを言わない |
+| D | 分けるが webui を縛らず token だけで認める | 同じ browser の中で、漏れた token を別 origin の page から使える経路が残る。token は人を識別するだけで、どの page が持っているかを言わない。browser の外に出た token はどの案でも防げないが、それは閉じられる経路を開けたままにする理由にならない |
 | E | 許可する origin の一覧を instance の設定に持たせる | credential が既に webui を持つので、一覧はその写しにしかならない。同じ事実が 2 箇所に綴られ、食い違えば設定の側が入口を増やす |
 | F | `rpId` に host の suffix を許し、登録時に決めた値を record / claims に固定して持つ | WebAuthn は suffix を許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。値を持たせること自体がこの案の帰結でもある — host に固定するなら URL から毎回導けるので、持つ意味があるのは「URL から導けない値を選べる」時だけであり、それはまさに緩める時。導出にすれば、両者が食い違う状態をそもそも表現できない |
 | G | 生きている登録 URL を mesh に複製し、どの instance でも CORS に答えられるようにする | 複製する record が 1 種増え、未消費の登録という短命な状態が全体に配られる。登録自体は発行者にしか成立しないので、増えるのは「CORS だけ通って登録は断られる」経路 |
