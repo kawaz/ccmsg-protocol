@@ -43,12 +43,14 @@ export const InstanceId = Type.String({
 });
 export type InstanceId = Static<typeof InstanceId>;
 
-/** A host as a browser serializes one: lowercase labels, or an address literal
- * in its brackets. No uppercase, no userinfo, no empty label and no zone id —
- * every one of those is either a second spelling of one host or a string no URL
- * parser will take. */
-const HOST =
-  "(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*|\\[[0-9a-f:.]+\\])";
+/** A host name as a browser serializes one: lowercase labels, no uppercase, no
+ * userinfo and no empty label — each of those is either a second spelling of
+ * one host or a string no URL parser will take. */
+const HOST_NAME = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*";
+
+/** A host: a name as above, or an address literal in its brackets (no zone id,
+ * which no URL parser takes). */
+const HOST = `(?:${HOST_NAME}|\\[[0-9a-f:.]+\\])`;
 
 /** A port in range, 1 to 65535. */
 const PORT =
@@ -58,14 +60,36 @@ const PORT =
  * browser omits it, so writing it would be a second name for one place. `tail`
  * closes the pattern: the end of the string for an origin, a path for a base
  * URL, and it is what the lookaheads read to know a port ended. */
+function port(its: string): string {
+  return `(?::(?!${its}(?:/|$))${PORT})?`;
+}
+
 function authority(tail: string): string {
-  const port = (its: string) => `(?::(?!${its}(?:/|$))${PORT})?`;
   return `^(?:https://${HOST}${port("443")}|http://${HOST}${port("80")})${tail}`;
 }
 
 /** A base URL: an authority as above, then a path that ends in a slash and
  * carries no query or fragment. */
 const BASE_URL = authority("(?:/[^?#\\s]*)?/$");
+
+/** The path part of a base URL, as above. */
+const BASE_PATH = "(?:/[^?#\\s]*)?/$";
+
+/** A base URL a WebAuthn ceremony can actually run at.
+ *
+ * Narrower than `BASE_URL` on two counts, both of them the authenticator's
+ * rules rather than this contract's taste. A ceremony needs a secure context,
+ * so the scheme is `https` — with `http` on the loopback names browsers treat
+ * as trustworthy, which is what makes a web UI runnable on a development
+ * machine. And a relying party is a domain, so the host may not be an address
+ * literal: `https://198.51.100.9/` parses fine and could never hold a passkey.
+ *
+ * Writing it into the type rather than leaving it to the daemon is what keeps
+ * `rpIdOf` total over the values a record may carry. A URL that no ceremony can
+ * run at would be a credential that could never have been made. */
+const WEBUI_URL =
+  `^(?:https://(?!\\d{1,3}(?:\\.\\d{1,3}){3}(?:[:/]))${HOST_NAME}${port("443")}` +
+  `|http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])${port("80")})${BASE_PATH}`;
 
 /** Where an instance is published: the base URL everything it serves hangs
  * under, ending in a slash and naming no route of its own.
@@ -103,7 +127,12 @@ export type Endpoint = Static<typeof Endpoint>;
  * where an instance is dialed; this says where the page doing the dialing came
  * from, and one of each is what a credential is made against. Spelled to the
  * same rule as an endpoint, path and trailing slash included, because it is the
- * same kind of value: a base URL that something is published under.
+ * same kind of value: a base URL that something is published under — but held
+ * to a narrower set of them: `https`, or `http` on a loopback name a browser
+ * treats as trustworthy, and never an address literal for a host. Those are the
+ * authenticator's conditions, not this contract's taste: a ceremony wants a
+ * secure context, and a relying party is a domain. A URL outside them is one no
+ * credential could have been made at.
  *
  * **What is kept and what is compared are different sizes.** The whole URL is
  * kept: it is where a person is sent, what an operator configures, and what
@@ -114,7 +143,7 @@ export type Endpoint = Static<typeof Endpoint>;
  * under one origin are therefore one place to everything here. The origin is
  * read off the URL where a header has to be matched rather than kept beside it
  * as a second field that could disagree. */
-export const WebUi = Type.String({ $id: "WebUi", pattern: BASE_URL });
+export const WebUi = Type.String({ $id: "WebUi", pattern: WEBUI_URL });
 export type WebUi = Static<typeof WebUi>;
 
 /** Where a page was served from: a scheme and an authority and nothing else,

@@ -556,6 +556,30 @@ describe("authenticating a person", () => {
     }
   });
 
+  test("a web UI is somewhere a ceremony could run, which an endpoint need not be", () => {
+    // The authenticator's conditions, not this contract's taste: a secure
+    // context, and a relying party that is a domain. An endpoint is neither a
+    // relying party nor a page, so it is held to none of it.
+    for (const url of [
+      // Plain http anywhere but a loopback name the browser trusts.
+      "http://ui.example.test/",
+      "http://ui.example.ts.net/ccmsg/",
+      // An address literal cannot be a relying party, https or not.
+      "https://198.51.100.9/",
+      "https://127.0.0.1:8443/",
+      "https://[::1]/",
+      "https://[fe80::1]/x/",
+    ]) {
+      expect(isValid(WebUi, url)).toBe(false);
+      expect(isValid(Endpoint, url)).toBe(true);
+    }
+    // The development exception, and only on the loopback names.
+    for (const url of ["http://localhost/", "http://localhost:5173/ccmsg/", "http://[::1]:8080/"]) {
+      expect(isValid(WebUi, url)).toBe(true);
+    }
+    expect(isValid(WebUi, "http://127.0.0.2/")).toBe(false);
+  });
+
   test("every web UI this contract takes has an origin and a relying party", () => {
     for (const webui of [
       FIXTURE_IDS.webui,
