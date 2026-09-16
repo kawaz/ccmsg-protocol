@@ -20,8 +20,10 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 - **relying party も webui の URL から導く** (`rpIdOf` = その host)。origin と同じ理由で record にも claims にも持たない — 同じ URL から決まる値を別に持てば、食い違いうる写しが増えるだけ。client は rpId を page の origin に照らす (effective domain かその registrable suffix) ので、host と一致させておけば契約の照合 (`clientDataJSON.origin`) と認証器の束縛 (`rpIdHash`) が同じ 1 つの site を指す。daemon は authenticator data の `rpIdHash` を「webui の host の SHA-256」と比べる。endpoint の host は一切関与しない
 - 登録 URL の claims も webui を運ぶ。**登録 URL は webui を名指して発行される** — 人をどこへ送るかがまさにその URL であり、名指さない登録 URL は誰も開けない
 - token family は認証された webui を持ち、**WS の handshake は token の webui から導いた origin と `Origin` ヘッダの一致で通す**。読むのは「この token を作った page と同じ site から来たか」の 1 点。WS で `Origin` を読むのはここだけで、HTTP の認証 op が読む分は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
+- **`Origin` の不在は不一致**。WS の upgrade でも HTTP の 3 op でも同じで、ヘッダを付けない呼び手を通す例外を置かない。**全てのゲートを通ることが条件**であり、比べる物が無い呼び手は条件を満たしていない呼び手。person の token を提示する接続は browser の page からしか来ない (CLI は到達そのものが権限の Unix socket を使う)
 - 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
-- HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**で CORS に答える。許可一覧を設定にも管理 UI にも持たない — 登録した場所がそのまま許可
+- **登録 URL は発行 instance 自身の endpoint を名指し、登録はその instance に届く**。URL の secret も 6 桁の試行回数もそこにしか無いので、登録が成立するのは発行者に届いた時だけ ([DR-0021](DR-0021-registration-in-two-halves.md))
+- HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**と、**その instance 自身が発行してまだ生きている登録 URL の webui から導いた origin** で CORS に答える。後者は **複製しない** — 発行者の手元にしか無く、発行者だけが答えればよい。許可一覧を設定にも管理 UI にも持たない、登録した場所がそのまま許可という形はこれで保たれ、**新しい webui での最初の 1 件も発行者に届けば通る**
 - HTTP の認証 op がどの束縛で落ちても、答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ理由)
 - credential の **endpoint 束縛はそのまま残る** ([DR-0022](DR-0022-credential-bound-to-an-endpoint.md))。webui は「どの page から来てよいか」、endpoint は「どの instance に入ってよいか」で、答えている問いが違う
 - 契約が持たないもの: webui 自身の `connect-src` allowlist。「この page がどの instance に繋いでよいか」は page を配る側の宣言であって線上の形ではなく、webui リポの責務
@@ -38,12 +40,16 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
   - 不採用理由: 1 つの origin に同居する隣の instance への入口になる ([DR-0022](DR-0022-credential-bound-to-an-endpoint.md) 案 A と同じ)
 - 案 F: relying party に host の suffix (`a.example.com` の credential に `example.com`) を許し、登録時に決めた値を record / claims に固定して持つ
   - 不採用理由: WebAuthn は suffix を許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。契約の側で `clientDataJSON.origin` を照合すれば断れるものの、認証器の束縛と契約の方針が食い違ったまま並ぶことになり、片方だけを見た実装が緩い方に倒れる。**値を持たせること自体がこの案の帰結**でもある — host に固定するなら webui の URL から毎回導けるので、持つ意味があるのは「URL から導けない値を選べる」時だけであり、それはまさに緩める時。導出にすれば両者が食い違う状態を表現できない
+- 案 G: 生きている登録 URL を mesh に複製し、どの instance でも「その origin は登録の途中か」を答えられるようにする
+  - 不採用理由: 複製する record が 1 種増え、未消費の登録という短命な状態が mesh 全体に配られる。答えられる instance を増やしても、登録そのものは発行者にしか成立しない (secret も試行回数もそこにある) ので、増えるのは「CORS だけ通って登録は断られる」経路。発行者が自分の分だけ答えれば足りる
 
 ## Consequences
 
 - 別の origin の webui から使う人は、origin ごとに登録する。webui を別の origin へ移すことは、全員の登録をやり直すこと (同じ origin の中で path を動かすだけなら、契約は何も見ていないので登録は生きたまま)
 - instance が答える CORS の集合は、人が登録するたびに増える。これは設定の変更ではなく登録の結果なので、増やす操作も減らす操作も credential の追加と削除しかない
-- `Origin` を送らない client (非 browser) は、この束縛の対象ではない — token の origin と比べる物が無い経路は、そもそも browser の同一生成元規則の外にある
+- この束縛が防ぐのは、**browser の中で別 origin の page が token を使うこと**。token が機械の外に出た後の防御ではないし、乗っ取られた自 origin の page も (同じ origin なので) 通る。防ぐ範囲を取り違えないこと
+- `webui` を持たない credential と token family は **無効**。契約は移行の形を持たず、人は登録し直す (旧 record を消す手順は daemon の作業)
+- 新しい webui での最初の登録は、**発行者に届いた時だけ**通る。load balancer の下で別の instance に落ちれば、その instance はまだその origin を知らないので CORS で断る。`auth.resolve` による転送が消えるわけではない (同じ endpoint に既にその origin の credential があれば、どの instance でも CORS は通り、判定だけが発行者に転送される)
 
 ## 関連
 

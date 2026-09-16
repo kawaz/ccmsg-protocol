@@ -122,9 +122,12 @@ export const RegisterClaims = Type.Object(
      * name it would not be a URL anyone could open.
      *
      * Its origin (`originOf`) is what the ceremony is then held to, and it is
-     * also what lets a first registration be answered across sites at all: the
+     * also what lets a first registration be answered across sites at all: an
      * instance answers CORS for the origins its credentials name, and the first
-     * registration at a new UI has no credential yet. */
+     * registration at a new UI has no credential yet — the URL it issued and
+     * still holds stands in for one until it does. That is the issuer's own
+     * knowledge and travels nowhere, which is why a registration is only
+     * completed where it was issued. */
     webui: WebUi,
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
@@ -501,7 +504,9 @@ export const TokenFamily = Type.Object(
      * handshake compares `originOf` this with the `Origin` the browser states,
      * and a page from anywhere else is refused however good the token is —
      * refused as an upgrade that does not happen, there being no connection yet
-     * to answer an error on. Without it a token that leaked would be usable
+     * to answer an error on. A handshake that states no `Origin` at all is
+     * refused the same way: every gate has to be passed, and a caller with
+     * nothing to compare has not passed this one. Without it a token that leaked would be usable
      * from any page at all, since it says who the person is and nothing about
      * what is holding it. It lives on the family rather than inside the token's
      * own spelling because every instance has the family and none of them has
