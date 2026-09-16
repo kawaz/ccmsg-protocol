@@ -209,9 +209,13 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 登録 URL の claims は `user_id` (発行 instance が `sub` ごとに 1 度決める 16 byte 乱数) を持つ。ページは `navigator.credentials.create()` の `user.id` にこれを使い、instance は `CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せにしないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの値が付けば端末上では 2 つのアカウントになる。
 
-credential record は登録時の `endpoint` を持ち、assertion はその endpoint (origin 一致 + パス prefix 一致) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が答えるか」までで、「どの instance に入ってよいか」より粗いため。origin ではなく base URL 全体に束ねるのは、隣の instance への入口を兼ねさせないため。
+credential record は登録時の `endpoint` を持ち、assertion はその endpoint (パス prefix 一致) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が答えるか」までで、「どの instance に入ってよいか」より粗いため。base URL 全体に束ねるのは、隣の instance への入口を兼ねさせないため。
 
-credential record は登録時の `rp_id` を持つ。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
+**page の origin と instance の endpoint は別物**で、credential record は両方を持つ。`origin` は credential を作った page が配られた site で、endpoint である必要は無い (webui はどこから配ってもよく、繋ぐ先は別の場所でよい)。これは relying party とは別の規則ではなく同じ規則の書き写しで、passkey は `rp_id` に束縛され、page がその domain の下に無ければ browser は ceremony を走らせず、origin は `clientDataJSON` で ceremony ごとに確定する。record に書くのは、WebAuthn が既に強制している束縛を「ceremony を手元に持たない instance が読める場所」に写すこと。2 つの site を使う人は credential を 2 つ持つ (authenticator が 1 つ目の鍵で 2 つ目の site に答えることはないため)。
+
+origin の残り 2 つの使い道はこの読み出しの上に乗る。token family は認証した credential の `origin` を持ち、WS の handshake は接続の `Origin` ヘッダをそれと照合する — token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。そして HTTP の認証 op は、その endpoint の credential が名乗る origin 集合と、まだ生きている登録 URL が名指す origin (`RegisterClaims.origin`) で CORS に答える。後者があることで、新しい site での最初の登録も同じ規則で答えられる。管理すべき一覧は無い — 登録することが site を許すことで、最後の credential を消すことが外すこと。page がどの instance に繋いでよいかは page 側の宣言で、この契約ではなく webui の持ち物。
+
+credential record は登録時の `rp_id` (その origin の host の登録可能な suffix) を持つ。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はそこから引く — 到達した endpoint のホストではない。
 
 登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。
 
@@ -235,7 +239,7 @@ credential record と token family は topic `auth.records` (`roles: ["instance"
 - 開いた 3 つの item 族 (`tool.<Name>` / `system.attachment.<kind>` / `hook.<Event>`) の最終セグメントは harness の綴りで、この規約の外にある。文字集合は `[A-Za-z0-9_-]+` で `.` を含まない (harness 名に `.` があれば型を coin する側が `_` へ写す) ので、読み手は型名を `.` で分割して階層を得てよい
 - 根 (prefix 無し) に置けるのは特定の対象に属さない名前だけ = 挨拶と、全体の集合である topic (`peers` / `agents` / `instances` / `inbox` / `notify`)。これらの topic が複数形なのは集合だからで、単数の `instance.*` op (呼び手が到達した当の instance を指す) と対になる
 - 「不明」は省略、「無い」は空配列
-- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`mid` は `<instance>/<連番>`
+- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`origin` は page が配られた scheme + authority、`mid` は `<instance>/<連番>`
 
 形の検査は `test/conventions.test.ts` が全 schema を走査して行い、`_` の規則は同じ名前の一覧に対して別に検査する — 形だけでは 1 語と 2 語を区別できないので、2 語のセグメントは「1 語として読む」と書き出すまで落ちる。
 
