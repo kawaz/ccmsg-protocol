@@ -28,13 +28,12 @@ Status は各 DR ファイルの `Status:` 行が正本。
 | [DR-0019](DR-0019-mesh-has-no-ops-of-its-own.md) | mesh は専用 op を持たず、転送された要求は宛先で全部認可し直す |
 | [DR-0020](DR-0020-auth-shape-on-the-wire.md) | 人の認証は線上の形だけを契約が持つ。4 op は HTTP で運び、属性表には載る |
 | [DR-0021](DR-0021-registration-in-two-halves.md) | 登録は URL と 6 桁を別経路で要求し、判定は発行者だけが行う |
-| [DR-0022](DR-0022-credential-bound-to-an-endpoint.md) | credential は endpoint に束縛。住所や BE/BS は見分けるための物で何も決めない |
 | [DR-0023](DR-0023-naming-rules-machine-checked.md) | 名前の規則を決め、全 schema を歩いて機械検査する |
 | [DR-0024](DR-0024-executable-contract-and-fixtures.md) | 契約は実行可能で、線上の代表例 (fixtures) も契約が持つ |
 | [DR-0025](DR-0025-upstream-marked-types.md) | 上流の語彙を持つ型に mark を付け、綴りだけはこの契約に揃える |
 | [DR-0026](DR-0026-terminals-are-their-own-list.md) | 端末は端末の一覧 (`terminals` topic) として述べ、セッションとは pid の一致で結ぶ。起動直後のハーネスは 2 つの一覧の差として導出する |
-| [DR-0027](DR-0027-webui-apart-from-endpoint.md) | webui の URL は endpoint と別物。credential は作られた 1 つの webui を持ち、そこから導く origin が handshake の照合先であり CORS の許可集合そのもの |
 | [DR-0028](DR-0028-refresh-cookie-across-sites.md) | refresh token は endpoint の HttpOnly cookie のまま。site をまたぐ時だけ分割された cookie として渡り、identity を決める 3 op は `Origin` と `Sec-Fetch-Site` を見る |
+| [DR-0029](DR-0029-what-a-credential-is-bound-to.md) | credential は endpoint (どの instance に入れるか) と webui (どの page から来てよいか) の 2 つに縛られ、origin と rpId はその URL から導く |
 
 ## Superseded
 
@@ -44,7 +43,12 @@ Status は各 DR ファイルの `Status:` 行が正本。
 
 ## Archived
 
-<!-- 現役の文脈を汚す古い DR は decisions/archive/ に退避し、ここに記載 -->
+現役の文脈を汚す古い DR は `decisions/archive/` に退避し、ここに記載する。
+
+| DR | 要旨 |
+|---|---|
+| [DR-0022](archive/DR-0022-credential-bound-to-an-endpoint.md) | credential は endpoint に束縛。住所や BE/BS は見分けるための物で何も決めない (Superseded by [DR-0029](DR-0029-what-a-credential-is-bound-to.md)) |
+| [DR-0027](archive/DR-0027-webui-apart-from-endpoint.md) | webui の URL は endpoint と別物で、credential は作られた 1 つの webui を持つ (Superseded by [DR-0029](DR-0029-what-a-credential-is-bound-to.md)) |
 
 ## Moved to research/
 

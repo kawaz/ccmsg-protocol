@@ -36,6 +36,6 @@
 ## 関連
 
 - [DR-0021](DR-0021-registration-in-two-halves.md) — 登録の 2 経路と発行者の単独判定
-- [DR-0022](DR-0022-credential-bound-to-an-endpoint.md) — credential の束縛
+- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — credential が何に縛られるか
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` (手順の正本)
 - `docs/DESIGN.md` §Authenticating a person

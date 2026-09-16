@@ -5,7 +5,7 @@
 
 ## Context
 
-refresh token は `<endpoint>auth/*` が Set-Cookie する HttpOnly cookie で、page の script からは読めない ([DR-0020](DR-0020-auth-shape-on-the-wire.md))。webui の URL と endpoint が別物になった ([DR-0027](DR-0027-webui-apart-from-endpoint.md)) 今、その cookie は page から見て first-party とは限らない — 同じ値が、同じ site から呼ばれることも、別の site から呼ばれることもある。
+refresh token は `<endpoint>auth/*` が Set-Cookie する HttpOnly cookie で、page の script からは読めない ([DR-0020](DR-0020-auth-shape-on-the-wire.md))。webui の URL と endpoint が別物になった ([DR-0029](DR-0029-what-a-credential-is-bound-to.md)) 今、その cookie は page から見て first-party とは限らない — 同じ値が、同じ site から呼ばれることも、別の site から呼ばれることもある。
 
 ## Decision
 
@@ -31,6 +31,6 @@ refresh token は `<endpoint>auth/*` が Set-Cookie する HttpOnly cookie で�
 ## 関連
 
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — 4 op の carrier と、手順を契約に写さない境界
-- [DR-0027](DR-0027-webui-apart-from-endpoint.md) — webui の束縛と、そこから導く origin が CORS の許可集合であること
+- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — credential の 2 つの束縛と、webui から導く origin が CORS の許可集合であること
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — 手順の正本。cookie の属性を 1 通りに決めている §54 と、`Origin` を見ない理由を述べる §90 は本 DR が置き換える (daemon 側の DR 更新が要る)
 - `docs/DESIGN.md` §Authenticating a person

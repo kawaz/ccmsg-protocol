@@ -1,11 +1,11 @@
 # DR-0022: credential は endpoint に束縛し、認証しない手掛かりを併せて持つ
 
-- Status: Active
+- Status: Superseded by DR-0029
 - Date: 2026-09-14
 
 ## Context
 
-1 つの host に複数の instance が同居しうる ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。passkey が答えるのはドメイン単位なので、authenticator の側の単位 (RP ID) は「どの instance に入れたか」より粗い。粗い方に合わせて受け入れると、ある instance に登録した鍵が隣の instance への入口になる。
+1 つの host に複数の instance が同居しうる ([DR-0018](../DR-0018-instance-id-apart-from-endpoint.md))。passkey が答えるのはドメイン単位なので、authenticator の側の単位 (RP ID) は「どの instance に入れたか」より粗い。粗い方に合わせて受け入れると、ある instance に登録した鍵が隣の instance への入口になる。
 
 ## Decision
 
@@ -33,7 +33,8 @@
 
 ## 関連
 
-- [DR-0018](DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
-- [DR-0020](DR-0020-auth-shape-on-the-wire.md) — record の複製経路
+- [DR-0029](../DR-0029-what-a-credential-is-bound-to.md) — 本 DR を置き換えた統合版 (credential が何に縛られるか)
+- [DR-0018](../DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
+- [DR-0020](../DR-0020-auth-shape-on-the-wire.md) — record の複製経路
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md`
 - `docs/DESIGN.md` §Authenticating a person
