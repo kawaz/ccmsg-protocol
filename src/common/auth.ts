@@ -1,6 +1,20 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response, topicFrame } from "../envelope.ts";
-import { Endpoint, InstanceId, Origin, Timestamp } from "../identifiers.ts";
+import { Endpoint, InstanceId, type Origin, Timestamp, WebUi } from "../identifiers.ts";
+
+/** The origin of a web UI's URL: what a browser puts in an `Origin` header and
+ * in a credential's `clientDataJSON`, which is the URL's scheme and authority
+ * and no more.
+ *
+ * Derived rather than stored, and derived here rather than once per
+ * implementation, because every use of it is an exact comparison against a
+ * value a browser serialized. The normalization that makes those comparisons
+ * hold — a lowercase scheme and host, a port only where it is not the scheme's
+ * own, an address literal in its brackets — is the URL parser's, and this is
+ * the one place the contract says so. */
+export function originOf(webui: string): Origin {
+  return new URL(webui).origin;
+}
 
 /** A value that is nothing but bytes to everyone who handles it: a token, a
  * challenge, a credential id, a signature. Spelled base64url without padding so
@@ -88,19 +102,18 @@ export const RegisterClaims = Type.Object(
      * registration is posted to `<endpoint>auth/register`, and the cookie set
      * for it hangs under the same prefix. */
     endpoint: Endpoint,
-    /** The site the URL points at, where the person will open it and where the
-     * credential will be made. It is not read off the endpoint: the page may be
-     * served from somewhere else entirely, and which site that is decides both
-     * what the browser will accept as a relying party and what the credential
-     * will be good for afterwards.
+    /** Where the URL sends the person: the web UI they will open it at, and so
+     * the page the credential will be made by. It is not read off the endpoint,
+     * the UI being publishable anywhere, and a registration URL that did not
+     * name it would not be a URL anyone could open.
      *
-     * It is also what lets a registration be answered at all across sites: the
-     * instance answers CORS for the origins its credentials name, and a first
-     * registration has no credential yet — the outstanding URL naming its
-     * origin is what stands in for one until it does. */
-    origin: Origin,
-    /** The WebAuthn relying party: a domain, not an origin. The `origin`'s host
-     * itself, and nothing shorter. A relying party may be any suffix of the
+     * Its origin (`originOf`) is what the ceremony is then held to, and it is
+     * also what lets a first registration be answered across sites at all: the
+     * instance answers CORS for the origins its credentials name, and the first
+     * registration at a new UI has no credential yet. */
+    webui: WebUi,
+    /** The WebAuthn relying party: a domain, not an origin. The host of
+     * `webui`, and nothing shorter. A relying party may be any suffix of the
      * host the page is at, but every origin under that suffix would then share
      * one credential — the host is the value that makes the authenticator's own
      * binding name the single site this credential is for. Nothing about it
@@ -177,8 +190,8 @@ export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
  * the cookie exists to have. That holds however far the page is from the
  * endpoint: a cookie the page's own site cannot reach is sent from a site it
  * does not own only as a partitioned one, which keeps a session taken at one
- * site from being carried to another — the same shape the credential's single
- * origin already has. A browser without that partitioning sends nothing across
+ * site from being carried to another — the same shape one credential per web UI
+ * already has. A browser without that partitioning sends nothing across
  * sites, and the client falls back to asserting the passkey again, which costs
  * a user verification and no function. */
 export const AuthSession = Type.Object(
@@ -382,8 +395,8 @@ export const CredentialRecord = Type.Object(
      * Which instance the credential admits its holder to: an assertion is
      * accepted only where the request arrived at this base URL — the same
      * scheme and authority, and a path below it. (The authority the request
-     * reached, which is a property of the connection; what site the page asking
-     * came from is `origin` below and a separate question.)
+     * reached, which is a property of the connection; where the page asking was
+     * served from is `webui` below and a separate question.)
      * `https://h.example/` and `https://h.example/personal/` are
      * two endpoints and take two registrations, even on one host and one
      * relying party — the RP ID says which domain an authenticator will answer
@@ -391,29 +404,31 @@ export const CredentialRecord = Type.Object(
      * admitted to. Binding to the base URL rather than the origin is what keeps
      * one instance's credential from being a way into its neighbour. */
     endpoint: Endpoint,
-    /** The site the page that created this credential was served from, which is
-     * the one site it may ever be used from.
+    /** The web UI the page that created this credential was served from, which
+     * is the one place it may ever be used from.
      *
-     * This contract's own rule rather than WebAuthn's. A passkey is bound to
-     * its `rp_id`, and a relying party may be a suffix of the host, so the
-     * authenticator alone would answer for every origin under that suffix. What
-     * holds a credential to one site is the check made here: the
-     * `clientDataJSON.origin` of every ceremony, registration and assertion
-     * alike, has to equal this. Keeping `rp_id` at the origin's host is what
-     * makes the authenticator's binding say the same thing rather than
-     * something wider.
+     * Holding it to one place is this contract's rule rather than WebAuthn's. A
+     * passkey is bound to its `rp_id`, and a relying party may be a suffix of
+     * the host, so the authenticator alone would answer for every origin under
+     * that suffix. What holds a credential to one is the check made against
+     * this: the `clientDataJSON.origin` of every ceremony, registration and
+     * assertion alike, has to equal `originOf` this URL. Keeping `rp_id` at
+     * that host is what makes the authenticator's binding say the same thing
+     * rather than something wider.
      *
-     * The value written down is what the rest of the origin's work rests on: a token
-     * minted here carries this value and its connection's `Origin` header is
-     * held to it, and the set of these across an endpoint's credentials is the
-     * set of origins the HTTP auth ops answer CORS for. A person using two
-     * hosting sites holds two credentials, one per site.
+     * The URL is what is kept, and the origin read off it where a header is
+     * matched — a token minted here carries the same URL and its connection's
+     * `Origin` is held to the origin of it, and the origins of an endpoint's
+     * credentials are the set the HTTP auth ops answer CORS for. Keeping the
+     * origin alongside instead would be a second copy of one fact, able to
+     * disagree with the URL a person is actually sent to. A person using two
+     * web UIs holds two credentials, one per UI.
      *
      * Apart from `endpoint` because the two answer different questions: which
      * page may speak, and which instance it may speak to. */
-    origin: Origin,
+    webui: WebUi,
     /** The relying party this credential was created under, as the claims of
-     * the registration that made it stated: the `origin`'s host. Written by the
+     * the registration that made it stated: the host of `webui`. Written by the
      * registration and not derived later, and an assertion's `rpIdHash` is
      * checked against it rather than against whatever endpoint was reached.
      * Absent only on a record written before the field existed. */
@@ -476,20 +491,19 @@ export const TokenFamily = Type.Object(
     sub: Subject,
     /** The instance that minted the family and the only one that may write it. */
     iss: InstanceId,
-    /** The site the page that authenticated was served from, carried over from
-     * the credential that answered.
+    /** The web UI the page that authenticated was served from, carried over
+     * from the credential that answered.
      *
      * What a connection presenting one of these tokens is held to: the
-     * handshake compares this with the `Origin` the browser states, and a page
-     * from anywhere else is refused however good the token is — refused as an
-     * upgrade that does not happen, there being no connection yet to answer an
-     * error on. Without it a
-     * token that leaked would be usable from any page at all — it says who the
-     * person is and nothing about what is holding it. It lives on the family
-     * rather than inside the token's own spelling because every instance has
-     * the family and none of them has the minting instance's reading of an
-     * opaque value. */
-    origin: Origin,
+     * handshake compares `originOf` this with the `Origin` the browser states,
+     * and a page from anywhere else is refused however good the token is —
+     * refused as an upgrade that does not happen, there being no connection yet
+     * to answer an error on. Without it a token that leaked would be usable
+     * from any page at all, since it says who the person is and nothing about
+     * what is holding it. It lives on the family rather than inside the token's
+     * own spelling because every instance has the family and none of them has
+     * the minting instance's reading of an opaque value. */
+    webui: WebUi,
     access: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     /** When the family was last rotated, and what the client said prompted it.

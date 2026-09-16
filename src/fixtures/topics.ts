@@ -21,8 +21,8 @@ const {
   other_instance,
   endpoint,
   other_endpoint,
-  origin,
-  same_site_origin,
+  webui,
+  same_site_webui,
   mid,
 } = FIXTURE_IDS;
 
@@ -521,7 +521,7 @@ export const AUTH_RECORDS_FRAME = {
           public_key: "pQECAyYgASFYIA",
           user_handle: "dXNlci1oYW5kbGU",
           endpoint,
-          origin,
+          webui,
           rp_id: "ui.example.test",
           sign_count: 0,
           issued_label: "for kawaz",
@@ -548,7 +548,7 @@ export const AUTH_RECORDS_FRAME = {
           public_key: "pQECAyYgASFYIB",
           user_handle: "dXNlci1oYW5kbGU",
           endpoint,
-          origin: same_site_origin,
+          webui: same_site_webui,
           rp_id: "ui.example.ts.net",
           device_label: "phone",
           registered_at: FIXTURE_NOW - 300_000,
@@ -573,7 +573,7 @@ export const AUTH_RECORDS_FAMILY_FRAME = {
           kind: "token_family",
           sub: "personal-1",
           iss: instance,
-          origin,
+          webui,
           access: { value: "YWNjZXNz", expires_at: FIXTURE_NOW + 10_000_000 },
           refresh: { value: "cmVmcmVzaA", expires_at: FIXTURE_NOW + 600_000_000 },
           last_refresh: {

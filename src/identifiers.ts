@@ -72,6 +72,27 @@ export const Endpoint = Type.String({
 });
 export type Endpoint = Static<typeof Endpoint>;
 
+/** Where the web UI is published: the base URL a person opens it at, ending in
+ * a slash and naming no route of its own (`https://ui.example/ccmsg/`).
+ *
+ * The counterpart of `Endpoint` on the other side of the wire. An endpoint says
+ * where an instance is dialed; this says where the page doing the dialing came
+ * from, and one of each is what a credential is made against. Spelled to the
+ * same rule as an endpoint, path and trailing slash included, because it is the
+ * same kind of value: a base URL that something is published under, of which
+ * several may share one host.
+ *
+ * What is compared against a browser's `Origin` is narrower than this — the
+ * scheme and authority alone, which `originOf` derives. The URL is what is
+ * stored because it is what a person is sent to and what an operator
+ * configures; the origin is read off it whenever a header has to be matched,
+ * rather than being kept beside it as a second field that could disagree. */
+export const WebUi = Type.String({
+  $id: "WebUi",
+  pattern: "^https?://[^/?#\\s]+(/[^?#\\s]*)?/$",
+});
+export type WebUi = Static<typeof WebUi>;
+
 /** Where a page was served from: a scheme and an authority and nothing else,
  * spelled as a browser spells it in the `Origin` header and in a credential's
  * `clientDataJSON` — no path, no trailing slash.

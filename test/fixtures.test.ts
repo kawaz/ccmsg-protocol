@@ -9,6 +9,7 @@ import {
   AuthRegisterRequest,
   AuthResolveRequest,
   AuthResolveResponse,
+  originOf,
   FAMILY_TOMBSTONE_RETENTION_MS,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
@@ -18,6 +19,7 @@ import {
   HelloSessionResponse,
   HelloUserRequest,
 } from "../src/common/hello.ts";
+import { Origin } from "../src/identifiers.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
@@ -463,89 +465,89 @@ describe("authenticating a person", () => {
     );
   });
 
-  test("a credential names the one site it was made at, and cannot leave it out", () => {
+  test("a credential names the one web UI it was made at, and cannot leave it out", () => {
     const frame = TOPIC_FIXTURES["auth.records"];
     const [record] = frame.data.records;
-    const { origin: _dropped, ...body } = record.body;
+    const { webui: _dropped, ...body } = record.body;
     expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
       false,
     );
   });
 
-  test("the site a credential was made at is no part of the endpoint it admits to", () => {
-    // The page may be served from anywhere; neither value is read off the
-    // other, and the fixtures are written at sites that are nobody's endpoint.
+  test("where a credential was made is no part of the endpoint it admits to", () => {
+    // The UI may be published anywhere; neither value is read off the other,
+    // and the fixtures are written at UIs that are nobody's endpoint.
     for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(body.endpoint.startsWith(`${body.origin}/`)).toBe(false);
+      expect(body.endpoint).not.toBe(body.webui);
+      expect(body.endpoint.startsWith(originOf(body.webui))).toBe(false);
     }
   });
 
-  test("the two credentials differ in whether their site is the endpoint's", () => {
+  test("the two credentials differ in whether their UI is the endpoint's site", () => {
     // What decides the shape of the refresh cookie, so the fixtures carry one
-    // of each: a site that shares the endpoint's registrable domain, and one
-    // that does not.
+    // of each: a UI that shares the endpoint's registrable domain, and one that
+    // does not.
     const [crossSite, sameSite] = TOPIC_FIXTURES["auth.records"].data.records;
-    // The endpoints are published under one registrable domain; a site is
-    // theirs when its host ends there. (Spelled out rather than computed: the
-    // rule is the public suffix list, which this contract does not carry.)
+    // The endpoints are published under one registrable domain; a UI is on
+    // their site when its host ends there. (Spelled out rather than computed:
+    // the rule is the public suffix list, which this contract does not carry.)
     const endpointSite = "example.ts.net";
     expect(new URL(crossSite.body.endpoint).host.endsWith(`.${endpointSite}`)).toBe(true);
-    expect(new URL(crossSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(false);
-    expect(new URL(sameSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(true);
+    expect(new URL(crossSite.body.webui).host.endsWith(`.${endpointSite}`)).toBe(false);
+    expect(new URL(sameSite.body.webui).host.endsWith(`.${endpointSite}`)).toBe(true);
     expect(crossSite.body.credential_id).not.toBe(sameSite.body.credential_id);
   });
 
-  test("the relying party is the origin's host, so neither is wider than the other", () => {
+  test("the relying party is the UI's host, so neither is wider than the other", () => {
     // A suffix would be a relying party several origins share, which is the one
-    // thing holding a credential to a single site rules out.
+    // thing holding a credential to a single UI rules out.
     for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(body.rp_id).toBe(new URL(body.origin).host);
+      expect(body.rp_id).toBe(new URL(body.webui).host);
     }
   });
 
-  test("an origin is a site, spelled the one way a browser serializes it", () => {
+  test("a web UI is a base URL, spelled as an endpoint is", () => {
     const frame = TOPIC_FIXTURES["auth.records"];
     const [record] = frame.data.records;
-    for (const origin of [
-      "https://ui.example.test/",
-      "https://ui.example.test/webui",
-      "https://ui.example.test?x=1",
-      "https://someone@ui.example.test",
-      "https://UI.example.test",
-      "HTTPS://ui.example.test",
-      // A default port is left out of the serialization, so spelling it would
-      // be a second name for the same site.
-      "https://ui.example.test:443",
-      "http://ui.example.test:80",
-      "https://ui.example.test:99999",
-      "https://ui.example.test:0",
-      "wss://ui.example.test",
+    for (const webui of [
+      // No trailing slash, so `/ccmsg` and `/ccmsg/` cannot be two spellings of
+      // one UI — the rule an endpoint is held to.
+      "https://ui.example.test/ccmsg",
+      "https://ui.example.test",
+      "https://ui.example.test/?x=1",
+      "https://ui.example.test/#top",
+      "wss://ui.example.test/",
     ]) {
       expect(
         isValid(AuthRecordsFrame, {
           ...frame,
-          data: { records: [{ ...record, body: { ...record.body, origin } }] },
+          data: { records: [{ ...record, body: { ...record.body, webui } }] },
         }),
       ).toBe(false);
     }
-    for (const origin of [
-      "https://ui.example.test:8443",
-      "http://localhost",
-      "http://127.0.0.1:3000",
-      "http://[::1]:8080",
-    ]) {
-      expect(
-        isValid(AuthRecordsFrame, {
-          ...frame,
-          data: { records: [{ ...record, body: { ...record.body, origin } }] },
-        }),
-      ).toBe(true);
+  });
+
+  test("the origin held against a header is read off the URL, never stored beside it", () => {
+    // One fact, one place: what a person is sent to. The origin is what a
+    // browser will have serialized, so the derivation is the browser's own
+    // normalization — a lowercase scheme and host, no default port, an address
+    // literal in its brackets.
+    expect(originOf(FIXTURE_IDS.webui)).toBe("https://ui.example.test");
+    expect(originOf("https://UI.Example.Test:443/ccmsg/")).toBe("https://ui.example.test");
+    expect(originOf("http://ui.example.test:80/")).toBe("http://ui.example.test");
+    expect(originOf("https://ui.example.ts.net:8443/webui/")).toBe(
+      "https://ui.example.ts.net:8443",
+    );
+    expect(originOf("http://[::1]:8080/x/")).toBe("http://[::1]:8080");
+    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
+      expect(isValid(Origin, originOf(body.webui))).toBe(true);
+      expect(body).not.toHaveProperty("origin");
     }
   });
 
-  test("a token family states the site its connections are held to", () => {
+  test("a token family states the web UI its connections are held to", () => {
     const [record] = AUTH_RECORDS_FAMILY_FRAME.data.records;
-    const { origin: _dropped, ...body } = record.body;
+    const { webui: _dropped, ...body } = record.body;
     expect(
       isValid(AuthRecordsFrame, {
         ...AUTH_RECORDS_FAMILY_FRAME,
@@ -554,8 +556,8 @@ describe("authenticating a person", () => {
     ).toBe(false);
   });
 
-  test("a registration URL says which site it will be opened at", () => {
-    const { origin: _dropped, ...claims } = AUTH_RESOLVE_RESPONSE.claims;
+  test("a registration URL says which web UI it will be opened at", () => {
+    const { webui: _dropped, ...claims } = AUTH_RESOLVE_RESPONSE.claims;
     expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims })).toBe(false);
   });
 
