@@ -2,7 +2,7 @@
 
 このリポの判断記録 (DR) の索引。**なぜそう決めたか / 何を捨てたか**はここにあり、[docs/DESIGN.md](../DESIGN.md) / [DESIGN-ja.md](../DESIGN-ja.md) は今の姿だけを述べる。
 
-Status は各 DR ファイルの `Status:` 行が正本。ここに載るのは**今立っている DR だけ**で、置き換えられた物は `archive/` に居る (どれに置き換えられたかは、その file の `Status:` 行が名指す)。
+Status は各 DR ファイルの `Status:` 行が正本。ここに載るのは**今立っている DR だけ**で、置き換えられた物は [archive/INDEX.md](archive/INDEX.md) にある。
 
 ## Active
 
