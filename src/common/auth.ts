@@ -415,9 +415,9 @@ export const CredentialRecord = Type.Object(
      * is the one place it may ever be used from.
      *
      * Holding it to one place is this contract's rule rather than WebAuthn's. A
-     * passkey is bound to its `rp_id`, and a relying party may be a suffix of
-     * the host, so the authenticator alone would answer for every origin under
-     * that suffix. What holds a credential to one is the check made against
+     * passkey is bound to its relying party, which may be a suffix of the host,
+     * so the authenticator alone would answer for every origin under that
+     * suffix. What holds a credential to one is the check made against
      * this: the `clientDataJSON.origin` of every ceremony, registration and
      * assertion alike, has to equal `originOf` this URL. The relying party is
      * `rpIdOf` the same URL, which is what makes the authenticator's own

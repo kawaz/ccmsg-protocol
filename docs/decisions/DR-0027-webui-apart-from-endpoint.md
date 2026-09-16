@@ -35,8 +35,8 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
   - 不採用理由: credential が既に 1 つの webui を持つので、一覧はその写しにしかならない。同じ事実が 2 箇所に綴られ、食い違えば設定の側が入口を増やす
 - 案 E: endpoint 束縛をやめて origin 束縛に置き換える
   - 不採用理由: 1 つの origin に同居する隣の instance への入口になる ([DR-0022](DR-0022-credential-bound-to-an-endpoint.md) 案 A と同じ)
-- 案 F: `rp_id` に host の suffix (`a.example.com` の credential に `example.com`) を許す
-  - 不採用理由: WebAuthn はそれを許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。契約の側で `clientDataJSON.origin` を照合すれば断れるものの、認証器の束縛と契約の方針が食い違ったまま並ぶことになり、片方だけを見た実装が緩い方に倒れる
+- 案 F: relying party に host の suffix (`a.example.com` の credential に `example.com`) を許し、登録時に決めた値を record / claims に固定して持つ
+  - 不採用理由: WebAuthn は suffix を許すが、許した瞬間に同じ suffix の下の別 origin から同じ credential で ceremony が走る。契約の側で `clientDataJSON.origin` を照合すれば断れるものの、認証器の束縛と契約の方針が食い違ったまま並ぶことになり、片方だけを見た実装が緩い方に倒れる。**値を持たせること自体がこの案の帰結**でもある — host に固定するなら webui の URL から毎回導けるので、持つ意味があるのは「URL から導けない値を選べる」時だけであり、それはまさに緩める時。導出にすれば両者が食い違う状態を表現できない
 
 ## Consequences
 
