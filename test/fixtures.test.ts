@@ -8,6 +8,7 @@ import {
   AuthRecordsFrame,
   AuthRegisterRequest,
   AuthResolveRequest,
+  AuthResolveResponse,
   FAMILY_TOMBSTONE_RETENTION_MS,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
@@ -33,6 +34,7 @@ import {
   AUTH_RECORDS_TOMBSTONE_FRAME,
   AUTH_RESOLVE_CHALLENGE_REQUEST,
   AUTH_RESOLVE_CHALLENGE_RESPONSE,
+  AUTH_RESOLVE_RESPONSE,
   ERROR_RESPONSE,
   ERROR_RESPONSE_UNIDENTIFIED,
   FIXTURE_IDS,
@@ -459,6 +461,52 @@ describe("authenticating a person", () => {
     expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
       false,
     );
+  });
+
+  test("a credential names the one site it was made at, and cannot leave it out", () => {
+    const frame = TOPIC_FIXTURES["auth.records"];
+    const [record] = frame.data.records;
+    const { origin: _dropped, ...body } = record.body;
+    expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
+      false,
+    );
+  });
+
+  test("the site a credential was made at is no part of the endpoint it admits to", () => {
+    // The page may be served from anywhere; neither value is read off the
+    // other, and the fixture is written at a site that is nobody's endpoint.
+    const [record] = TOPIC_FIXTURES["auth.records"].data.records;
+    expect(record.body.endpoint.startsWith(`${record.body.origin}/`)).toBe(false);
+    expect(record.body.rp_id).toBe(new URL(record.body.origin).host);
+  });
+
+  test("an origin is a site and not a URL with a path", () => {
+    const frame = TOPIC_FIXTURES["auth.records"];
+    const [record] = frame.data.records;
+    for (const origin of ["https://ui.example.ts.net/", "https://ui.example.ts.net/webui"]) {
+      expect(
+        isValid(AuthRecordsFrame, {
+          ...frame,
+          data: { records: [{ ...record, body: { ...record.body, origin } }] },
+        }),
+      ).toBe(false);
+    }
+  });
+
+  test("a token family states the site its connections are held to", () => {
+    const [record] = AUTH_RECORDS_FAMILY_FRAME.data.records;
+    const { origin: _dropped, ...body } = record.body;
+    expect(
+      isValid(AuthRecordsFrame, {
+        ...AUTH_RECORDS_FAMILY_FRAME,
+        data: { records: [{ ...record, body }] },
+      }),
+    ).toBe(false);
+  });
+
+  test("a registration URL says which site it will be opened at", () => {
+    const { origin: _dropped, ...claims } = AUTH_RESOLVE_RESPONSE.claims;
+    expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims })).toBe(false);
   });
 
   test("a retired generation is remembered as a digest and not as the token", () => {

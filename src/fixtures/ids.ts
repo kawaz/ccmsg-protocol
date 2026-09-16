@@ -9,6 +9,9 @@ export const FIXTURE_IDS = {
   other_instance: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
   endpoint: "https://mba.example.ts.net/ccmsg/personal/",
   other_endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
+  /** The site the web UI is served from, which is nobody's endpoint: a
+   * credential is made here and used against the endpoints above. */
+  origin: "https://ui.example.ts.net",
   mid: "3f9c1a7b5e2d48069c1a7b5e2d480691/1841",
   request_id: "1",
 } as const;

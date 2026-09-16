@@ -36,7 +36,7 @@ import type {
 } from "../common/topics.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
-const { sid, instance, other_instance, endpoint, other_endpoint, request_id } = FIXTURE_IDS;
+const { sid, instance, other_instance, endpoint, other_endpoint, origin, request_id } = FIXTURE_IDS;
 
 export const HELLO_SESSION_REQUEST: Static<typeof HelloSessionRequest> = {
   request_id,
@@ -277,7 +277,8 @@ export const AUTH_RESOLVE_RESPONSE = {
     sub: SUBJECT,
     unit: "personal",
     endpoint,
-    rp_id: "mba.example.ts.net",
+    origin,
+    rp_id: "ui.example.ts.net",
     expires_at: FIXTURE_NOW + 600_000,
     jti: "01J9Z3W2Q",
     user_id: "dXNlci1oYW5kbGU",

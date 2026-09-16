@@ -72,6 +72,23 @@ export const Endpoint = Type.String({
 });
 export type Endpoint = Static<typeof Endpoint>;
 
+/** Where a page was served from: a scheme and an authority and nothing else,
+ * spelled as a browser spells it in the `Origin` header and in a credential's
+ * `clientDataJSON` — no path, no trailing slash.
+ *
+ * Apart from `Endpoint` because the two are units of different size and answer
+ * different questions. An endpoint says which instance a person is admitted to
+ * and is compared with its path; an origin says which site the page in front of
+ * them came from, which is all the browser's same-origin rules know about and
+ * all a page's own script cannot lie about. One site may be the page for many
+ * endpoints, and one origin may carry many instances, so neither is derivable
+ * from the other. */
+export const Origin = Type.String({
+  $id: "Origin",
+  pattern: "^https?://[^/?#\\s]+$",
+});
+export type Origin = Static<typeof Origin>;
+
 /** A delivery-frame id: `<instance id>/<counter>`, numbered by the instance
  * that issued the frame. It exists so `reply_to` can point at one frame; it is
  * not a cursor and carries no ordering across instances. */

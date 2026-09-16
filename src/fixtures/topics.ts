@@ -14,7 +14,8 @@ import type { InboxFrame } from "../messaging/message.ts";
 import type { NotifyFrame } from "../messaging/notify.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
-const { sid, other_sid, instance, other_instance, endpoint, other_endpoint, mid } = FIXTURE_IDS;
+const { sid, other_sid, instance, other_instance, endpoint, other_endpoint, origin, mid } =
+  FIXTURE_IDS;
 
 const WORKSPACE = "/repos/kawaz/ccmsg-protocol/main";
 
@@ -511,7 +512,8 @@ export const AUTH_RECORDS_FRAME = {
           public_key: "pQECAyYgASFYIA",
           user_handle: "dXNlci1oYW5kbGU",
           endpoint,
-          rp_id: "mba.example.ts.net",
+          origin,
+          rp_id: "ui.example.ts.net",
           sign_count: 0,
           issued_label: "for kawaz",
           device_label: "work laptop",
@@ -542,6 +544,7 @@ export const AUTH_RECORDS_FAMILY_FRAME = {
           kind: "token_family",
           sub: "personal-1",
           iss: instance,
+          origin,
           access: { value: "YWNjZXNz", expires_at: FIXTURE_NOW + 10_000_000 },
           refresh: { value: "cmVmcmVzaA", expires_at: FIXTURE_NOW + 600_000_000 },
           last_refresh: {

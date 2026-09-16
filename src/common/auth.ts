@@ -1,6 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response, topicFrame } from "../envelope.ts";
-import { Endpoint, InstanceId, Timestamp } from "../identifiers.ts";
+import { Endpoint, InstanceId, Origin, Timestamp } from "../identifiers.ts";
 
 /** A value that is nothing but bytes to everyone who handles it: a token, a
  * challenge, a credential id, a signature. Spelled base64url without padding so
@@ -88,8 +88,21 @@ export const RegisterClaims = Type.Object(
      * registration is posted to `<endpoint>auth/register`, and the cookie set
      * for it hangs under the same prefix. */
     endpoint: Endpoint,
-    /** The WebAuthn relying party: a domain, not an origin. Either the
-     * endpoint's host or a registrable suffix of it. */
+    /** The site the URL points at, where the person will open it and where the
+     * credential will be made. It is not read off the endpoint: the page may be
+     * served from somewhere else entirely, and which site that is decides both
+     * what the browser will accept as a relying party and what the credential
+     * will be good for afterwards.
+     *
+     * It is also what lets a registration be answered at all across sites: the
+     * instance answers CORS for the origins its credentials name, and a first
+     * registration has no credential yet — the outstanding URL naming its
+     * origin is what stands in for one until it does. */
+    origin: Origin,
+    /** The WebAuthn relying party: a domain, not an origin. A registrable
+     * suffix of the `origin`'s host — a passkey answers only for the domain the
+     * page creating it was at, which has nothing to do with the endpoint's
+     * host. */
     rp_id: Type.String({ minLength: 1 }),
     expires_at: Timestamp,
     /** Names this registration, so it can be spent once. */
@@ -358,15 +371,36 @@ export const CredentialRecord = Type.Object(
     /** The endpoint this credential was registered for, as the registration's
      * claims stated it.
      *
-     * What the credential is good for, and the whole of it: an assertion is
-     * accepted only where the origin matches and the request's path falls under
-     * this base URL. `https://h.example/` and `https://h.example/personal/` are
+     * Which instance the credential admits its holder to: an assertion is
+     * accepted only where the request's path falls under this base URL.
+     * `https://h.example/` and `https://h.example/personal/` are
      * two endpoints and take two registrations, even on one host and one
      * relying party — the RP ID says which domain an authenticator will answer
      * for, which is a coarser thing than which instance a person has been
      * admitted to. Binding to the base URL rather than the origin is what keeps
      * one instance's credential from being a way into its neighbour. */
     endpoint: Endpoint,
+    /** The site the page that created this credential was served from, which is
+     * the one site it can ever be used from.
+     *
+     * Not a second rule beside the relying party but the same one written down:
+     * a passkey is bound to its `rp_id`, and a browser runs neither a creation
+     * nor an assertion unless the page's own origin is under that domain. The
+     * origin is settled by `clientDataJSON`, which is verified at every
+     * ceremony — so writing it here copies a binding WebAuthn already enforces
+     * into somewhere an instance can read it without a ceremony in hand.
+     *
+     * That reading is what the rest of the origin's work rests on: a token
+     * minted here carries this value and its connection's `Origin` header is
+     * held to it, and the set of these across an endpoint's credentials is the
+     * set of origins the HTTP auth ops answer CORS for. A person using two
+     * hosting sites holds two credentials, one per site, which is not a
+     * restriction this contract adds — the authenticator would not answer for
+     * the second site with the first site's key either.
+     *
+     * Apart from `endpoint` because the two answer different questions: which
+     * page may speak, and which instance it may speak to. */
+    origin: Origin,
     /** The relying party this credential was created under, as the claims of
      * the registration that made it stated. Written by the registration and not
      * derived later: a passkey only answers for the domain it was made under,
@@ -432,6 +466,18 @@ export const TokenFamily = Type.Object(
     sub: Subject,
     /** The instance that minted the family and the only one that may write it. */
     iss: InstanceId,
+    /** The site the page that authenticated was served from, carried over from
+     * the credential that answered.
+     *
+     * What a connection presenting one of these tokens is held to: the
+     * handshake compares this with the `Origin` the browser states, and a page
+     * from anywhere else is refused however good the token is. Without it a
+     * token that leaked would be usable from any page at all — it says who the
+     * person is and nothing about what is holding it. It lives on the family
+     * rather than inside the token's own spelling because every instance has
+     * the family and none of them has the minting instance's reading of an
+     * opaque value. */
+    origin: Origin,
     access: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     /** When the family was last rotated, and what the client said prompted it.
