@@ -570,7 +570,9 @@ export const AUTH_RECORDS_FRAME = {
         },
       },
       {
-        // The instance this person made themselves: nobody granted it.
+        // The instance this person made themselves, from its command line:
+        // there was no user yet to do it, which is why a granting's author can
+        // be an instance at all.
         key: `ownership/${instance}/${USER}/${GRANT}`,
         updated_at: FIXTURE_NOW - 600_000,
         body: {
@@ -579,6 +581,7 @@ export const AUTH_RECORDS_FRAME = {
           instance,
           grant: GRANT,
           granted_at: FIXTURE_NOW - 600_000,
+          granted_by: { kind: "instance", instance },
         },
       },
       {
@@ -598,7 +601,7 @@ export const AUTH_RECORDS_FRAME = {
           instance: other_instance,
           grant: OTHER_GRANT,
           granted_at: FIXTURE_NOW - 60_000,
-          granted_by: USER,
+          granted_by: { kind: "user", user: USER },
         },
       },
       {
@@ -612,7 +615,7 @@ export const AUTH_RECORDS_FRAME = {
           instance: other_instance,
           grant: THIRD_GRANT,
           granted_at: FIXTURE_NOW - 30_000,
-          granted_by: USER,
+          granted_by: { kind: "user", user: USER },
         },
       },
     ],
@@ -685,7 +688,7 @@ export const AUTH_RECORDS_TOMBSTONE_FRAME = {
           instance: other_instance,
           grant: FOURTH_GRANT,
           granted_at: FIXTURE_NOW + 200_000,
-          granted_by: USER,
+          granted_by: { kind: "user", user: USER },
         },
       },
       {

@@ -340,12 +340,17 @@ export const AUTH_ACCOUNT_READ_RESPONSE: Static<typeof AuthAccountReadResponse> 
     },
   ],
   instances: [
-    { instance, endpoint, granted_at: FIXTURE_NOW - 600_000 },
+    {
+      instance,
+      endpoint,
+      granted_at: FIXTURE_NOW - 600_000,
+      granted_by: { kind: "instance", instance },
+    },
     {
       instance: other_instance,
       endpoint: other_endpoint,
       granted_at: FIXTURE_NOW - 60_000,
-      granted_by: USER,
+      granted_by: { kind: "user", user: USER },
     },
   ],
 };

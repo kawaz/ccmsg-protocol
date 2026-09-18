@@ -20,7 +20,7 @@ import {
   HelloSessionResponse,
   HelloUserRequest,
 } from "../src/common/hello.ts";
-import { Endpoint, Origin } from "../src/identifiers.ts";
+import { Endpoint, InstanceId, Origin } from "../src/identifiers.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
@@ -568,6 +568,29 @@ describe("authenticating a person", () => {
     const frame = TOPIC_FIXTURES["auth.records"];
     expect(frame.instance).toBe(INSTANCE);
     expect(ownershipRecords().map((record) => record.body.instance)).toContain(OTHER_INSTANCE);
+  });
+
+  test("who put a granting there is a person or an instance, and says which", () => {
+    // The first granting of every instance is made from a terminal, where
+    // there is no person to name — so a field that could only hold a user id
+    // would be empty in exactly the place a list is first read.
+    const authors = ownershipRecords().map((record) => record.body.granted_by);
+    expect(authors.map((by) => by?.kind).sort()).toEqual(["instance", "user", "user"]);
+    for (const by of authors) {
+      if (by?.kind === "instance") expect(isValid(InstanceId, by.instance)).toBe(true);
+      if (by?.kind === "user") expect(isValid(UserId, by.user)).toBe(true);
+    }
+    // A bare id says neither which of the two it is nor which field to read.
+    const record = ownershipRecords()[0];
+    expect(
+      isValid(AuthRecordsFrame, frameOf(record, { ...record.body, granted_by: FIXTURE_IDS.user })),
+    ).toBe(false);
+    expect(
+      isValid(
+        AuthRecordsFrame,
+        frameOf(record, { ...record.body, granted_by: { kind: "user", instance: INSTANCE } }),
+      ),
+    ).toBe(false);
   });
 
   test("one instance may be owned by more than one person", () => {

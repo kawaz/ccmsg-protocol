@@ -564,6 +564,28 @@ export type CredentialRecord = Static<typeof CredentialRecord>;
  * endpoint a request arrived at is not part of this and is not compared with
  * anything: an instance reached through a load balancer it shares with its
  * peers admits the same people as one reached directly. */
+/** Who put a granting there, which is either a person acting on an
+ * authenticated channel or an instance whose command line was used.
+ *
+ * Two shapes rather than one id, because the two are not the same kind of
+ * thing and a bare string would leave a reader guessing which they held. A
+ * granting made from a terminal has no user behind it at all — what authorizes
+ * it is standing at that machine — so a field that could only name a person
+ * would be empty exactly where the first granting of every instance is made.
+ *
+ * A hint, like the labels and the addresses: it decides nothing, and it is the
+ * caller's own account of itself. Vouching for who actually wrote a record is
+ * not this field's job and never was; that is what signing the replicated
+ * records would answer (see the extension in Consequences). */
+export const GrantedBy = Type.Union(
+  [
+    Type.Object({ kind: Type.Literal("user"), user: UserId }),
+    Type.Object({ kind: Type.Literal("instance"), instance: InstanceId }),
+  ],
+  { $id: "GrantedBy" },
+);
+export type GrantedBy = Static<typeof GrantedBy>;
+
 export const OwnershipRecord = Type.Object(
   {
     kind: Type.Literal("ownership"),
@@ -584,11 +606,11 @@ export const OwnershipRecord = Type.Object(
      * record but whether any granting for the pair is still alive. */
     grant: Base64Url,
     granted_at: Timestamp,
-    /** Who added this owner, when an owner did rather than the command line. A
-     * hint, as the labels are: it decides nothing, and it is here so that a
+    /** Who added this owner: the person who did it from an authenticated
+     * channel, or the instance whose command line was used. Here so that a
      * person reading a list of several owners can see how each came to be
      * there. */
-    granted_by: Type.Optional(UserId),
+    granted_by: Type.Optional(GrantedBy),
   },
   { $id: "OwnershipRecord" },
 );
@@ -751,7 +773,7 @@ export const AuthAccountReadResult = Type.Object(
         instance: InstanceId,
         endpoint: Type.Optional(Endpoint),
         granted_at: Timestamp,
-        granted_by: Type.Optional(UserId),
+        granted_by: Type.Optional(GrantedBy),
       }),
     ),
   },
