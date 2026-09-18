@@ -240,6 +240,12 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 - **この束縛が防ぐのは、browser の中で別 origin の page が token を使うこと**。token が機械の外に出た後の防御ではなく、乗っ取られた自 origin の page は同じ origin なので通る。範囲は現行と同じ
 - `webui` を持つ credential と token family、`sub` を持つ record は**無効**。契約は移行の形を持たない (下記)
 
+### 後続の拡張 (本 DR では実装しない)
+
+複製する record (credential / 所有 / family / tombstone) に **書き手の署名**を付ける拡張が、この形の上に素直に乗る。instance が初回起動で自分の署名鍵を生成して OS の鍵保管 (Keychain / Secure Enclave 等) に置き、公開鍵 (JWK) を peers に配り、自分が書いた record に署名する。得るのは **mesh 内の帰属と改竄検知** — 1 台が乗っ取られても、その instance は他 instance の名で record を書けず、複製されてきた record がどの instance の手による物かが受け側で確かめられる。得ないのは **乗っ取られた instance 自身の全権**で、そのプロセスが自分の鍵で署名できる以上、その場で自分の名において濫用することは防げない。信頼の根が「その instance をローカルで操作できる者」であることは本 DR から変わらない。
+
+やるべきなのは、この拡張が **`signature` 欄 1 つの追加 (minor) で済む形に record を保っておくこと**で、そのためには **record の正規化された表現** (署名対象のバイト列をどう作るか) を決めておく必要がある。決め方自体は後続の判断に譲るが、`signature` を持つ record が「自分自身を除いた残り」を対象に署名する形になるので、フィールドを 1 つ足すことが既存の署名を壊さない並びであること — それだけをここで意図しておく。
+
 ### 現行 DR との対応
 
 | 現行の判断 | 本 DR で |
