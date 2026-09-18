@@ -199,42 +199,51 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 契約が持つのは **wire の形だけ**。手順 (passkey の登録・検証、cookie、record の複製、challenge の転送先) の正本は daemon リポの decisions にあり、ここに複製しない。
 
-人の identity を確定させる 4 op (`auth.challenge` / `auth.register` / `auth.assert` / `auth.token.refresh`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答えることが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」ではない。この 4 つは `needs_hello: false` で、挨拶と同じく identity 未確定の接続から呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*` で、`RegisterClaims.endpoint` もこの base URL を指す。
+**identity はユーザで、instance はその人の所有物**。passkey で登録した人がユーザであり、その id (`user`) は登録が成立した瞬間に発行 instance が 1 度決めて以後変わらない。値は **WebAuthn の user handle そのもの** — 16 byte の乱数を base64url で綴った 1 つの値が、record の key であり、authenticator が保持する値であり、assertion が `user_handle` として名乗り返す値である。2 つの表現を持てば食い違いうる写しが増えるだけで、比較は全て文字列の一致なので綴りは 1 つでよい。人が読む名前は `UserRecord.display_name` で、認証しない手掛かりの側にある。
 
-`auth.register` は登録 URL の token とは別に、URL を発行した CLI が表示した 6 桁のコードを受け取る。コードは URL に含めない — 2 つが別の経路でブラウザに届くことが「URL を持っているだけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを形にする。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、どちらの半分が失敗したかは名乗らない。
+人の identity を確定させる 5 op (`auth.challenge` / `auth.register` / `auth.assert` / `auth.enroll` / `auth.token.refresh`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答えることが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」ではない。この 5 つは `needs_hello: false` で、挨拶と同じく identity 未確定の接続から呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*`。
 
-登録も assertion と同じく challenge を issuer 付きで運ぶ。値は `client_data_json` の中にもあるが「誰が使い切れるか」は入っておらず、LB の下では challenge の発行 instance・登録 URL を作った instance・この request を受けた instance が全部違い得るため。任意フィールドなので省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を持っている場合しか通せない (推測して通すことはしない)。
+登録の操作は 2 つで、答えている問いが違う。`auth.register` は **ユーザを作る** (初回) — 成立した瞬間にユーザ・credential・所有 record の 3 つが同時に生まれる。`auth.enroll` は **instance をその人に紐付ける** (2 台目以降) — 運ぶのは新しい credential ではなく既存 passkey の assertion で、増えるのは所有 record 1 行だけ。2 つを 1 op にまとめて引数の有無で振る舞いを変えると、属性表からは同じ 1 行に見えるまま副作用が変わる (= 認可を表の外に置くのと同じ形になる)。
 
-コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `register` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。
+**どちらも 6 桁のコードを要る**。URL を発行した CLI が表示した数字で、URL には含めない — 2 つが別の経路でブラウザに届くことが「URL を持っているだけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを形にする。`auth.enroll` で assertion が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではなく、後者を確かめる材料は 6 桁しかない。離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、どちらの半分が失敗したかは名乗らない。
 
-登録 URL の claims は `user_id` (発行 instance が `sub` ごとに 1 度決める 16 byte 乱数) を持つ。ページは `navigator.credentials.create()` の `user.id` にこれを使い、instance は `CredentialRecord.user_handle` に保存して assertion の `userHandle` と照合する。ページ任せにしないのは、authenticator が instance の手の届かない所でこれを保持するため — 同じ人に 2 つの値が付けば端末上では 2 つのアカウントになる。
+登録も assertion と同じく challenge を issuer 付きで運ぶ。値は `client_data_json` の中にもあるが「誰が使い切れるか」は入っておらず、LB の下では challenge の発行 instance・登録 URL を作った instance・この request を受けた instance が全部違い得るため。`auth.register` では任意フィールドなので、省略されたら受け側は issuer を知らないまま値だけを持つことになり、自分がその challenge を持っている場合しか通せない (推測して通すことはしない)。
 
-credential record は登録時の `endpoint` を持ち、assertion はその endpoint に届いた要求 (scheme + authority が一致し、パスがその下にあること) でだけ受理される。`https://h/` と `https://h/personal/` は別 endpoint で別登録になる — 同じ host・同じ RP ID でも、RP ID が言えるのは「どの domain に authenticator が答えるか」までで、「どの instance に入ってよいか」より粗いため。base URL 全体に束ねるのは、隣の instance への入口を兼ねさせないため。
+コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `claims` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。2 つの登録経路で `auth.resolve` を割らないのは、検証する物 (token・6 桁・試行回数) が同じで、どちらだったかは返る claims が言うため。
 
-**webui が配られている URL と instance の endpoint は別物**で、credential record は両方を持つ。`webui` は credential を作った page が配られた base URL で、endpoint と同じ綴り方 (path まで含み末尾スラッシュ必須) をする — これも「何かが publish されている base URL」で、1 つの host に複数載りうるため。どちらも 1 つの場所につき綴り方は 1 つ (host は小文字、既定 port は綴らない、punycode) に型で縛られ、`webui` にはもう 1 つ「origin を必ず導けること」が課される — 導けない値を通せば、その record を受理した後に読み出しが壊れるため。endpoint である必要は無い (webui はどこから配ってもよく、繋ぐ先は別の場所でよい)。**credential をその 1 つの origin に縛るのは WebAuthn ではなくこの契約の規則**。passkey は relying party に束縛されるが、それは page の host の suffix でもよいので、authenticator だけに任せるとその suffix の下の全 origin で答えてしまう。1 つに留めているのは record 側の照合 — 登録でも assertion でも、ceremony の `clientDataJSON.origin` がこの URL の origin と一致すること。relying party をその URL の host に保つことで、authenticator の束縛も同じ 1 つの site を指し、広い方に倒れない。別の origin の webui を使う人は credential を 2 つ持つ。
+登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。
 
-**保持する単位と比べる単位は違う**。URL を丸ごと持つのは、それが登録 URL で人を送る先であり、運用者が設定する形であり、自分の credential 一覧で人が見分ける形だから。一方ここでの照合はすべてその origin か host で行われる — browser は `Origin` ヘッダにも `clientDataJSON` にも path を書かないため。**同じ origin に載る 2 つの webui は、ここでのすべての検査にとって 1 つの場所**になる。
+**`EnrollClaims.endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、端末から運ばれる URL が行き先を言う手段は他に無い。受け取った側はこれを何とも照合しない — 自分の endpoint とも、発行者のものとも。HA の住所 (裏に複数 instance が居る FQDN) でもよく、どれに着弾しても登録は成立する: 受けた instance が自分で ceremony を検査し、自分で record を書き、発行者に問うのは発行者のメモリにしか無い物 (token の真正・`jti` の未消費・6 桁と試行回数) だけである。したがって **発行 instance の endpoint が browser から到達できなくてよい**。
 
-**ヘッダと比べる値は、その URL から導く origin** (`originOf`) で、record の隣には持たない。origin は URL の scheme + authority で、browser が `Origin` や `clientDataJSON` に綴るのはこの形。record が URL の側を持つのは、人を送る先も運用者が設定するのも URL だから — origin を別フィールドで併記すれば 1 つの事実が 2 箇所になり、食い違いうる。比較が成り立つための正規化 (小文字の scheme と host、既定でない port だけを綴る、address literal は角括弧のまま) は導出が引き受け、契約は実装ごとに書かせず 1 つの関数で述べる。
+credential record が持つ束縛は **`origin` 1 つ**で、「どの page から来てよいか」だけを答える。登録でも assertion でも `clientDataJSON.origin` がこの値と一致すること、`Origin` ヘッダがこの値と一致すること、relying party はこの origin の host であること。**1 つの origin に縛るのは WebAuthn ではなくこの契約の規則** — passkey は relying party に束縛されるが、それは page の host の suffix でもよいので、authenticator だけに任せるとその suffix の下の全 origin で答えてしまう。relying party を origin の host に保つことで、authenticator 側の束縛も同じ 1 つの site を指し、広い方に倒れない。
 
-残りはこの導出の上に乗る。token family は認証した credential の `webui` を持ち、WS の handshake は接続の `Origin` ヘッダをその origin と照合する — token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。通らない時は接続が成立しない (upgrade の拒否) のであって、繋がった上で error を返すのではない — token を読むのは carrier で、断る時点で frame を運ぶ接続がまだ無い。**`Origin` の不在は不一致**で、handshake でも HTTP の op でも同じ — 全てのゲートを通ることが条件であり、比べる物が無い呼び手はこのゲートを通っていない。そして HTTP の認証 op は、その endpoint の credential が名乗る webui から導いた origin の集合と、**その instance が発行してまだ持っている登録 URL の webui の origin** で CORS に答える。管理すべき一覧は無い — 登録することが webui を許すことで、最後の credential を消すことが外すこと。新しい webui での最初の 1 件を運ぶのが、まだ credential が無い段階の登録 URL になる。登録 URL は人を送る先の webui (`RegisterClaims.webui`) を名指し (それが人の開く URL そのものだから)、同時に発行者自身の endpoint を名指す — secret も 6 桁の試行回数もそこにしか無く、登録が完了するのもそこだけ。page がどの instance に繋いでよいかは page 側の宣言で、この契約ではなく webui の持ち物。
+**credential は endpoint を持たない**。どの instance に入ってよいかは credential の問いではなく、**所有 record** (`OwnershipRecord`) が答える。認証の可否は「そのユーザがこの instance の所有者か」で決まり、どの endpoint から来ても、HA の裏のどれに落ちても、所有者なら通る。endpoint は instance の住所という役目のまま残り、認証のどの検査にも現れない。1 つの instance が複数のユーザを所有者に持ってよく、1 人のユーザが複数の instance を所有してよい (`granted_by` はその一覧を人が読む時の手掛かり)。**mesh は束縛の単位ではない** — mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値を持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる。
 
-refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の本文には現れない。page が別の site になる場合、その cookie が site をまたいで送られるのは分割された cookie としてだけで、1 つの site で取った session が別の site に持ち越されることはない。ただし分割の単位は site で、credential の単位は origin なので、session をその 1 箇所に留めているのは cookie の分割ではなく family の webui に対する `Origin` の照合 — cookie の分割が答えるのは site の粒度まで。identity を決める 3 op は 2 つのヘッダに照らされ、これが契約が HTTP で読む唯一のヘッダになる: `Origin` を credential (register では登録 URL) が名乗る webui の origin と比べること、そして `Sec-Fetch-Site` が `same-origin` / `same-site` / `cross-site` のいずれかであること — この 3 つが「page が呼んだ」の全体で、それ以外は通らない (`none` = initiator の無い要求、ヘッダの不在、契約が知らない値)。ヘッダの不在は値が違うのと同じく失敗で、どちらで落ちても `auth_invalid`、どちらかは述べない。`auth.challenge` はどちらにも照らされない — 照らす相手がまだ無い段階の op で、配る challenge は発行者でしか使い切れない。**site をまたいでその cookie を運ぶには、分割された cookie に対応した browser が要る。それがこの契約の前提**で、対応しない browser はこの契約を話す環境ではなく、そこに合わせて何かを形作ることもしない。cookie の属性の組み立て方とヘッダの検査手順は、他の手順と同じく daemon の持ち物。
+数えるのは **ユーザ × origin × 認証器**。1 人が 2 つの origin の page を使うなら credential は 2 つ、2 台の端末を使うならさらに 2 つで、instance の数も endpoint の本数も掛からない。**origin が許可集合に入るのは明示の操作ではない** — その origin で最初の credential が成立した時点で入り、その origin の credential を全部消せば許可からも消える。origin を足す op も設定項目も無い。
 
-relying party も同じ URL から導く (`rpIdOf` = その host) もので、record の隣には持たない。passkey は作成時の domain にしか答えないので、assertion の `rpIdHash` の期待値はその host の SHA-256 — 到達した endpoint のホストではない。
+**保持するのも比べるのも origin** で、URL を持って毎回導く形は無い。browser が `Origin` にも `clientDataJSON` にも path を書かない以上、同じ origin の下の別 path はこの契約の全ての検査から見分けられない。したがって **path mount は非対応** — `https://h/` の下に `/personal/` を切って別 instance を出す形は持たない。1 つの host で複数 instance を出す必要があるなら **host を分ける** (`a.example` / `b.example`)。それが browser が見分けられる唯一の単位である。
 
-登録には名前が 2 つ載る。`RegisterClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。
+token family はユーザの物で、認証した credential の `origin` を引き継ぐ。WS の handshake は接続の `Origin` ヘッダをこれと照合し、加えて **そのユーザが到達した instance の所有者であること**を照らす。到達した endpoint は見ない。token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。通らない時は接続が成立しない (upgrade の拒否) のであって、繋がった上で error を返すのではない。**`Origin` の不在は不一致**で、handshake でも HTTP の op でも同じ — 全てのゲートを通ることが条件であり、比べる物が無い呼び手はこのゲートを通っていない。
+
+**rotate は所有されているどの instance でも行える**。family は複製されていて単一 writer を持たず、発行者への転送も要らない — `iss` は発行 instance の記録であって書き手の制限ではない。`iss` が落ちている間だけ refresh が通らない、という穴がそこで閉じる。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後に負けた側の値は「retired に入った値の提示」として失効する。replay と見分ける材料を持たないので、見分けようとして猶予を広げることはしない — 失効させたまま、その端末は passkey で入り直す。分断は稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい。
+
+refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の本文には現れない。page が別の site になる場合、その cookie が site をまたいで送られるのは分割された cookie としてだけで、1 つの site で取った session が別の site に持ち越されることはない。ただし分割の単位は site で、credential の単位は origin なので、session をその 1 箇所に留めているのは cookie の分割ではなく family の `origin` に対する `Origin` の照合 — cookie の分割が答えるのは site の粒度まで。identity を決める 4 op (`auth.register` / `auth.assert` / `auth.enroll` / `auth.token.refresh`) は 2 つのヘッダに照らされ、これが契約が HTTP で読む唯一のヘッダになる: `Origin` を credential (register では登録 URL) が名乗る origin と比べること、そして `Sec-Fetch-Site` が `same-origin` / `same-site` / `cross-site` のいずれかであること。それ以外は通らない (`none` = initiator の無い要求、ヘッダの不在、契約が知らない値)。ヘッダの不在は値が違うのと同じく失敗で、どちらで落ちても `auth_invalid`、どちらかは述べない。`auth.challenge` はどちらにも照らされない — 照らす相手がまだ無い段階の op で、配る challenge は発行者でしか使い切れない。**site をまたいでその cookie を運ぶには、分割された cookie に対応した browser が要る。それがこの契約の前提**で、対応しない browser はこの契約を話す環境ではなく、そこに合わせて何かを形作ることもしない。cookie の名前・属性の組み立て方とヘッダの検査手順は、他の手順と同じく daemon の持ち物。
+
+**CORS は op で 2 通り**。登録 op (`auth.register` / `auth.challenge`) は **全 origin に開く** — HA の裏でどれに着弾しても登録が成立する必要があり、登録を守っているのは token と 6 桁と発行者の判定であって CORS ではない。それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は **その instance の所有者たちの credential の origin**。管理すべき一覧は無く、登録することが origin を許すことで、最後の credential を消すことが外すことである。
+
+登録には名前が 2 つ載る。`EnrollClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。`display_name` と `granted_by` も同じ側にある。
 
 credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` / `backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
 
 残り 3 op:
 
 - `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、切らずに延ばす
-- `auth.resolve` / `auth.rotate` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証、challenge の使い切り、token family の rotate — を `to_instance = iss` で発行者へ転送する。転送される rotate は受けた instance が観測した `reason` / `ip` / `user_agent` を一緒に運ぶ (人が居るのは受けた instance の接続の向こうで、発行者の接続の向こうではない)。発行者はそれを検証せず `last_refresh` に書く (自分で観測した値と同じ扱い)
+- `auth.account.read` も WS (`roles: ["user"]`、`scope: "role"`)。**ユーザ / passkey (認証器ごと) / 所有 instance** の 3 段を 1 度に答える。答えるのは呼び手自身の分だけで、他人の分を読む形は持たない。公開鍵は返らない。名前を 3 つのどれかにすると他の 2 つが付属物に見えるので、account という名にしてある
+- `auth.resolve` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証と challenge の使い切り — を `to_instance = iss` で発行者へ転送する。family の rotate はここに無い (どの所有 instance でも書けるので、転送する物が無い)
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
 
-credential record と token family は topic `auth.records` (`roles: ["instance"]`、element 粒度) で複製する。kv に載せないのは、kv は user role が読み書きできるため — token が読めればその人のセッションになり、credential が書ければ新しい入口になる。削除は tombstone という要素として届く (変化の一覧における不在は何も言わないので)。
+ユーザ・credential・所有・token family は topic `auth.records` (`roles: ["instance"]`、element 粒度) で複製する。key は `user/<user>`、`credential/<credential_id>`、`ownership/<instance>/<user>`、`family/<id>`。kv に載せないのは、kv は user role が読み書きできるため — token が読めればその人のセッションになり、credential や所有が書ければ新しい入口になる。削除は tombstone という要素として届く (変化の一覧における不在は何も言わないので)。tombstone が何を指すかは key が言うので、record 自身は対象のフィールドを持たない。
 
 ## 表記規約 (機械検査あり)
 
@@ -245,7 +254,7 @@ credential record と token family は topic `auth.records` (`roles: ["instance"
 - 開いた 3 つの item 族 (`tool.<Name>` / `system.attachment.<kind>` / `hook.<Event>`) の最終セグメントは harness の綴りで、この規約の外にある。文字集合は `[A-Za-z0-9_-]+` で `.` を含まない (harness 名に `.` があれば型を coin する側が `_` へ写す) ので、読み手は型名を `.` で分割して階層を得てよい
 - 根 (prefix 無し) に置けるのは特定の対象に属さない名前だけ = 挨拶と、全体の集合である topic (`peers` / `agents` / `instances` / `inbox` / `notify`)。これらの topic が複数形なのは集合だからで、単数の `instance.*` op (呼び手が到達した当の instance を指す) と対になる
 - 「不明」は省略、「無い」は空配列
-- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`webui` は page が配られた base URL でそこから `originOf` が browser の綴る origin を導く、`mid` は `<instance>/<連番>`
+- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`origin` は browser が `Origin` や `clientDataJSON` に綴る形そのもの (scheme + authority、末尾スラッシュ無し)、`user` は 16 byte の乱数を base64url で綴った WebAuthn の user handle、`mid` は `<instance>/<連番>`
 
 形の検査は `test/conventions.test.ts` が全 schema を走査して行い、`_` の規則は同じ名前の一覧に対して別に検査する — 形だけでは 1 語と 2 語を区別できないので、2 語のセグメントは「1 語として読む」と書き出すまで落ちる。
 
@@ -253,7 +262,7 @@ credential record と token family は topic `auth.records` (`roles: ["instance"
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 48 | common 15 / messaging 4 / control 29 / mesh 0 |
+| op | 49 | common 16 / messaging 4 / control 29 / mesh 0 |
 | topic | 13 | messaging 2 (`inbox` / `notify`)、control 10、common 1 (`auth.records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
 | ErrorCode | 21 | 閉じた union |
