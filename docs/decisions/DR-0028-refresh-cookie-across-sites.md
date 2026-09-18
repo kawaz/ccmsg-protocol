@@ -1,6 +1,6 @@
 # DR-0028: refresh token は endpoint の cookie のままで、site をまたぐときだけ分割された cookie として渡る
 
-- Status: Active — ✅ 実装済
+- Status: Active — ✅ 実装済。一部を [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) が上書き (cookie の属性を決める判定の相手。§「現行 DR との対応」参照)
 - Date: 2026-09-16
 
 ## Context

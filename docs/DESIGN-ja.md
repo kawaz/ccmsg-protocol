@@ -225,7 +225,7 @@ credential record が持つ束縛は **`origin` 1 つ**で、「どの page か�
 
 token family はユーザの物で、認証した credential の `origin` を引き継ぐ。WS の handshake は接続の `Origin` ヘッダをこれと照合し、加えて **そのユーザが到達した instance の所有者であること**を照らす。到達した endpoint は見ない。token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。通らない時は接続が成立しない (upgrade の拒否) のであって、繋がった上で error を返すのではない。**`Origin` の不在は不一致**で、handshake でも HTTP の op でも同じ — 全てのゲートを通ることが条件であり、比べる物が無い呼び手はこのゲートを通っていない。
 
-**rotate は所有されているどの instance でも行える**。family は複製されていて単一 writer を持たず、発行者への転送も要らない — `iss` は発行 instance の記録であって書き手の制限ではない。`iss` が落ちている間だけ refresh が通らない、という穴がそこで閉じる。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後に負けた側の値は「retired に入った値の提示」として失効する。replay と見分ける材料を持たないので、見分けようとして猶予を広げることはしない — 失効させたまま、その端末は passkey で入り直す。分断は稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい。
+**rotate は所有されているどの instance でも行える**。family は複製されていて単一 writer を持たず、発行者への転送も要らない — `iss` は発行 instance の記録であって書き手の制限ではない。`iss` が落ちている間だけ refresh が通らない、という穴がそこで閉じる。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後、負けた側が client に渡した値は **family のどの世代にも無い値**になる (今立っている refresh でも、猶予中の前世代でも、retired の digest でもない)。**family が知らない値の提示は `auth_invalid` で断るだけで、family は失効させない** — その端末は passkey で入り直すが、同じ family の他の client は動き続ける。family ごと失効させるのは **retired の digest に一致した時だけ**で、それが replay の検知そのもの。見分けようとして猶予を広げることはしない。分断は稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい。
 
 refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の本文には現れない。page が別の site になる場合、その cookie が site をまたいで送られるのは分割された cookie としてだけで、1 つの site で取った session が別の site に持ち越されることはない。ただし分割の単位は site で、credential の単位は origin なので、session をその 1 箇所に留めているのは cookie の分割ではなく family の `origin` に対する `Origin` の照合 — cookie の分割が答えるのは site の粒度まで。identity を決める 4 op (`auth.register` / `auth.assert` / `auth.enroll` / `auth.token.refresh`) は 2 つのヘッダに照らされ、これが契約が HTTP で読む唯一のヘッダになる: `Origin` を credential (register では登録 URL) が名乗る origin と比べること、そして `Sec-Fetch-Site` が `same-origin` / `same-site` / `cross-site` のいずれかであること。それ以外は通らない (`none` = initiator の無い要求、ヘッダの不在、契約が知らない値)。ヘッダの不在は値が違うのと同じく失敗で、どちらで落ちても `auth_invalid`、どちらかは述べない。`auth.challenge` はどちらにも照らされない — 照らす相手がまだ無い段階の op で、配る challenge は発行者でしか使い切れない。**site をまたいでその cookie を運ぶには、分割された cookie に対応した browser が要る。それがこの契約の前提**で、対応しない browser はこの契約を話す環境ではなく、そこに合わせて何かを形作ることもしない。cookie の名前・属性の組み立て方とヘッダの検査手順は、他の手順と同じく daemon の持ち物。
 
@@ -244,7 +244,7 @@ credential record は登録時の authenticator data の BE / BS フラグ (`bac
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
 
-ユーザ・credential・所有・token family は topic `auth.records` (`roles: ["instance"]`、element 粒度) で複製する。key は `user/<user>`、`credential/<credential_id>`、`ownership/<instance>/<user>`、`family/<id>`。kv に載せないのは、kv は user role が読み書きできるため — token が読めればその人のセッションになり、credential や所有が書ければ新しい入口になる。削除は tombstone という要素として届く (変化の一覧における不在は何も言わないので)。tombstone が何を指すかは key が言うので、record 自身は対象のフィールドを持たない。
+ユーザ・credential・所有・token family は topic `auth.records` (`roles: ["instance"]`、element 粒度) で複製する。key は `user/<user>`、`credential/<credential_id>`、`ownership/<instance>/<user>/<grant>`、`family/<id>`。所有の key が granting の id まで持つのは、tombstone がその key への以後の書き込みを永久に拒むため — instance と人だけの key にすると、一度外した所有者を二度と足せなくなる。「今その人がその instance を所有しているか」は、その (instance, 人) に**生きている granting が 1 つでもあるか**で決まる。kv に載せないのは、kv は user role が読み書きできるため — token が読めればその人のセッションになり、credential や所有が書ければ新しい入口になる。削除は tombstone という要素として届く (変化の一覧における不在は何も言わないので)。tombstone が何を指すかは key が言うので、record 自身は対象のフィールドを持たない。
 
 ## 表記規約 (機械検査あり)
 

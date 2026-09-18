@@ -53,7 +53,7 @@ browser が述べる `Origin` が言えるのは **その page がどの site �
 
 ## 関連
 
-- [DR-0029](../DR-0029-what-a-credential-is-bound-to.md) — 本 DR を置き換えた統合版 (credential が何に縛られるか)
+- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — 本 DR を置き換えた統合版 (credential が何に縛られるか)
 - [DR-0018](../DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
 - [DR-0020](../DR-0020-auth-shape-on-the-wire.md) — HTTP で運ぶ 4 op と record の複製経路
 - [DR-0021](../DR-0021-registration-in-two-halves.md) — 登録 URL の claims と、失敗の述べ方

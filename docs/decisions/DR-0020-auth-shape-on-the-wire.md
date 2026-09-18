@@ -1,6 +1,6 @@
 # DR-0020: 人の認証は線上の形だけを契約が持ち、4 つの op は HTTP で運ぶ
 
-- Status: Active — ✅ 実装済
+- Status: Active — ✅ 実装済。一部を [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) が上書き (`RegisterClaims.endpoint` / `auth.rotate` の転送。§「現行 DR との対応」参照)
 - Date: 2026-09-14
 
 ## Context

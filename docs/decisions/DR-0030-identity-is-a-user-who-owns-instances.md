@@ -73,19 +73,29 @@ CredentialRecord = {
 - **endpoint は 2 種類あり、mesh のピアが使うものは instance に 1 対 1 で届く住所でなければならない**。HA の住所 (hosting の FQDN) は、そこへ送っても load balancer がどれに落とすか決めるので、ピアが特定のピアへ届ける用途には使えない。人が繋ぐ住所としての HA の住所は、それとは別に持つ。`iss` は endpoint ではなく instance id なので ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))、HA の裏に何台居ても発行者は一意に指せる
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
 - 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい。`granted_by` はその前提の手掛かりで、複数居る一覧を人が読む時に誰が足したかを言う
-- **所有を外す経路は CLI と認証済みチャンネルの両方**。線上は `auth.ownership.remove(instance)` で、名指すのは外す対象だけ (誰の物かは接続が言っているので、ユーザを引数に取れば他人の物を外す形ができる)。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove (`auth.credential.remove(credential_id)`) が「今使っている物は消せない」のと同型で、どちらも `auth_in_use` で断り、外す先を他の経路から選び直せば済む。`forbidden` と別の code にするのは、呼び手の資格の問題ではない (本人の物である) から。「今使っているか」の判定は daemon
+- **所有を外す経路は CLI と認証済みチャンネルの両方**。線上は `auth.ownership.remove(instance)` で、持っていない物を名指せば `not_found` (既存の語彙が record を含む)。名指すのは外す対象だけ (誰の物かは接続が言っているので、ユーザを引数に取れば他人の物を外す形ができる)。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove (`auth.credential.remove(credential_id)`) が「今使っている物は消せない」のと同型で、どちらも `auth_in_use` で断り、外す先を他の経路から選び直せば済む。`forbidden` と別の code にするのは、呼び手の資格の問題ではない (本人の物である) から。「今使っているか」の判定は daemon
 
 ```ts
 OwnershipRecord = {
   kind: "ownership",
   user: UserId,
   instance: InstanceId,
+  grant: Base64Url,          // この granting の id。乱数、毎回新しい
   granted_at: Timestamp,
   granted_by?: UserId,       // 手掛かり。既存の所有者が足したなら誰か
 }
 ```
 
-key は `ownership/<instance>/<user>`、credential は `credential/<credential_id>`、ユーザは `user/<user>`、family は現行どおり。削除は現行と同じく tombstone の要素として運び、tombstone が何を指すかは key が言うので、record 自身は `sub` のような対象フィールドを持たない。
+key は `ownership/<instance>/<user>/<grant>`、credential は `credential/<credential_id>`、ユーザは `user/<user>`、family は現行どおり。削除は現行と同じく tombstone の要素として運び、tombstone が何を指すかは key が言うので、record 自身は `sub` のような対象フィールドを持たない (tombstone の種類は key の側で user / credential / ownership / family の 4 つ)。
+
+**所有の key が granting の id を持つ理由**。tombstone は **その key への以後の書き込みを永久に拒む**。key が `<instance>/<user>` だけだと、一度所有を外した時点でその組み合わせの key が死に、**同じ人を同じ instance に二度と足せなくなる** — 誤って外した所有者を戻す手段が契約から失われる。credential にこの問題が無いのは id が登録ごとに新しいからで、同じ性質を所有にも持たせる。したがって:
+
+- **granting ごとに乱数の id を 1 つ**持ち、それが key の末尾に入る
+- **「今その人がその instance を所有しているか」は、その (instance, user) に生きている granting が 1 つでもあるか**で決まる (record 1 つの有無ではない)
+- **外す** = その (instance, user) の生きている granting 全部に tombstone を置く。`auth.ownership.remove` は instance しか名指さないので、「2 つある granting の片方だけ外す」形は持たない
+- **足し直す** = 新しい granting を 1 つ書く。key が違うので、前の tombstone は何も拒まない
+
+tombstone を期限付きにして LWW に委ねる案は採らない。分断から戻った peer が古い ownership を「新しい知らせ」として運び直す窓ができ、外した所有者が黙って復活しうる。永久 tombstone + 新しい id の方が、どちらの向きにも取り違えが無い。
 
 ### 4. 登録の操作は 2 つ
 
@@ -166,8 +176,8 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 
 - family はユーザの物で、mesh に複製する。`sub` は `user` になり、`webui` は `origin` になる。他は変わらない (単一世代 + 前世代の猶予 + retired の digest)
 - 接続が照らされるのは **family の origin と `Origin` ヘッダ**、そして **そのユーザが到達した instance の所有者であること**。到達した endpoint は見ない
-- **rotate は所有されているどの instance でも行える**。発行者 (`iss`) への転送は無くなり、`auth.rotate` の中継も要らない。family は単一 writer ではなくなる。所有者ならどの instance でも書けるのが本 DR の形と揃い、`iss` が落ちている間だけ refresh が通らない、という穴が閉じる
-- **競合した時は負けた側の端末がサインインし直す**。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後に片方の値は「retired に入った値の提示」として失効する。replay と見分ける材料を持たないので、見分けようとして猶予を広げることはしない — 失効させたまま、その端末は passkey で入り直す。分断が起きるのは稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい
+- **rotate は所有されているどの instance でも行える**。発行者 (`iss`) への転送は無くなり、`auth.rotate` の中継も要らない。family は単一 writer ではなくなり、**`iss` は mint した instance の記録として残るだけで、書き手を制限しない**。所有者ならどの instance でも書けるのが本 DR の形と揃い、`iss` が落ちている間だけ refresh が通らない、という穴が閉じる
+- **競合した時は負けた側の端末がサインインし直す**。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後、負けた側が client に渡した値は **family のどの世代にも無い値**になる — 今立っている `refresh` でも、猶予中の `previous_refresh` でも、`retired` の digest でもない。**family が知らない値の提示は `auth_invalid` で断るだけで、family は失効させない**。失効させるのは **`retired` の digest に一致した時だけ**で、それが replay の検知そのものである。両者を混ぜて「知らない値も replay 扱い」にすると、並行 rotate のたびに同じ family の他の端末まで巻き添えで落ちる。負けた側は passkey で入り直す。分断が起きるのは稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい
 
 ### 6. 保存の単位はユーザ
 
@@ -313,6 +323,26 @@ Decision の内容は下記の裁定を織り込んだ後の姿で、ここは�
 **Q5. 1 つの instance が複数の所有者を持ってよいか** (§3) — **よい**。
 
 **Q6. `auth.enroll` でも 6 桁を要るか** (§4) — **要る**。
+
+## 付録: daemon に渡すもの
+
+本 DR は wire の形しか決めない ([DR-0020](DR-0020-auth-shape-on-the-wire.md) の境界)。手順の側で daemon が持つ項目を、契約が何を言っているかと合わせて並べる。daemon リポの追従作業はこの表を指示書として使う (起票は契約側の作業ではない)。
+
+| 項目 | 契約 / 本 DR が言うこと | daemon 側の現状 (DR-0001) |
+|---|---|---|
+| 「今使っているか」の判定 (`auth_in_use`) | 判定は daemon。契約は code を 1 つ持つだけ | 無し。「今の接続の instance」「この session が assert した credential」の定義から要る |
+| cookie の名前 | `__Secure-ccmsg-<digest(user id)>`、instance を含めない (本 DR の「cookie の名前」節) | §2.4 が `sha256(instance id + "\n" + sub)`。**矛盾** |
+| rotate の writer と競合 | 所有されているどの instance でも書ける。負けた側の値は family が知らない値として `auth_invalid`、family は失効させない (§5) | §2.4 が「単一 writer で LWW 衝突を避ける」。**矛盾** |
+| 所有の再付与と tombstone | granting ごとに id を持ち、外す = その granting の tombstone、足し直す = 新しい granting (§3) | 無し。§2.6 の tombstone は sub 単位 |
+| `owner add <user>` / `--all` の CLI | 経路として §4 (b) が決めている。線上には record の形しか現れない | 無し |
+| 既に所有者である人の `auth.enroll` | **成功として扱い、ownership を増やさない** (冪等)。拒否にすると page からは `auth_invalid` としか見えず、何が起きたか人に言えない | 無し |
+| 最後の credential を消した時 | 契約は禁じない。消えた credential で始まった family をどうするかは daemon (issue `passkey-list-for-people` の残論点) | §2.5 は「該当 sub の family を全部失効」で sub 前提 |
+| user の tombstone | ユーザを消す op を契約は持たない。key (`user/<user>`) だけが用意されている | 無し |
+| 6 桁の試行回数の上限 | 発行者だけが数える ([DR-0021](DR-0021-registration-in-two-halves.md)) | §2.10 にあり。現状維持 |
+| ヘッダと ceremony の検査手順 | §9 の表。`Origin` は登録 URL (register / enroll) か credential (assert / refresh) の origin と比べる | §2.5 が endpoint の origin と比べる旧手順。**要更新** |
+| CORS の 2 通り | 登録 op は全 origin、それ以外は所有者たちの credential の origin (§9) | §2.4 が「credential の webui + 生きている登録 URL」。**要更新** |
+| WS upgrade で所有を照らす | §9 の表の `WS upgrade` 行 | 無し |
+| 旧 record の削除 (移行) | 作り直す。移行コードは書かない (「移行」節) | 無し |
 
 ## 関連
 

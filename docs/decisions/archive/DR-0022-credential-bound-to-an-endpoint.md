@@ -33,7 +33,7 @@
 
 ## 関連
 
-- [DR-0029](../DR-0029-what-a-credential-is-bound-to.md) — 本 DR を置き換えた統合版 (credential が何に縛られるか)
+- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — 本 DR を置き換えた統合版 (credential が何に縛られるか)
 - [DR-0018](../DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
 - [DR-0020](../DR-0020-auth-shape-on-the-wire.md) — record の複製経路
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md`

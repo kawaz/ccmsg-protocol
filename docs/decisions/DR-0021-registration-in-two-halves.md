@@ -1,6 +1,6 @@
 # DR-0021: 登録は URL と 6 桁を別経路で要求し、判定は発行者だけが行う
 
-- Status: Active — ✅ 実装済
+- Status: Active — ✅ 実装済。一部を [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) が上書き (claims が運ぶ `user_id`。§「現行 DR との対応」参照)
 - Date: 2026-09-14
 
 ## Context
