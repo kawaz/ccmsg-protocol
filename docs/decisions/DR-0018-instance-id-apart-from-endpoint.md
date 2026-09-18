@@ -30,7 +30,7 @@ instance を指す値は 2 つの仕事をする。「同じ instance かどう�
 ## Consequences
 
 - 認証と信頼は endpoint に根を持ち、id は認証された対応付けを通してのみダイヤルされる ([DR-0019](DR-0019-mesh-has-no-ops-of-its-own.md))
-- credential は endpoint 単位で束縛される ([DR-0029](DR-0029-what-a-credential-is-bound-to.md))
+- credential は endpoint に縛られず、origin と所有で決まる ([DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md))
 
 ## 関連
 

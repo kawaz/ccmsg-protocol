@@ -35,5 +35,4 @@ Status は各 DR ファイルの `Status:` 行が正本。ここに載るのは*
 | [DR-0025](DR-0025-upstream-marked-types.md) | ✅ 実装済 | 上流の語彙を持つ型に mark を付け、綴りだけはこの契約に揃える |
 | [DR-0026](DR-0026-terminals-are-their-own-list.md) | ✅ 実装済 | 端末は端末の一覧 (`terminals` topic) として述べ、セッションとは pid の一致で結ぶ。起動直後のハーネスは 2 つの一覧の差として導出する |
 | [DR-0028](DR-0028-refresh-cookie-across-sites.md) | ✅ 実装済 | refresh token は endpoint の HttpOnly cookie のまま。site をまたぐ時だけ分割された cookie として渡り、identity を決める 3 op は `Origin` と `Sec-Fetch-Site` を見る |
-| [DR-0029](DR-0029-what-a-credential-is-bound-to.md) | ✅ 実装済 | credential は endpoint (どの instance に入れるか) と webui (どの page から来てよいか) の 2 つに縛られ、origin と rpId はその URL から導く |
-| [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) | 💭 提案 | identity はユーザで、instance はその人の所有物。credential はユーザ × origin × 認証器に 1 つで、endpoint にも mesh にも縛られない |
+| [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) | ⬜ 未実装 | identity はユーザで、instance はその人の所有物。credential はユーザ × origin × 認証器に 1 つで、endpoint にも mesh にも縛られない |

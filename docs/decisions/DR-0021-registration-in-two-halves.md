@@ -34,6 +34,6 @@
 ## 関連
 
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — 4 op の carrier と `auth.resolve` の転送
-- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — 登録された credential が何に縛られるか
+- [DR-0030](DR-0030-identity-is-a-user-who-owns-instances.md) — 登録された credential が何に縛られ、誰の物になるか
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md`
 - `docs/DESIGN.md` §Authenticating a person

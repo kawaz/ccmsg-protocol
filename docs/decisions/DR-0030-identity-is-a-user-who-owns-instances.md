@@ -1,6 +1,6 @@
 # DR-0030: identity はユーザで、instance はその人の所有物。credential はユーザ × origin × 認証器に 1 つ
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-17
 
 ## Context
@@ -9,13 +9,13 @@
 
 この姿に今の契約が噛み合わない。
 
-**credential が endpoint に縛られている** ([DR-0029](DR-0029-what-a-credential-is-bound-to.md))。assertion は登録された base URL に届いた時だけ受ける、という条件は、hosting の FQDN で来た要求がどの instance の endpoint とも一致しないという形で最初から満たされない。満たすには hosting 自体をどれか 1 つの instance の endpoint と名乗らせるしかなく、そうすると 3 つのうち 1 つだけが人の入口になり、HA の意味が消える。
+**credential が endpoint に縛られている**。assertion は登録された base URL に届いた時だけ受ける、という条件は、hosting の FQDN で来た要求がどの instance の endpoint とも一致しないという形で最初から満たされない。満たすには hosting 自体をどれか 1 つの instance の endpoint と名乗らせるしかなく、そうすると 3 つのうち 1 つだけが人の入口になり、HA の意味が消える。
 
 **複製と束縛が逆を向いている**。credential record と token family は mesh 全体に複製される ([DR-0020](DR-0020-auth-shape-on-the-wire.md))。複製する理由は「登録した instance が落ちていても人が入れること」以外にない。ところが endpoint 束縛は、複製された record を受け取った隣の instance に「これは自分の endpoint ではないから受けない」と言わせる。全部の instance が同じ record を持ち、1 つを除いて誰も使えない。**複製の目的と束縛の条件が同じ判断の中で矛盾している。**
 
 **人が instance の数だけ増える**。`sub` は登録 URL を出した instance が付ける名前 (`<unit>-<連番>`) で、WebAuthn の user handle もその `sub` ごとに決まる ([DR-0021](DR-0021-registration-in-two-halves.md))。3 台に登録すれば 1 人が 3 つの subject になり、認証器の中では 3 つのアカウントとして並び、token も、いずれサーバに置く設定も、3 つに割れる。同じ人が同じ browser で同じ mesh を見ているのに。
 
-**path で instance を分ける形が、比べられない粒度を要求している**。DR-0029 は webui を path 込みの URL で持ちながら、照合は全て origin か host でしか行えないと自ら述べている。browser は `Origin` にも `clientDataJSON` にも path を書かない。持っているが比べられない値がそこにある。
+**path で instance を分ける形が、比べられない粒度を要求している**。現行の契約は webui を path 込みの URL で持ちながら、照合は全て origin か host でしか行えない。browser は `Origin` にも `clientDataJSON` にも path を書かない。持っているが比べられない値がそこにある。
 
 共通の原因は、**identity を「どこに繋いだか」から組み立てていること**にある。endpoint は住所で、mesh は複製の経路で、hosting は配られ方で、どれも「誰か」の答えにならない。passkey が答えるのは人であり、instance はその人が持っている物である。ここを入れ替える。
 
@@ -72,7 +72,8 @@ CredentialRecord = {
 - **endpoint は束縛に出てこない**。どの endpoint から来ても、hosting の裏のどれに落ちても、所有者なら通る。endpoint は instance の住所という DR-0018 の役目のまま残る
 - **endpoint は 2 種類あり、mesh のピアが使うものは instance に 1 対 1 で届く住所でなければならない**。HA の住所 (hosting の FQDN) は、そこへ送っても load balancer がどれに落とすか決めるので、ピアが特定のピアへ届ける用途には使えない。人が繋ぐ住所としての HA の住所は、それとは別に持つ。`iss` は endpoint ではなく instance id なので ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))、HA の裏に何台居ても発行者は一意に指せる
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
-- 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい
+- 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい。`granted_by` はその前提の手掛かりで、複数居る一覧を人が読む時に誰が足したかを言う
+- **所有を外す経路は CLI と認証済みチャンネルの両方**。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove が「今使っている物は消せない」のと同型で、外す先を他の経路から選び直せば済む
 
 ```ts
 OwnershipRecord = {
@@ -93,7 +94,7 @@ key は `ownership/<instance>/<user>`、credential は `credential/<credential_i
 **(b) instance をユーザに紐付ける** (2 台目以降)。経路は 2 つで、既定は前者:
 
 - **その instance の CLI で `owner add <user>`**。mesh の複製でそのユーザを既に知っているなら、確かめる物は全て手元にあり、**URL も browser も要らない**。所有 record を 1 行書くだけで、線上には record の形しか現れない。peers 全部に足す形 (`--all`) も同じ操作の範囲
-- **enroll URL + 既存 passkey の assert**。そのユーザをまだ知らない instance のための経路。CLI が「所有者を足す」URL と 6 桁を出し、人が browser で開いて **既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。6 桁を要る理由は §未決 Q6。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)
+- **enroll URL + 既存 passkey の assert**。そのユーザをまだ知らない instance のための経路。CLI が「所有者を足す」URL と 6 桁を出し、人が browser で開いて **既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。**6 桁はここでも必須**で、assert が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではない。後者を確かめる材料は 6 桁しかなく、離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)
 
 **endpoint のための手順は無い** (HA の住所も同じ)。endpoint は何にも縛られないので、足すことも紐付けることもない。ただし cookie は endpoint host ごとに別なので ([DR-0028](DR-0028-refresh-cookie-across-sites.md))、**新しい endpoint host に初めて繋ぐ時は 1 回 assert してその host の cookie をもらう**。これは登録でも紐付けでもなく、ただのサインインである。
 
@@ -161,7 +162,8 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 
 - family はユーザの物で、mesh に複製する。`sub` は `user` になり、`webui` は `origin` になる。他は変わらない (単一世代 + 前世代の猶予 + retired の digest)
 - 接続が照らされるのは **family の origin と `Origin` ヘッダ**、そして **そのユーザが到達した instance の所有者であること**。到達した endpoint は見ない
-- rotate をどこで行うかは **§未決 Q1**
+- **rotate は所有されているどの instance でも行える**。発行者 (`iss`) への転送は無くなり、`auth.rotate` の中継も要らない。family は単一 writer ではなくなる。所有者ならどの instance でも書けるのが本 DR の形と揃い、`iss` が落ちている間だけ refresh が通らない、という穴が閉じる
+- **競合した時は負けた側の端末がサインインし直す**。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後に片方の値は「retired に入った値の提示」として失効する。replay と見分ける材料を持たないので、見分けようとして猶予を広げることはしない — 失効させたまま、その端末は passkey で入り直す。分断が起きるのは稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい
 
 ### 6. 保存の単位はユーザ
 
@@ -186,7 +188,7 @@ auth.account.read() -> {
 }
 ```
 
-`roles: ["user"]`、`needs_hello: true`、`scope: "role"` (答えるのは**呼び手自身の**ユーザの分だけ。他人の分を読む形は持たない)、`locality: "any_instance"`。op の名前は **§未決 Q2**。
+`roles: ["user"]`、`needs_hello: true`、`scope: "role"` (答えるのは**呼び手自身の**ユーザの分だけ。他人の分を読む形は持たない)、`locality: "any_instance"`。**名前は `auth.account.read`** — 答えるのがユーザ・passkey・所有 instance の 3 つなので、どれか 1 つを名前にすると他の 2 つが付属物に見える。
 
 ### 9. 検査の表
 
@@ -202,17 +204,17 @@ auth.account.read() -> {
 | `auth.account.read` | — | — | — | — | 接続時に済んでいる |
 
 - 「列挙」は `same-origin` / `same-site` / `cross-site` のいずれかであること。`none`・不在・知らない値は通さない (DR-0028 のまま)
-- **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない (DR-0029 のまま)
+- **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない
 - **`endpoint` の列は無い**。どの列にも現れないことがこの DR である
 - どの検査で落ちても答えは `auth_invalid` で、どれが合わなかったかは述べない
-- CORS は op で 2 通り。**登録 op (`auth.register` / `auth.challenge`) は全 origin に開く** — HA の裏でどれに着弾しても登録が成立するため (§4)。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance の所有者たちの credential の origin」**。生きている登録 URL の origin を発行者だけが足す形 (DR-0029) は、前者が全 origin に開いたことで要らなくなり、**消える**
+- CORS は op で 2 通り。**登録 op (`auth.register` / `auth.challenge`) は全 origin に開く** — HA の裏でどれに着弾しても登録が成立するため (§4)。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance の所有者たちの credential の origin」**。生きている登録 URL の origin を発行者だけが足す形は、前者が全 origin に開いたことで要らなくなり、**消える**
 
 ## Alternatives Considered
 
 | 案 | 内容 | 不採用理由 |
 |---|---|---|
 | A | mesh を束縛の単位にする (mesh id を持ち、credential をそれに縛る) | 「同じ mesh なら入れる」という 2 枚目の認可ができる。instance を 1 つ足すと全ユーザの権限が黙って広がり、外したい 1 台だけを外す操作が無い。所有 record なら足すも外すも 1 行で、mesh の形と独立している |
-| B | endpoint 束縛のまま (現行 DR-0029) | hosting の FQDN がどの endpoint とも一致せず、HA の裏に入れない。複製した record を隣の instance が使えないので、複製の目的 (登録先が落ちていても入れる) が果たされない。Context の矛盾そのもの |
+| B | endpoint 束縛のまま (現行) | hosting の FQDN がどの endpoint とも一致せず、HA の裏に入れない。複製した record を隣の instance が使えないので、複製の目的 (登録先が落ちていても入れる) が果たされない。Context の矛盾そのもの |
 | C | credential を endpoint ごとに作る (現行の運用として受け入れる) | 1 人が instance の数だけ passkey を持ち、認証器の中で同じ人が複数アカウントとして並ぶ。増えるのは安全性ではなく人が管理する鍵の本数で、どれを消せるか分からなくなる方に効く |
 | D | path mount を残す (`WebUi` を path 込みで持ち続ける) | 持てるが比べられない。browser は `Origin` にも `clientDataJSON` にも path を書かないので、同じ origin の別 path はこの契約の全ての検査で同一物になる。区別できない値を record に持つのは、区別されていると読み違える余地を作るだけ |
 | E | 所有 record を持たず「mesh の全 instance を所有」と読む | A と同じ帰結を record 無しで得るだけで、外す操作がさらに無い。所有を明示的な record にすると、一覧に出せて、消せて、複製の対象になる (§8 の 3 段目がそれ) |
@@ -233,9 +235,9 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 - **mesh をローカルに閉じたまま運用できる**。browser から見えるのは HA の住所 1 つでよく、instance 個別の endpoint はピア同士が 1 対 1 で届くためだけに要る。ピア用の住所に HA の住所を書くことはできない
 - **endpoint を足す操作が無い**。新しい endpoint host に初めて繋いだ人は、cookie を貰うために 1 回 assert する。それは登録でも紐付けでもないので、記録も増えない
 - **endpoint は住所に戻る**。引っ越しても credential も token も無効にならない。DR-0018 の「id を鍵にする物は endpoint の変更を跨いで生き残る」が、認証にもそのまま及ぶ
-- **origin を移すことは全員の登録をやり直すこと**。ここは DR-0029 から変わらない。変わったのは endpoint 側で、そちらは動かしても登録が生きる
+- **origin を移すことは全員の登録をやり直すこと**。ここは現行から変わらない。変わったのは endpoint 側で、そちらは動かしても登録が生きる
 - **1 つの host に複数 instance を出す形が無くなる**。必要なら host を分ける。運用の制約が増えるのではなく、元々見分けられていなかった物が契約から消える
-- **この束縛が防ぐのは、browser の中で別 origin の page が token を使うこと**。token が機械の外に出た後の防御ではなく、乗っ取られた自 origin の page は同じ origin なので通る。範囲は DR-0029 と同じ
+- **この束縛が防ぐのは、browser の中で別 origin の page が token を使うこと**。token が機械の外に出た後の防御ではなく、乗っ取られた自 origin の page は同じ origin なので通る。範囲は現行と同じ
 - `webui` を持つ credential と token family、`sub` を持つ record は**無効**。契約は移行の形を持たない (下記)
 
 ### 現行 DR との対応
@@ -247,7 +249,7 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 | DR-0020: `needs_hello: false`、提供場所は `<endpoint>auth/*` | 残る |
 | DR-0020: `RegisterClaims.endpoint` が base URL を名指す | **置き換わる** — `EnrollClaims.endpoint` は宛先で、照合しない |
 | DR-0020: `auth.extend` は WS の op | 残る |
-| DR-0020: `auth.resolve` / `auth.rotate` は発行者へ転送 | resolve は残る (`register` kind が `claims` kind に)。rotate は **§未決 Q1** |
+| DR-0020: `auth.resolve` / `auth.rotate` は発行者へ転送 | resolve は残る (`register` kind が `claims` kind に)。rotate の転送は **消える** — 所有されているどの instance でも書ける |
 | DR-0020: record は `auth.records` topic で複製、kv には載せない | 残る (載る record に `user` と `ownership` が増える) |
 | DR-0020: retired は digest で持つ | 残る |
 | **DR-0021**: 6 桁を別経路で要求する | 残る (`auth.enroll` にも同じく必須) |
@@ -255,57 +257,52 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 | DR-0021: 6 桁を判定するのは発行者だけ | 残る |
 | DR-0021: challenge は発行者と一緒に旅する | 残る |
 | DR-0021: claims が `user_id` を運び、page に決めさせない | **置き換わる** — ユーザに 1 つの値で、`create_user` の claims だけが運ぶ |
-| **DR-0022** (archive) | 既に置き換え済み。archive の索引が指す先が本 DR になる |
 | **DR-0028**: refresh は HttpOnly cookie、本文に出さない | 残る |
 | DR-0028: 分割された cookie (CHIPS) を前提とする | 残る |
 | DR-0028: cookie の属性は webui と endpoint が same-site かで決まる | **置き換わる** — 判定は credential の `origin` と endpoint の間で行う |
 | DR-0028: identity を決める op は `Origin` と `Sec-Fetch-Site` を見る | 残る (`auth.enroll` が加わって 4 op) |
 | DR-0028: `auth.challenge` はこの 2 つを見ない | 残る |
 | DR-0028: 断り方は `auth_invalid` で、どのヘッダかは述べない | 残る |
-| **DR-0029**: credential は endpoint と webui の 2 つに縛られる | **置き換わる** — `origin` 1 つ。instance は所有で決まる |
-| DR-0029: endpoint 束縛 (base URL の下に届いた時だけ受ける) | **消える** |
-| DR-0029: 保持は URL、比べるのは origin | **消える** — origin を持つので導出が無い |
-| DR-0029: `originOf` / `rpIdOf` と `WebUi` 型 | **消える** — `Origin` 型 1 つに戻る |
-| DR-0029: relying party は host に固定する | 残る (origin の host) |
-| DR-0029: 登録 URL は webui と発行者の endpoint を名指す | **置き換わる** — origin (人を送る先) と endpoint (宛先) を名乗る |
-| DR-0029: token family は credential の webui を引き継ぐ | **置き換わる** — `origin` を引き継ぐ |
-| DR-0029: WS の handshake は `Origin` と照合する | 残る (加えて所有を照らす) |
-| DR-0029: `Origin` の不在は不一致 | 残る |
-| DR-0029: CORS は登録済み credential の origin + 生きている登録 URL の origin | **置き換わる** — 前者は「所有者たちの credential の origin」になり、後者は登録 op を全 origin に開くことで不要になる |
-| DR-0029: 新しい webui での最初の登録は発行者に届いた時だけ通る | **置き換わる** — どの instance に着弾しても成立し、発行者に問うのは token と 6 桁だけ |
-| DR-0029: 認証しない手掛かりを持つ / それで判定しない | 残る |
-| DR-0029: webui の `connect-src` は契約の外 | 残る |
+| **現行の credential 束縛**: endpoint と webui の 2 つに縛られる | **置き換わる** — `origin` 1 つ。instance は所有で決まる |
+| 現行: endpoint 束縛 (base URL の下に届いた時だけ受ける) | **消える** |
+| 現行: 保持は URL、比べるのは origin | **消える** — origin を持つので導出が無い |
+| 現行: `originOf` / `rpIdOf` と `WebUi` 型 | **消える** — `Origin` 型 1 つに戻る |
+| 現行: relying party は host に固定する | 残る (origin の host) |
+| 現行: 登録 URL は webui と発行者の endpoint を名指す | **置き換わる** — origin (人を送る先) と endpoint (宛先) を名乗る |
+| 現行: token family は credential の webui を引き継ぐ | **置き換わる** — `origin` を引き継ぐ |
+| 現行: WS の handshake は `Origin` と照合する | 残る (加えて所有を照らす) |
+| 現行: `Origin` の不在は不一致 | 残る |
+| 現行: CORS は登録済み credential の origin + 生きている登録 URL の origin | **置き換わる** — 前者は「所有者たちの credential の origin」になり、後者は登録 op を全 origin に開くことで不要になる |
+| 現行: 新しい webui での最初の登録は発行者に届いた時だけ通る | **置き換わる** — どの instance に着弾しても成立し、発行者に問うのは token と 6 桁だけ |
+| 現行: 認証しない手掛かりを持つ / それで判定しない | 残る |
+| 現行: webui の `connect-src` は契約の外 | 残る |
 | **daemon DR-0001** §2.2 登録はローカルからしかできない | 残る。「所有者を足す」経路が 1 本増える |
-| daemon DR-0001 §2.3 credential が何に縛られるか | **置き換わる** (既に DR-0029 へ委譲済みの節) |
-| daemon DR-0001 §2.4 family は `sub` を持ち単一 writer | `sub` → `user` に置き換わる。単一 writer は **§未決 Q1** |
+| daemon DR-0001 §2.3 credential が何に縛られるか | **置き換わる** (既に委譲済みの節) |
+| daemon DR-0001 §2.4 family は `sub` を持ち単一 writer | **置き換わる** — `sub` は `user` になり、単一 writer は無くなる (所有されているどの instance でも rotate できる) |
 | daemon DR-0001 §2.6 tombstone は sub 単位 | **置き換わる** — key が対象を言い、user / credential / ownership の 3 種になる |
 | daemon DR-0001 §2.7 人の入口はパスの末尾で照合する | 残る。path mount を持たないので、prefix の下に別 instance が居る形は無くなる |
 
-supersede するのは **DR-0029** (全体)。**DR-0020 / DR-0021 / DR-0028 は立ったまま**で、上表の「置き換わる」行だけを本 DR が上書きする。実際の archive への移動と、archive 索引および daemon 側 DR の追従は**裁定後の作業**。
+**DR-0020 / DR-0021 / DR-0028 は立ったまま**で、上表の「置き換わる」行だけを本 DR が上書きする。daemon 側 DR の追従は daemon リポの作業。
 
 ### 移行
 
 既存の record は**作り直す**。移行コードは書かない。この契約は世代を 1 つしか持たず互換経路を持たない ([DR-0017](DR-0017-one-generation-no-compatibility-path.md)) し、今この mesh を使っている人は kawaz 1 人なので、失われるのは再登録 1 回分の手間だけである。旧 record を消す手順は daemon の作業。
 
-## 未決 (kawaz 裁定待ち)
+## 裁定の記録
 
-**Q1. rotate をどこでもできるようにするか。** 現行は family の `iss` だけが書き、他の instance が受けた rotate は `auth.rotate` で転送する。HA の裏では `iss` が落ちている時に refresh だけが通らなくなる (再 assert には落ちるが、user verification を求められる)。
-統括推し: **どこでもできる**。所有者ならどの instance でも書けるのが本 DR の形と揃う。悪い面は、2 つの instance が同じ family を並行に rotate した時に世代が競合し、LWW でどちらかが消えること — 消えた側の値の提示は replay と見分けが付かないので、**family の失効が誤発火する**。避けるなら「retired に入った値の提示は失効させるが、猶予の中の前世代は複数あってよい」のような緩め方が要り、それは replay 検知を弱める。転送を残す (現行) なら Q1 は「`iss` が落ちている間は refresh できない」を受け入れることになる。
+Decision の内容は下記の裁定を織り込んだ後の姿で、ここは問いと答えだけを残す (kawaz 裁定 2026-09-18)。
 
-**Q2. 一覧 op の名前。** 仮に `auth.account.read` と置いた。`auth.self.read` / `auth.user.read` / `auth.credentials.read` も候補。
-統括推し: **`auth.account.read`** — 答えるのがユーザ・passkey・所有 instance の 3 つなので、どれか 1 つを名前にすると他の 2 つが付属物に見える。
+**Q1. rotate をどこでもできるようにするか** (§5) — **どこでもできる**。所有されているどの instance でも family を書ける。並行 rotate が競合した時、負けた側の値の提示は replay と見分けが付かないので失効し、その端末は passkey でサインインし直す。猶予を広げて見分けようとはしない。
 
-**Q3. 所有を外す操作を誰が持つか。** CLI (ローカル) だけか、認証済みチャンネルからも外せるか。
-統括推し: **両方**。ただし「今入っている instance の所有を自分で外す」は塞ぐ (自分の足元を外す操作になる)。credential の remove が「今使っている物は消せない」のと同型。
+**Q2. 一覧 op の名前** (§8) — **`auth.account.read`**。
 
-**Q4. `display_name` をユーザが持つか。** §1 では持つ形で書いた。認証しない手掛かりなので DR-0029 の系列だが、ユーザ record に人が書く文字列が 1 つ増えることではある。
-統括推し: **持つ。** 所有者が複数居る instance で一覧を読む時、user id の 22 文字だけが並ぶのは見分けの用を成さない。
+**Q3. 所有を外す操作を誰が持つか** (§3) — **CLI と認証済みチャンネルの両方**。ただし今繋いでいる instance の自分の所有は外せない。
 
-**Q5. 1 つの instance が複数の所有者を持ってよいか。** §3 では「よい」と書いた。`granted_by` はその前提の手掛かり。
-統括推し: **よい。** 禁じるなら所有 record は instance ごとに 1 行の上書きで済み、`granted_by` も要らなくなるので、ここは形が分かれる。今後 kawaz 以外の人がこの mesh に入る形があるかどうかで決まる。
+**Q4. `display_name` をユーザが持つか** (§1) — **持つ**。
 
-**Q6. `auth.enroll` でも 6 桁を要るか。** 既存 passkey の assert が要るので、URL の所持 + user verification で既に 2 つの経路を通っている。6 桁はさらに「CLI の画面を見た」を足す。
-統括推し: **要る。** assert が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではない。6 桁は後者を確かめる唯一の材料で、離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。
+**Q5. 1 つの instance が複数の所有者を持ってよいか** (§3) — **よい**。
+
+**Q6. `auth.enroll` でも 6 桁を要るか** (§4) — **要る**。
 
 ## 関連
 
@@ -314,7 +311,6 @@ supersede するのは **DR-0029** (全体)。**DR-0020 / DR-0021 / DR-0028 は�
 - [DR-0020](DR-0020-auth-shape-on-the-wire.md) — 認証 op の carrier と record の複製経路
 - [DR-0021](DR-0021-registration-in-two-halves.md) — 登録の 2 経路と、発行者だけが判定すること
 - [DR-0028](DR-0028-refresh-cookie-across-sites.md) — refresh cookie と、認証 op が見るヘッダ
-- [DR-0029](DR-0029-what-a-credential-is-bound-to.md) — 本 DR が置き換える判断
 - `docs/issue/2026-09-09-passkey-list-for-people.md` — 認証済みチャンネルからの passkey の add / remove
 - `docs/issue/2026-09-10-token-family-bound-to-endpoint.md` — token family の endpoint 束縛 (本 DR が採らない方向)
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — WebAuthn の検証と cookie / carrier の手順の正本

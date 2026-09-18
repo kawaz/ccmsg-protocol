@@ -1,13 +1,13 @@
 # DR-0029: credential は endpoint と webui の 2 つに縛られ、比べる値はどちらも URL から導く
 
-- Status: Active — ✅ 実装済
+- Status: Superseded by DR-0030
 - Date: 2026-09-16
 
 ## Context
 
 passkey は人の identity を決める。では、登録された 1 つの credential は **何に対して**有効なのか。
 
-3 つの単位が絡む。**authenticator が知る単位**は `rpId` = ドメインで、これが一番粗い。**instance の単位**は endpoint で、1 つの host に複数の instance が同居しうるから host より細かい ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))。**page の単位**は webui が publish されている origin で、webui は endpoint と別の origin から配られてよい。
+3 つの単位が絡む。**authenticator が知る単位**は `rpId` = ドメインで、これが一番粗い。**instance の単位**は endpoint で、1 つの host に複数の instance が同居しうるから host より細かい ([DR-0018](../DR-0018-instance-id-apart-from-endpoint.md))。**page の単位**は webui が publish されている origin で、webui は endpoint と別の origin から配られてよい。
 
 authenticator の言い分だけに従うと、粗い方に合わせて受け入れることになる: ある instance に登録した鍵が隣の instance への入口になり、同じドメインの下の任意の page が ceremony を走らせられる。さらに、認証の後に残る token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token はどの page からでも使える。
 
@@ -32,12 +32,12 @@ browser が述べる `Origin` は **その page がどの origin から来たか
 
 ### いつ照らすか
 
-- **登録 URL は 2 つを名指す**。人を送る先の webui (名指さない URL は誰も開けない) と、**発行者自身の endpoint**。URL の secret も 6 桁の試行回数も発行者にしかないので、**登録が成立するのは発行者に届いた時だけ** ([DR-0021](DR-0021-registration-in-two-halves.md))
-- **token family は認証された credential の webui を引き継ぐ**。WS の handshake は、その webui から導いた origin と `Origin` ヘッダの一致で通す。読むのは「この token を作った page と同じ origin から来たか」の 1 点。**WS で `Origin` を読むのはこの handshake だけ** — upgrade に CORS は効かず browser は `Origin` を送るだけなので、契約が自分で見る。接続が立った後の frame 上の op では見ない。CORS が効く HTTP 側で何を見るかは [DR-0028](DR-0028-refresh-cookie-across-sites.md)
+- **登録 URL は 2 つを名指す**。人を送る先の webui (名指さない URL は誰も開けない) と、**発行者自身の endpoint**。URL の secret も 6 桁の試行回数も発行者にしかないので、**登録が成立するのは発行者に届いた時だけ** ([DR-0021](../DR-0021-registration-in-two-halves.md))
+- **token family は認証された credential の webui を引き継ぐ**。WS の handshake は、その webui から導いた origin と `Origin` ヘッダの一致で通す。読むのは「この token を作った page と同じ origin から来たか」の 1 点。**WS で `Origin` を読むのはこの handshake だけ** — upgrade に CORS は効かず browser は `Origin` を送るだけなので、契約が自分で見る。接続が立った後の frame 上の op では見ない。CORS が効く HTTP 側で何を見るかは [DR-0028](../DR-0028-refresh-cookie-across-sites.md)
 - **`Origin` の不在は不一致**。WS の upgrade でも、HTTP で identity を決める 3 op でも同じで、ヘッダを付けない呼び手を通す例外を置かない。**全てのゲートを通ることが条件**であり、比べる物が無い呼び手は条件を満たしていない。「person の token を提示する接続は browser の page からしか来ない」は **観測ではなく契約が置く前提** — CLI は到達そのものが権限の Unix socket を使うので、person の token を要る場面がそもそも無い。前提である以上、それを満たさない呼び手を見分けて通す仕組みは用意せず、ヘッダが無ければ断る
 - 一致しない handshake は **接続が成立しない** (upgrade の拒否) で、frame の error ではない。access token は挨拶の引数ではなく upgrade を受けた carrier が持つ物なので、断る時点でまだ frame を運ぶ接続が無い
-- HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**と、**その instance 自身が発行してまだ生きている登録 URL の webui から導いた origin** で CORS に答える。後者は **複製しない** — 発行者の手元にしかなく、発行者だけが答えればよい。許可一覧を設定にも管理 UI にも持たない (登録した場所がそのまま許可) 形はこれで保たれ、新しい webui での最初の 1 件も発行者に届けば通る。どのヘッダを見るかと断り方は [DR-0028](DR-0028-refresh-cookie-across-sites.md)
-- どの束縛で落ちても、HTTP の答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](DR-0021-registration-in-two-halves.md) と同じ理由)
+- HTTP の認証 op は、**その endpoint に登録済みの credential の webui から導いた origin の集合**と、**その instance 自身が発行してまだ生きている登録 URL の webui から導いた origin** で CORS に答える。後者は **複製しない** — 発行者の手元にしかなく、発行者だけが答えればよい。許可一覧を設定にも管理 UI にも持たない (登録した場所がそのまま許可) 形はこれで保たれ、新しい webui での最初の 1 件も発行者に届けば通る。どのヘッダを見るかと断り方は [DR-0028](../DR-0028-refresh-cookie-across-sites.md)
+- どの束縛で落ちても、HTTP の答えは既存の `auth_invalid` で、どれが合わなかったかは述べない ([DR-0021](../DR-0021-registration-in-two-halves.md) と同じ理由)
 
 ### 縛らないもの
 
@@ -70,9 +70,10 @@ browser が述べる `Origin` は **その page がどの origin から来たか
 
 ## 関連
 
-- [DR-0018](DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
-- [DR-0020](DR-0020-auth-shape-on-the-wire.md) — HTTP で運ぶ 4 op と record の複製経路
-- [DR-0021](DR-0021-registration-in-two-halves.md) — 登録の 2 経路と、発行者だけが判定すること
-- [DR-0028](DR-0028-refresh-cookie-across-sites.md) — site をまたいだときの refresh cookie と、認証 op が見るヘッダ
+- [DR-0018](../DR-0018-instance-id-apart-from-endpoint.md) — endpoint は path まで含めて比べる
+- [DR-0020](../DR-0020-auth-shape-on-the-wire.md) — HTTP で運ぶ 4 op と record の複製経路
+- [DR-0021](../DR-0021-registration-in-two-halves.md) — 登録の 2 経路と、発行者だけが判定すること
+- [DR-0028](../DR-0028-refresh-cookie-across-sites.md) — site をまたいだときの refresh cookie と、認証 op が見るヘッダ
+- [DR-0030](../DR-0030-identity-is-a-user-who-owns-instances.md) — 本 DR を置き換えた判断 (identity はユーザで、credential は origin だけに縛られる)
 - ccmsg (daemon) `docs/decisions/DR-0001-passkey-auth-for-people.md` — WebAuthn の検証と cookie / carrier の手順の正本
 - `docs/DESIGN.md` §Authenticating a person

@@ -35,7 +35,7 @@ DR-0001 §2.2 の「利用者が複数端末を持つ場合にどの端末の pa
 
 ## 追記
 
-kawaz 2026-09-16: list だけでなく、確立済みの認証済みチャンネル経由で passkey の add / remove もできてよい (CLI 以外の経路)。条件: add / remove は直前に既存 credential での assert (user verification) を要求する 2 段にする (登録 ceremony 自体の UV は新しい認証器の持ち主を確かめるだけで既存の持ち主を確かめないため)。token 単体では add / remove できない = 離席中に第三者が add できない。今使っている credential は自分では remove できない。add でできるのは同じ origin での追加だけ (登録 ceremony の rpId はそのページの origin なので、2 つ目の hosting site の bootstrap は CLI か CLI が出す一回限りの登録 URL の責務のまま)。CT-Q11 (DR-0029) と CT-Q12 の後に DR 1 本で扱う。
+kawaz 2026-09-16: list だけでなく、確立済みの認証済みチャンネル経由で passkey の add / remove もできてよい (CLI 以外の経路)。条件: add / remove は直前に既存 credential での assert (user verification) を要求する 2 段にする (登録 ceremony 自体の UV は新しい認証器の持ち主を確かめるだけで既存の持ち主を確かめないため)。token 単体では add / remove できない = 離席中に第三者が add できない。今使っている credential は自分では remove できない。add でできるのは同じ origin での追加だけ (登録 ceremony の rpId はそのページの origin なので、2 つ目の hosting site の bootstrap は CLI か CLI が出す一回限りの登録 URL の責務のまま)。CT-Q11 (DR-0030) と CT-Q12 の後に DR 1 本で扱う。
 
 訂正 (kawaz 2026-09-16): 「add でできるのは同じ origin での追加だけ」は誤り。add はページ上で登録 ceremony を走らせるのではなく、承認を置く場所を変えるだけ。手順: add のフォームで endpoint と登録先のホスト URL を入力 → 実行時に既存チャンネルの passkey 認証 (assert) を要求 → 通ったらそのホスト URL に endpoint を指定した登録 URL を発行 → その URL から CLI 発行の時と同じ手順で登録する。信頼源がローカルでは CLI、webui では認証済み WS チャンネルになるだけで、追加経路は既存と同じ 1 本。origin の限定は不要 (origin はユーザが信頼するホストを指定するものであり、登録 URL が名指す origin が CORS の許可集合に入る)。
 
