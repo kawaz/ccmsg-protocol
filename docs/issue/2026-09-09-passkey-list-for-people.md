@@ -39,6 +39,8 @@ kawaz 2026-09-16: list だけでなく、確立済みの認証済みチャンネ
 
 訂正 (kawaz 2026-09-16): 「add でできるのは同じ origin での追加だけ」は誤り。add はページ上で登録 ceremony を走らせるのではなく、承認を置く場所を変えるだけ。手順: add のフォームで endpoint と登録先のホスト URL を入力 → 実行時に既存チャンネルの passkey 認証 (assert) を要求 → 通ったらそのホスト URL に endpoint を指定した登録 URL を発行 → その URL から CLI 発行の時と同じ手順で登録する。信頼源がローカルでは CLI、webui では認証済み WS チャンネルになるだけで、追加経路は既存と同じ 1 本。origin の限定は不要 (origin はユーザが信頼するホストを指定するものであり、登録 URL が名指す origin が CORS の許可集合に入る)。
 
+追記 (2026-09-18): 線上の形は [DR-0030](../decisions/DR-0030-identity-is-a-user-who-owns-instances.md) で決めた — 一覧は `auth.account.read` (ユーザ / passkey / 所有 instance の 3 段)、remove は `auth.credential.remove` (`credential_id`) と `auth.ownership.remove` (`instance`) で、今使っている物は `auth_in_use` で断る。残るのは add の経路 (上の訂正の手順) と、論点 2 の「消した後の family の扱い」。
+
 ## 受け入れ条件
 
 - [ ] 論点 1-3 について方針を決定し、契約 (op 定義 / DR) に反映する

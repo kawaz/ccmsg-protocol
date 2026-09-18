@@ -235,10 +235,11 @@ refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の�
 
 credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` / `backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
 
-残り 3 op:
+残り 5 op:
 
 - `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、切らずに延ばす
 - `auth.account.read` も WS (`roles: ["user"]`、`scope: "role"`)。**ユーザ / passkey (認証器ごと) / 所有 instance** の 3 段を 1 度に答える。答えるのは呼び手自身の分だけで、他人の分を読む形は持たない。公開鍵は返らない。名前を 3 つのどれかにすると他の 2 つが付属物に見えるので、account という名にしてある
+- `auth.ownership.remove` (`instance`) と `auth.credential.remove` (`credential_id`) も WS (同じく `roles: ["user"]`、`scope: "role"`)。持っている物を手放す 2 op で、**名指すのは外す対象だけ**。誰の物かは接続が既に言っているので、ユーザを引数に取れば他人の物を外す形ができてしまう。**今その呼び出しに使っている物 — 繋いでいる instance の所有、今の session が認証に使った credential — は外せず、`auth_in_use` で断る**。呼び手の資格の問題ではない (本人の物である) ので `forbidden` とは別の code にしてあり、別の所有 instance や別の passkey から、あるいは CLI から外せば済む。「今使っているか」の判定は daemon
 - `auth.resolve` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証と challenge の使い切り — を `to_instance = iss` で発行者へ転送する。family の rotate はここに無い (どの所有 instance でも書けるので、転送する物が無い)
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
@@ -262,10 +263,10 @@ family は退役させた refresh の値を `retired` にダイジェストだ�
 
 | 単位 | 数 | 内訳 |
 |---|---|---|
-| op | 49 | common 16 / messaging 4 / control 29 / mesh 0 |
+| op | 51 | common 18 / messaging 4 / control 29 / mesh 0 |
 | topic | 13 | messaging 2 (`inbox` / `notify`)、control 10、common 1 (`auth.records`) |
 | capability | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| ErrorCode | 21 | 閉じた union |
+| ErrorCode | 22 | 閉じた union |
 
 全 op が `OP_SCHEMAS` に request / response の対を持ち、全 topic が `TOPIC_SCHEMAS` に frame を持つ。`OP_SCHEMAS` の型は `Record<OpName, OpSchemas>` なので、属性表に op を足して schema を書かなければ型検査で落ちる。topic 側も属性表と frame の対応を双方向に検査する。
 

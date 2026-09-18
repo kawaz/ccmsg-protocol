@@ -73,7 +73,7 @@ CredentialRecord = {
 - **endpoint は 2 種類あり、mesh のピアが使うものは instance に 1 対 1 で届く住所でなければならない**。HA の住所 (hosting の FQDN) は、そこへ送っても load balancer がどれに落とすか決めるので、ピアが特定のピアへ届ける用途には使えない。人が繋ぐ住所としての HA の住所は、それとは別に持つ。`iss` は endpoint ではなく instance id なので ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))、HA の裏に何台居ても発行者は一意に指せる
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
 - 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい。`granted_by` はその前提の手掛かりで、複数居る一覧を人が読む時に誰が足したかを言う
-- **所有を外す経路は CLI と認証済みチャンネルの両方**。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove が「今使っている物は消せない」のと同型で、外す先を他の経路から選び直せば済む
+- **所有を外す経路は CLI と認証済みチャンネルの両方**。線上は `auth.ownership.remove(instance)` で、名指すのは外す対象だけ (誰の物かは接続が言っているので、ユーザを引数に取れば他人の物を外す形ができる)。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove (`auth.credential.remove(credential_id)`) が「今使っている物は消せない」のと同型で、どちらも `auth_in_use` で断り、外す先を他の経路から選び直せば済む。`forbidden` と別の code にするのは、呼び手の資格の問題ではない (本人の物である) から。「今使っているか」の判定は daemon
 
 ```ts
 OwnershipRecord = {
@@ -104,7 +104,7 @@ key は `ownership/<instance>/<user>`、credential は `credential/<credential_i
 - 認証済み画面から add URL (+ 6 桁) を出し、別端末の browser で開いて作る
 - CLI から add URL を出す
 
-hosting origin が別なら、同じ端末の同じ認証器でもそこで 1 つ作ることになる (§2)。本 DR は各経路の線上の形を決めず (issue `passkey-list-for-people`)、**ユーザに対して足す物であって instance に対して足す物ではない**という位置づけと、user handle が 1 つであることだけを置く。
+hosting origin が別なら、同じ端末の同じ認証器でもそこで 1 つ作ることになる (§2)。本 DR は **足す**経路の線上の形を決めず (issue `passkey-list-for-people`)、**ユーザに対して足す物であって instance に対して足す物ではない**という位置づけと、user handle が 1 つであることだけを置く。**外す**方は §3 と同じ形で契約が持つ — `auth.credential.remove(credential_id)`、今使っている物は `auth_in_use`。
 
 登録 URL の claims:
 
@@ -138,6 +138,10 @@ auth.enroll(token, code, challenge: AuthChallenge, credential: AssertionCredenti
 
 // ユーザとして入る。現行のまま
 auth.assert(challenge, credential: AssertionCredential) -> AuthSession
+
+// 持っている物を手放す。名指すのは外す対象だけ
+auth.ownership.remove(instance: InstanceId) -> {}
+auth.credential.remove(credential_id: Base64Url) -> {}
 
 AuthSession = { user: UserId, access: { value, expires_at } }
 ```
@@ -302,7 +306,7 @@ Decision の内容は下記の裁定を織り込んだ後の姿で、ここは�
 
 **Q2. 一覧 op の名前** (§8) — **`auth.account.read`**。
 
-**Q3. 所有を外す操作を誰が持つか** (§3) — **CLI と認証済みチャンネルの両方**。ただし今繋いでいる instance の自分の所有は外せない。
+**Q3. 所有を外す操作を誰が持つか** (§3) — **CLI と認証済みチャンネルの両方**。ただし今繋いでいる instance の自分の所有は外せない。(kawaz 裁定 2026-09-18: 線上は `auth.ownership.remove` / `auth.credential.remove`、`roles: ["user"]` / `scope: "role"`、断りは `auth_in_use`。)
 
 **Q4. `display_name` をユーザが持つか** (§1) — **持つ**。
 

@@ -235,10 +235,11 @@ Two names travel with a registration. `EnrollClaims.issued_label` is what the ad
 
 A credential record also keeps the BE and BS flags of the authenticator data it was registered with (`backup_eligible`, `backup_state`), and a token family keeps its most recent rotation (`last_refresh`: when, from where, and the `reason` the client stated). Both are hints of the same order as the addresses above — **nothing is admitted or refused by either**. BE and BS say whether a passkey is one synced across a person's devices or one bound to the device it was made on, which is what removing a line costs them; `reason` is the caller's unchecked word, and a refresh that states none is as valid as any.
 
-The other three:
+The other five:
 
 - `auth.extend` is a WebSocket op. It moves a live connection's deadline (a greeting's `auth_expires_at`) rather than closing it
 - `auth.account.read` is one too (`roles: ["user"]`, `scope: "role"`). It answers the three things a person has at once — **the user, the passkeys, one per authenticator, and the instances they own**. It answers about the caller and nobody else, and public keys are not in the reply. Naming it after any one of the three would make the other two read as appendages, hence the account
+- `auth.ownership.remove` (`instance`) and `auth.credential.remove` (`credential_id`) are WebSocket ops as well (`roles: ["user"]`, `scope: "role"`), for letting go of what a person holds. **Each names only what is removed**: whose it is has already been settled by the connection, and taking a user as an argument would be a shape for removing somebody else's. **What the call is being made with — the ownership of the instance the connection is on, the credential this session authenticated with — cannot be removed, and is refused with `auth_in_use`.** Nothing is wrong with the caller's standing (it is theirs), which is why this is a code apart from `forbidden`: another instance they own, another passkey, or the command line removes it. Judging what is in use is the daemon's
 - `auth.resolve` is between instances (`roles: ["instance"]`, `locality: owner_instance`). What only an issuer can answer — checking an enrolment URL, spending a challenge — is forwarded to it as `to_instance = iss`. Rotating a family is not here: every instance its owner owns may write it, so there is nothing to forward
 
 A family remembers the refresh values it retired as digests in `retired`, kept until each value's own expiry — replicating the values themselves would be handing live secrets around, where recognising a replay only asks whether something presented now was once issued here and no longer stands.
@@ -262,10 +263,10 @@ The shapes above are checked by `test/conventions.test.ts`, which walks every sc
 
 | Unit | Count | Breakdown |
 |---|---|---|
-| ops | 49 | common 16 / messaging 4 / control 29 / mesh 0 |
+| ops | 51 | common 18 / messaging 4 / control 29 / mesh 0 |
 | topics | 13 | messaging 2 (`inbox` / `notify`), control 10, common 1 (`auth.records`) |
 | capabilities | 9 | `fork` `launcher` `llm_events` `llm_stats` `llm_status` `llm_usage` `sandbox` `terminal` `translate` |
-| error codes | 21 | one closed union |
+| error codes | 22 | one closed union |
 
 Every op has a request and a reply in `OP_SCHEMAS`, and every topic a frame in `TOPIC_SCHEMAS`. `OP_SCHEMAS` is typed `Record<OpName, OpSchemas>`, so adding an op to the attribute table without writing its schema fails to typecheck; the topics are checked against the attribute table in both directions.
 
