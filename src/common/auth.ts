@@ -55,8 +55,10 @@ export const REGISTER_TTL_MS = 10 * 60 * 1000;
  * A credential's tombstone has no counterpart here on purpose: it is kept
  * without end, because a peer returning from a partition longer than any
  * retention would otherwise carry the removed credential back as news. The same
- * holds of an ownership's — a removed owner brought back would be an instance
- * someone was let into again. */
+ * holds of an ownership's — a granting brought back would be an instance
+ * someone was let into again. Neither is a door closed for good: a credential id
+ * and a granting's id are both new every time, so registering again and being
+ * made an owner again write keys no tombstone stands on. */
 export const FAMILY_TOMBSTONE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // --- challenge -------------------------------------------------------------
@@ -118,8 +120,11 @@ const ENROLL_CLAIMS_FIELDS = {
    * header with this, and the relying party is this origin's host.
    *
    * An origin rather than a URL because that is the size of everything
-   * compared against it. Where under the origin the page is served is the
-   * operator's business and no part of any check made here. */
+   * compared against it, and because there is nothing else to say: **the person
+   * is sent to the root of this origin**. Nothing under it is named, since
+   * nothing under it can be told apart — a browser writes no path into an
+   * `Origin` header or a `clientDataJSON`, so two paths here would be one place
+   * to every check made. */
   origin: Origin,
   /** Where the page posts what it made: the base URL the `auth` routes hang
    * under.
@@ -564,6 +569,20 @@ export const OwnershipRecord = Type.Object(
     kind: Type.Literal("ownership"),
     user: UserId,
     instance: InstanceId,
+    /** Names this granting, and nothing else. Random, settled when the record
+     * is written, and never reused.
+     *
+     * It is in the key (`ownership/<instance>/<user>/<grant>`) so that giving an
+     * instance up and taking it again are two records rather than one key
+     * written twice. A tombstone refuses every later write to its key and is
+     * kept without end, so a key made only of the instance and the person would
+     * make the first removal final: the person could never be an owner of that
+     * instance again, and nothing here could undo it. With this, the removal
+     * ends one granting and a later one begins another.
+     *
+     * What answers "does this person own this instance" is therefore not one
+     * record but whether any granting for the pair is still alive. */
+    grant: Base64Url,
     granted_at: Timestamp,
     /** Who added this owner, when an owner did rather than the command line. A
      * hint, as the labels are: it decides nothing, and it is here so that a
@@ -636,7 +655,9 @@ export const TokenFamily = Type.Object(
      * retired token still inside its lifetime would be a live secret copied
      * around for no purpose it could serve. A digest answers the one question
      * asked of it, that a value presented now was once issued here and is no
-     * longer, which fails the whole family.
+     * longer, which fails the whole family. Matching one of these is the only
+     * thing that does: a value this family knows nothing of was never issued by
+     * it, and refusing the call is the whole of the answer.
      *
      * Written by whichever owned instance rotated, like the rest of the family,
      * and replicated, so the memory survives an instance restarting and holds
@@ -681,8 +702,9 @@ export type AuthTombstone = Static<typeof AuthTombstone>;
 /** One entry of the replicated set, under the key it is matched by.
  *
  * The keys are `user/<user>`, `credential/<credential_id>`,
- * `ownership/<instance>/<user>` and `family/<id>`. What a key names is what a
- * tombstone under it removes. */
+ * `ownership/<instance>/<user>/<grant>` and `family/<id>`. What a key names is
+ * what a tombstone under it removes — one granting rather than the pair, which
+ * is what lets an instance be given up and taken again. */
 export const AuthRecord = Type.Object(
   {
     /** What this entry is, mesh-wide. Two instances writing one key hold the
@@ -749,6 +771,11 @@ export const AuthAccountReadResponse = response("auth.account.read", AuthAccount
  * person, and the person is the caller — there is no shape here for removing
  * somebody else's ownership, an instance's owners not being its administrators
  * of one another.
+ *
+ * Every granting of that instance to this person ends, there being no shape
+ * here for giving up one of two grantings of the same thing. Being made an
+ * owner again afterwards is a new granting and is not refused by what this
+ * left behind.
  *
  * Removing the ownership of the instance the connection is on is refused
  * (`auth_in_use`). It is theirs to remove; asking from another instance they

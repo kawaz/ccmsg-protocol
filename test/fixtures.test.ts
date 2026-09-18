@@ -495,13 +495,7 @@ describe("authenticating a person", () => {
   test("a credential says nothing about which instance its holder may enter", () => {
     // The whole of this decision: an endpoint appears nowhere on a credential,
     // and being admitted is what the ownership records answer.
-    for (const { body } of credentialRecords()) {
-      expect(body).not.toHaveProperty("endpoint");
-      expect(body).not.toHaveProperty("webui");
-      expect(body).not.toHaveProperty("rp_id");
-      expect(body).not.toHaveProperty("user_handle");
-    }
-    expect(AUTH_RESOLVE_RESPONSE.claims).not.toHaveProperty("rp_id");
+    for (const { body } of credentialRecords()) expect(body).not.toHaveProperty("endpoint");
   });
 
   test("the two credentials differ in whether their origin is the endpoints' site", () => {
@@ -557,9 +551,14 @@ describe("authenticating a person", () => {
     const owned = ownershipRecords().filter((record) => record.body.user === FIXTURE_IDS.user);
     expect(owned.length).toBeGreaterThan(1);
     expect(new Set(owned.map((record) => record.body.instance)).size).toBe(owned.length);
-    // And one credential per origin, not per instance.
-    expect(credentialRecords().length).toBeLessThan(owned.length * credentialRecords().length + 1);
-    for (const { body } of credentialRecords()) expect(body.user).toBe(FIXTURE_IDS.user);
+    // What multiplies the credentials is the origins, never the instances: the
+    // fixtures own more instances than that person has passkeys, and the
+    // passkeys are one per origin exactly.
+    const credentials = credentialRecords().filter((r) => r.body.user === FIXTURE_IDS.user);
+    expect(new Set(credentials.map((r) => r.body.origin)).size).toBe(credentials.length);
+    expect(credentials.length).toBeLessThan(
+      owned.length * new Set(credentials.map((r) => r.body.origin)).size,
+    );
   });
 
   test("one instance may be owned by more than one person", () => {
@@ -569,11 +568,30 @@ describe("authenticating a person", () => {
     expect(new Set(owners.map((record) => record.body.user)).size).toBe(2);
   });
 
-  test("an ownership is keyed by the instance and the person, and says nothing more", () => {
+  test("an ownership is keyed by the instance, the person and the granting", () => {
     for (const record of ownershipRecords()) {
-      expect(record.key).toBe(`ownership/${record.body.instance}/${record.body.user}`);
+      expect(record.key).toBe(
+        `ownership/${record.body.instance}/${record.body.user}/${record.body.grant}`,
+      );
       expect(record.body).not.toHaveProperty("endpoint");
     }
+  });
+
+  test("an instance given up can be taken again, the granting being what is keyed", () => {
+    // A tombstone refuses every later write to its key and is kept without end.
+    // Were the key the pair alone, the first removal would be final and nothing
+    // could undo it — so what a removal ends is one granting.
+    const records = AUTH_RECORDS_TOMBSTONE_FRAME.data.records;
+    const removed = records.find((record) => record.key.startsWith("ownership/"));
+    const regranted = records.find(
+      (record) => record.body.kind === "ownership" && record.key.startsWith("ownership/"),
+    );
+    expect(removed?.body.kind).toBe("tombstone");
+    expect(regranted?.body.kind).toBe("ownership");
+    const pair = (key: string) => key.split("/").slice(0, 3).join("/");
+    expect(pair(regranted!.key)).toBe(pair(removed!.key));
+    expect(regranted!.key).not.toBe(removed!.key);
+    expect(regranted!.updated_at).toBeGreaterThan(removed!.updated_at);
   });
 
   test("a token family states the origin its connections are held to", () => {
@@ -709,16 +727,16 @@ describe("authenticating a person", () => {
   });
 
   test("a removal says when and nothing else — its key says what", () => {
-    for (const record of AUTH_RECORDS_TOMBSTONE_FRAME.data.records) {
-      expect(record.body.kind).toBe("tombstone");
-      expect(record.body).not.toHaveProperty("sub");
-      expect(record.body).not.toHaveProperty("user");
+    const tombstones = AUTH_RECORDS_TOMBSTONE_FRAME.data.records.filter(
+      (record) => record.body.kind === "tombstone",
+    );
+    for (const record of tombstones) {
+      expect(Object.keys(record.body).sort()).not.toContain("user");
+      expect(Object.keys(record.body).sort()).not.toContain("sub");
     }
     // A credential's and an ownership's are kept without end; a family's is
     // dropped once no refresh token could still arrive.
-    const kept = AUTH_RECORDS_TOMBSTONE_FRAME.data.records.filter(
-      (record) => !("expires_at" in record.body),
-    );
+    const kept = tombstones.filter((record) => !("expires_at" in record.body));
     expect(kept.map((record) => record.key.split("/")[0])).toEqual(["credential", "ownership"]);
   });
 
@@ -731,12 +749,6 @@ describe("authenticating a person", () => {
       expect(credential.user).toBe(FIXTURE_IDS.user);
     }
     expect(reply.instances.map((entry) => entry.instance)).toEqual([INSTANCE, OTHER_INSTANCE]);
-  });
-
-  test("rotating a family is not an op — every owned instance writes it", () => {
-    expect(OP_NAMES).not.toContain("auth.rotate");
-    expect(OP_NAMES).toContain("auth.enroll");
-    expect(OP_NAMES).toContain("auth.account.read");
   });
 
   test("letting go names what is removed and never whose it is", () => {

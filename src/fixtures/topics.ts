@@ -506,6 +506,13 @@ export const KV_FRAME: Static<typeof KvFrame> = {
   },
 };
 
+/** The grantings the fixtures name. A granting's id is random and never reused,
+ * which is what lets the same instance be given up and taken again. */
+const GRANT = "Z3JhbnQtb25l";
+const OTHER_GRANT = "Z3JhbnQtdHdv";
+const THIRD_GRANT = "Z3JhbnQtdGhyZWU";
+const FOURTH_GRANT = "Z3JhbnQtZm91cg";
+
 /** The person, the passkeys that answer for them, and the instances they own —
  * the records an instance needs to admit somebody, all replicated. */
 export const AUTH_RECORDS_FRAME = {
@@ -564,12 +571,13 @@ export const AUTH_RECORDS_FRAME = {
       },
       {
         // The instance this person made themselves: nobody granted it.
-        key: `ownership/${instance}/${USER}`,
+        key: `ownership/${instance}/${USER}/${GRANT}`,
         updated_at: FIXTURE_NOW - 600_000,
         body: {
           kind: "ownership",
           user: USER,
           instance,
+          grant: GRANT,
           granted_at: FIXTURE_NOW - 600_000,
         },
       },
@@ -577,25 +585,27 @@ export const AUTH_RECORDS_FRAME = {
         // A second instance, taken as their own afterwards. Neither credential
         // is named here: which instances a person may enter is this record's
         // answer, and which page may speak is the credential's.
-        key: `ownership/${other_instance}/${USER}`,
+        key: `ownership/${other_instance}/${USER}/${OTHER_GRANT}`,
         updated_at: FIXTURE_NOW - 60_000,
         body: {
           kind: "ownership",
           user: USER,
           instance: other_instance,
+          grant: OTHER_GRANT,
           granted_at: FIXTURE_NOW - 60_000,
           granted_by: USER,
         },
       },
       {
         // A second person owning that same instance. One instance may have
-        // several owners, and the two are told apart by the key alone.
-        key: `ownership/${other_instance}/${OTHER_USER}`,
+        // several owners, and they are told apart by the key alone.
+        key: `ownership/${other_instance}/${OTHER_USER}/${THIRD_GRANT}`,
         updated_at: FIXTURE_NOW - 30_000,
         body: {
           kind: "ownership",
           user: OTHER_USER,
           instance: other_instance,
+          grant: THIRD_GRANT,
           granted_at: FIXTURE_NOW - 30_000,
           granted_by: USER,
         },
@@ -652,9 +662,26 @@ export const AUTH_RECORDS_TOMBSTONE_FRAME = {
         body: { kind: "tombstone", deleted_at: FIXTURE_NOW + 100_000 },
       },
       {
-        key: `ownership/${other_instance}/${OTHER_USER}`,
+        // The second person gives that instance up.
+        key: `ownership/${other_instance}/${OTHER_USER}/${THIRD_GRANT}`,
         updated_at: FIXTURE_NOW + 100_000,
         body: { kind: "tombstone", deleted_at: FIXTURE_NOW + 100_000 },
+      },
+      {
+        // And is made an owner of it again. A granting has an id of its own, so
+        // this is a key no tombstone stands on — where a key made of the
+        // instance and the person alone would have made the removal above
+        // final, with nothing able to undo it.
+        key: `ownership/${other_instance}/${OTHER_USER}/${FOURTH_GRANT}`,
+        updated_at: FIXTURE_NOW + 200_000,
+        body: {
+          kind: "ownership",
+          user: OTHER_USER,
+          instance: other_instance,
+          grant: FOURTH_GRANT,
+          granted_at: FIXTURE_NOW + 200_000,
+          granted_by: USER,
+        },
       },
       {
         key: "family/01J9Z3W2Q",
