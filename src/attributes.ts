@@ -39,10 +39,11 @@ export interface OpAttributes {
    * cannot, and they answer before any identity is settled. The route each is
    * published at belongs to the instance, not here.
    *
-   * Being reachable from a page is also what gives the three that settle an
+   * Being reachable from a page is also what gives the four that settle an
    * identity the only headers this contract reads over HTTP: the `Origin` a
-   * browser states, held to the origin of the web UI the credential or the
-   * registration names, and `Sec-Fetch-Site`, which has to be one of
+   * browser states, held to the origin the credential names (the enrolment
+   * URL's, where the credential is the one being made), and `Sec-Fetch-Site`,
+   * which has to be one of
    * `same-origin`, `same-site` or `cross-site` — the three that say a page made
    * the call. Anything else fails: `none`, which is a request with no initiator
    * at all, a header that is absent, and a value this contract does not know.
@@ -70,7 +71,7 @@ const INSTANCE_ONLY = ["instance"] as const;
  * facts live: authorization, capability gating and forwarding all read it
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
-  // --- common: connect, declare the end, and subscribe (15) ---
+  // --- common: connect, declare the end, and subscribe (16) ---
   // A greeting settles what the connection is, and there is one per role: what
   // each must carry is then the op's own schema rather than a rule read off a
   // field, and a connection cannot be settled as something neither side meant.
@@ -138,7 +139,7 @@ export const OP_ATTRIBUTES = {
     errors: ["topic_unknown"],
   },
 
-  // The four ops that authenticate a person are open to every role for the
+  // The five ops that authenticate a person are open to every role for the
   // same reason the greetings are: they run before there is an identity to
   // check, and what they answer is what settles one. They are `any_instance` because whichever
   // instance is reached answers — behind a load balancer that is not a choice
@@ -168,6 +169,17 @@ export const OP_ATTRIBUTES = {
     carrier: "http",
     errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
   },
+  // Adding an instance to a person who already exists: the same enrolment URL
+  // and the same six digits as a registration, answered by an assertion instead
+  // of a new credential. Its attributes are the registration's for that reason.
+  "auth.enroll": {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "any_instance",
+    carrier: "http",
+    errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
+  },
   "auth.token.refresh": {
     plane: "common",
     roles: ALL_ROLES,
@@ -185,17 +197,27 @@ export const OP_ATTRIBUTES = {
     locality: "any_instance",
     errors: ["auth_invalid", "auth_expired"],
   },
-  // Between instances: what an issuer alone can answer. `owner_instance` by the
-  // usual rule — the subject belongs to one instance, and it is reached by
-  // `to_instance` being that instance's id.
-  "auth.resolve": {
+  // Reads back the caller's own account, which the connection already settled
+  // who is — so there is nothing further to check and nothing to name.
+  // `scope: "role"` because the role is what decides the reply's contents: it
+  // is the caller's own user, passkeys and instances and nobody else's.
+  "auth.account.read": {
     plane: "common",
-    roles: INSTANCE_ONLY,
+    roles: USER_ONLY,
     needs_hello: true,
-    locality: "owner_instance",
-    errors: ["auth_invalid", "auth_expired"],
+    locality: "any_instance",
+    scope: "role",
+    errors: [],
   },
-  "auth.rotate": {
+  // Between instances: what an issuer alone can answer — an enrolment URL's
+  // secret and a challenge that may be spent once. `owner_instance` because
+  // both live in one instance's memory, and it is reached by `to_instance`
+  // being that instance's id.
+  //
+  // Rotating a token family is not here. A family is replicated and every
+  // instance its owner owns may write it, so the rotation happens where the
+  // request landed rather than being carried to the instance that minted it.
+  "auth.resolve": {
     plane: "common",
     roles: INSTANCE_ONLY,
     needs_hello: true,
