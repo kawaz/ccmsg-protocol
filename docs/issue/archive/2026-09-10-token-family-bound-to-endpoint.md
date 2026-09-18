@@ -1,6 +1,6 @@
 ---
 title: TokenFamily を mint 時の endpoint に束縛する
-status: open
+status: discarded
 category: bug
 created: 2026-09-10T10:43:18+09:00
 last_read:
@@ -8,9 +8,9 @@ open_entered: 2026-09-10T10:43:18+09:00
 wip_entered:
 blocked_entered:
 pending_entered:
-discarded_entered:
+discarded_entered: 2026-09-18T09:35:10+09:00
 resolved_entered:
-discard_reason:
+discard_reason: ["DR-0030 (identity はユーザ、instance は所有物) と逆向き。token family は endpoint に束縛せず、所有されているどの instance でも rotate できる設計に確定 (kawaz 2026-09-18)"]
 pending_reason:
 close_reason:
 blocked_by:
