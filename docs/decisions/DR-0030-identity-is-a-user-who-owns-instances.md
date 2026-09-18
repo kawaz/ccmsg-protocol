@@ -193,7 +193,7 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 ### 6. 保存の単位はユーザ
 
 - webui の設定 (将来のサーバ保存、kv op) はユーザの record として複製する。持ち主が instance でも endpoint でもないので、人は 3 台のどれから入っても同じ設定を見る
-- **localStorage の名前空間は user id**。endpoint でも instance でも mesh でもない。同じ origin の page が同じユーザとして開かれたなら同じ引き出しを見る
+- **localStorage の名前は値が誰のものかで決まる** (webui の DESIGN「localStorage のキー規律」)。人に属する値 (認証のロック・channel) の名前空間は **user id** で、endpoint でも instance でも mesh でもない。セッションに属する値 (下書き・Files の選択) は instance と sid、人の読み方の好み (色・設定) は全体で 1 つ。同じ origin の page が同じユーザとして開かれたなら認証の引き出しは同じになる
 - cookie は endpoint host の path のまま ([DR-0028](DR-0028-refresh-cookie-across-sites.md))。cookie は browser が住所で配る物で、ユーザの持ち物にはできない
 
 ### 7. hosting は origin だけを持つ
