@@ -220,6 +220,11 @@ auth.account.read() -> {
 | G | `sub` を人が付ける名前のまま残す (`<unit>-<連番>`) | 名前を付けた instance が identity の所有者になる。引っ越しと HA で名前の由来が意味を失い、同じ人の 2 つの `sub` を後から 1 つにする手段が無い。人が読む名前は `display_name` として認証しない側に置けば足りる |
 | H | ユーザ id と user handle を別の値にする | 同じ事実の 2 つ目の写しで、食い違えば認証器の中の人と record の人が別人になる。比較は全て文字列の一致なので、綴りを 1 つにして困る場面が無い |
 
+
+### cookie の名前
+
+refresh cookie の名前は **ユーザで決まり、instance を含めない** (`__Secure-ccmsg-<digest(user id)>`)。値は family の refresh token で、受けた instance は複製済みの family から値で引く。名前に instance が入っていると、HA の住所の裏で別の instance が置いた cookie を自分のものと認識できず、family が複製されていても refresh が通らない。host は endpoint の host (host-only)、path は `<endpoint の path>auth/` まで (同じ origin の下の別 endpoint で cookie が分かれるため)。同じブラウザに複数の人の cookie が居る時は、受けた instance が自分の family に一致するものを値で選ぶ。
+
 ## Consequences
 
 - **人は 1 人で 1 つの identity を持つ**。3 台の instance を所有していても credential は origin と端末の数だけで、token も設定も 1 つに集まる
