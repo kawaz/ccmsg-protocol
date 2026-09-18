@@ -108,7 +108,7 @@ tombstone を期限付きにして LWW に委ねる案は採らない。分断�
 **(b) instance をユーザに紐付ける** (2 台目以降)。経路は 2 つで、既定は前者:
 
 - **その instance の CLI で `owner add <user>`**。mesh の複製でそのユーザを既に知っているなら、確かめる物は全て手元にあり、**URL も browser も要らない**。所有 record を 1 行書くだけで、線上には record の形しか現れない。peers 全部に足す形 (`--all`) も同じ操作の範囲
-- **enroll URL + 既存 passkey の assert**。そのユーザをまだ知らない instance のための経路。CLI が「所有者を足す」URL と 6 桁を出し、人が browser で開いて **既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。**6 桁はここでも必須**で、assert が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではない。後者を確かめる材料は 6 桁しかなく、離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)
+- **enroll URL + 既存 passkey の assert**。**受ける instance が、複製でそのユーザの credential を既に持っていることが前提**: assert の検証には公開鍵が要り、それが届く経路は `auth.records` の複製しか無い。したがってこれは「mesh には居るが、この人にはまだ渡していない instance」のための経路であって、mesh の外の instance のための経路ではない — 複製が届かない instance は別の mesh であり、そこで人が入るには `auth.register` で作り直す。HA の裏では ceremony がどの peer に着弾しても、その peer が同じ複製を持っているので成立する。CLI が「所有者を足す」URL と 6 桁を出し、人が browser で開いて **既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。**6 桁はここでも必須**で、assert が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではない。後者を確かめる材料は 6 桁しかなく、離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)
 
 **endpoint のための手順は無い** (HA の住所も同じ)。endpoint は何にも縛られないので、足すことも紐付けることもない。ただし cookie は endpoint host ごとに別なので ([DR-0028](DR-0028-refresh-cookie-across-sites.md))、**新しい endpoint host に初めて繋ぐ時は 1 回 assert してその host の cookie をもらう**。これは登録でも紐付けでもなく、ただのサインインである。
 
@@ -232,7 +232,7 @@ auth.account.read() -> {
 - **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない
 - **`endpoint` の列は無い**。どの列にも現れないことがこの DR である
 - どの検査で落ちても答えは `auth_invalid` で、どれが合わなかったかは述べない
-- CORS は op で 2 通り。**登録 op (`auth.register` / `auth.challenge`) は全 origin に開く** — HA の裏でどれに着弾しても登録が成立するため (§4)。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance の所有者たちの credential の origin」**。生きている登録 URL の origin を発行者だけが足す形は、前者が全 origin に開いたことで要らなくなり、**消える**
+- CORS は op で 2 通り。**`auth.register` と `auth.challenge` は全 origin に開く** — 人を作る ceremony は、その origin の credential がまだ 1 つも無い所から始まるので、照らせる集合が存在しない。守っているのは token と 6 桁と発行者の判定であって CORS ではない。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance が持っている credential record の origin」**。所有で絞らないのは、この集合が「その page を知っているか」を答える物であって「その人が入ってよいか」を答える物ではないから — 後者は所有が答え、両方を CORS に負わせると、複製で credential を知っているのに所有がまだ無い instance (= enroll が成立すべきちょうどその場面) で preflight が落ちる。生きている登録 URL の origin を発行者だけが足す形は、`register` が全 origin に開いたことで要らなくなり、**消える**
 
 ## Alternatives Considered
 
@@ -348,7 +348,7 @@ Decision の内容は下記の裁定を織り込んだ後の姿で、ここは�
 | user の tombstone | ユーザを消す op を契約は持たない。key (`user/<user>`) だけが用意されている | 無し |
 | 6 桁の試行回数の上限 | 発行者だけが数える ([DR-0021](DR-0021-registration-in-two-halves.md)) | §2.10 にあり。現状維持 |
 | ヘッダと ceremony の検査手順 | §9 の表。`Origin` は登録 URL (register / enroll) か credential (assert / refresh) の origin と比べる | §2.5 が endpoint の origin と比べる旧手順。**要更新** |
-| CORS の 2 通り | 登録 op は全 origin、それ以外は所有者たちの credential の origin (§9) | §2.4 が「credential の webui + 生きている登録 URL」。**要更新** |
+| CORS の 2 通り | `register` / `challenge` は全 origin、`enroll` / `assert` / `refresh` はその instance が持つ credential record の origin (§9) | §2.4 が「credential の webui + 生きている登録 URL」。**要更新** |
 | WS upgrade で所有を照らす | §9 の表の `WS upgrade` 行 | 無し |
 | 旧 record の削除 (移行) | 作り直す。移行コードは書かない (「移行」節) | 無し |
 

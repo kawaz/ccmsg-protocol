@@ -51,7 +51,15 @@ export interface OpAttributes {
    * Both headers are read as an allowlist rather than a blocklist, and either
    * failing answers `auth_invalid` without saying which. `auth.challenge` is checked
    * against neither, having nothing yet to be checked against; what it hands
-   * out is spendable only at its issuer. */
+   * out is spendable only at its issuer.
+   *
+   * Which pages may read the answers at all is a second question, and it too
+   * splits in two. `auth.register` and `auth.challenge` answer every origin:
+   * making a person begins where no credential names that origin yet, so there
+   * is no set to compare a caller against. The other three answer the origins of
+   * the credential records the instance holds — not narrowed by who owns the
+   * instance, that being what the ownership record answers and not what a
+   * preflight can. */
   readonly carrier?: "http";
   /** Present when the role changes what the reply may contain rather than
    * whether the call is allowed. */
@@ -173,6 +181,9 @@ export const OP_ATTRIBUTES = {
   // Adding an instance to a person who already exists: the same enrolment URL
   // and the same six digits as a registration, answered by an assertion instead
   // of a new credential. Its attributes are the registration's for that reason.
+  // It is answerable only where the person's credential has already arrived by
+  // replication, an assertion needing the public key; an instance the records
+  // never reach is in another mesh, and somebody entering there registers.
   "auth.enroll": {
     plane: "common",
     roles: ALL_ROLES,
