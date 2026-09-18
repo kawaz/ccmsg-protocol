@@ -40,7 +40,8 @@ UserRecord = {
 
 - credential が持つ束縛は **`origin` 1 つ**。「どの page から来てよいか」だけを答える。endpoint (どの instance に入るか) は credential の問いではなくなり、record から消える
 - 保持するのも比べるのも origin。URL を持って毎回導く形 (`originOf` / `rpIdOf`、`WebUi` 型) は**無くなる** — 導出が要ったのは path 込みの URL を持っていたからで、持たないなら導出する物が無い。relying party は引き続き origin の host に固定し、`rpIdHash` はその SHA-256 と比べる
-- 1 人が 2 つの origin の webui を使うなら credential は 2 つ、2 台の端末を使うならさらに 2 つ。**その掛け算が credential の数**であり、instance の数は掛からない
+- 1 人が 2 つの origin の webui を使うなら credential は 2 つ、2 台の端末を使うならさらに 2 つ。**その掛け算が credential の数**であり、instance の数も endpoint の本数も掛からない。数えるのは **ユーザ × hosting origin × 認証器**で、hosting origin が別なら「ユーザに passkey を 1 つ足す」であって別のユーザにはならない
+- **origin が許可集合に入るのは明示の操作ではない**。その origin で最初の credential が成立した時点で入る (それまでの入口は、発行者が出して生きている登録 URL がその origin を名乗っていること)。その origin の credential を全部消せば、許可からも消える。origin を足す op も設定項目も持たない
 
 ```ts
 CredentialRecord = {
@@ -69,6 +70,7 @@ CredentialRecord = {
 
 - 「この instance の所有者はこのユーザ」を **所有 record** として instance ごとに持ち、mesh で複製する。認証の可否は **そのユーザがこの instance の所有者か**で決まる
 - **endpoint は束縛に出てこない**。どの endpoint から来ても、hosting の裏のどれに落ちても、所有者なら通る。endpoint は instance の住所という DR-0018 の役目のまま残る
+- **endpoint は 2 種類あり、mesh のピアが使うものは instance に 1 対 1 で届く住所でなければならない**。HA の住所 (hosting の FQDN) は、そこへ送っても load balancer がどれに落とすか決めるので、ピアが特定のピアへ届ける用途には使えない。人が繋ぐ住所としての HA の住所は、それとは別に持つ。`iss` は endpoint ではなく instance id なので ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))、HA の裏に何台居ても発行者は一意に指せる
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
 - 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい
 
@@ -88,11 +90,20 @@ key は `ownership/<instance>/<user>`、credential は `credential/<credential_i
 
 **(a) ユーザを作る** (初回)。CLI が登録 URL と 6 桁を出し、人がそれを browser で開いて passkey を作る。成立した瞬間に **ユーザ・credential・所有 record の 3 つが同時に生まれ**、その instance の所有者になる。線上の op は現行の `auth.register` のまま。
 
-**(b) instance をユーザに紐付ける** (2 台目以降)。その instance の CLI が「所有者を足す」URL と 6 桁を出す。人が browser で開き、**既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)。
+**(b) instance をユーザに紐付ける** (2 台目以降)。経路は 2 つで、既定は前者:
 
-複製で既にそのユーザを知っている instance では **URL は要らない**。所有 record を書けばよく、それは CLI の操作で、線上には record の形しか現れない。
+- **その instance の CLI で `owner add <user>`**。mesh の複製でそのユーザを既に知っているなら、確かめる物は全て手元にあり、**URL も browser も要らない**。所有 record を 1 行書くだけで、線上には record の形しか現れない。peers 全部に足す形 (`--all`) も同じ操作の範囲
+- **enroll URL + 既存 passkey の assert**。そのユーザをまだ知らない instance のための経路。CLI が「所有者を足す」URL と 6 桁を出し、人が browser で開いて **既存の passkey で assert する**。通れば所有 record が 1 つ増える。新しい passkey は作らない。6 桁を要る理由は §未決 Q6。op を分けて `auth.enroll` とする — 答えている問いが違う (register は人を作り、enroll は持ち物を足す) し、運ぶ ceremony も違う (create と get)
 
-**認証器を足す** (2 台目の端末) は上のどちらでもなく「ユーザに passkey を足す」で、認証済みチャンネルからの add が担う (issue `passkey-list-for-people`)。本 DR はその経路の形を決めず、**ユーザに対して足す物であって instance に対して足す物ではない**という位置づけだけを置く。
+**endpoint のための手順は無い** (HA の住所も同じ)。endpoint は何にも縛られないので、足すことも紐付けることもない。ただし cookie は endpoint host ごとに別なので ([DR-0028](DR-0028-refresh-cookie-across-sites.md))、**新しい endpoint host に初めて繋ぐ時は 1 回 assert してその host の cookie をもらう**。これは登録でも紐付けでもなく、ただのサインインである。
+
+**認証器を足す** (2 台目の端末) は上のどちらでもなく「ユーザに passkey を足す」で、経路は 3 つ。いずれも **同じ user handle (そのユーザの id) を渡す**ので、増えるのは credential だけでユーザは増えない:
+
+- 認証済み画面から WebAuthn の cross-device (QR) で別端末の認証器に作る (**既定**)
+- 認証済み画面から add URL (+ 6 桁) を出し、別端末の browser で開いて作る
+- CLI から add URL を出す
+
+hosting origin が別なら、同じ端末の同じ認証器でもそこで 1 つ作ることになる (§2)。本 DR は各経路の線上の形を決めず (issue `passkey-list-for-people`)、**ユーザに対して足す物であって instance に対して足す物ではない**という位置づけと、user handle が 1 つであることだけを置く。
 
 登録 URL の claims:
 
@@ -110,7 +121,8 @@ EnrollClaims = {
 }
 ```
 
-- **`endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、その URL を URL 自身が名乗る以外に知らせる手段が無い。hosting の FQDN でもよく、どの instance に落ちても、判定は `auth.resolve` で `iss` に転送される ([DR-0020](DR-0020-auth-shape-on-the-wire.md))。**受け取った側は endpoint を何とも照合しない** — 照合する物が無いことがこの DR の眼目である
+- **`endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、その URL を URL 自身が名乗る以外に知らせる手段が無い。hosting の FQDN でもよく、どの instance に落ちても成立する (下記)。**受け取った側は endpoint を何とも照合しない** — 照合する物が無いことがこの DR の眼目である
+- したがって **発行 instance の endpoint が browser から到達できなくてよい**。mesh がローカルに閉じ、HA の住所だけが公開されている構成でも、初回登録から全部その住所 1 つで済む
 - `user` を `create_user` の時だけ claims が運ぶのは、認証器が instance の手の届かない所でその値を保持するため (DR-0021 の理由はそのまま生きる)。page に決めさせれば、1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない
 - 登録 URL の送り先は **origin の直下**。path mount は持たない (§7)
 
@@ -128,6 +140,20 @@ auth.assert(challenge, credential: AssertionCredential) -> AuthSession
 
 AuthSession = { user: UserId, access: { value, expires_at } }
 ```
+
+**HA の裏で、登録が発行 instance 以外に着弾しても成立する。** 受けた instance が自分で検査し、自分で record を書き、自分で応答する。発行者に問うのは **発行者のメモリにしか無い物だけ**で、それは `auth.resolve` の転送 ([DR-0021](DR-0021-registration-in-two-halves.md) の中継、[DR-0019](DR-0019-mesh-has-no-ops-of-its-own.md) のとおり宛先で認可し直す)。
+
+| 確かめる物 | 受けた instance | 発行者 (`iss`) |
+|---|---|---|
+| 登録 token の真正・`jti` の未消費・期限 | — | ✅ (メモリにしか無い) |
+| 6 桁とその試行回数 | — | ✅ (同上、[DR-0021](DR-0021-registration-in-two-halves.md)) |
+| claims の中身 (`purpose` / `origin` / `user` / `instance`) | resolve の答えを使う | ✅ (答えとして返す) |
+| `Origin` / `Sec-Fetch-Site` | ✅ | — |
+| `clientDataJSON.origin` / `challenge` | ✅ | — |
+| `rpIdHash` / attestation / 署名 | ✅ | — |
+| record を書く・複製する・応答する | ✅ | — |
+
+このため **登録 op (`auth.register` と `auth.challenge`) の CORS は全 origin に開く**。登録を守っているのは token と 6 桁と発行者の判定であって CORS ではなく、どの instance に落ちても page が最初の POST を出せる必要がある。assert / refresh の CORS は登録済み origin の集合のまま (§9)。
 
 `auth.enroll` の属性は他の HTTP op と揃える (`plane: "common"`、全 role、`needs_hello: false`、`locality: "any_instance"`、`carrier: "http"`、errors は `auth.register` と同じ)。`auth.resolve` の `register` kind は `claims` kind になり、purpose は返る claims が言う (検査する物 — token・6 桁・試行回数 — が 2 経路で同じなので、resolve を 2 つに割らない)。
 
@@ -179,7 +205,7 @@ auth.account.read() -> {
 - **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない (DR-0029 のまま)
 - **`endpoint` の列は無い**。どの列にも現れないことがこの DR である
 - どの検査で落ちても答えは `auth_invalid` で、どれが合わなかったかは述べない
-- CORS の許可集合は「**その instance の所有者たちの credential の origin**」と「その instance 自身が発行してまだ生きている登録 URL の origin」。後者は複製しない (DR-0029 のまま)
+- CORS は op で 2 通り。**登録 op (`auth.register` / `auth.challenge`) は全 origin に開く** — HA の裏でどれに着弾しても登録が成立するため (§4)。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance の所有者たちの credential の origin」**。生きている登録 URL の origin を発行者だけが足す形 (DR-0029) は、前者が全 origin に開いたことで要らなくなり、**消える**
 
 ## Alternatives Considered
 
@@ -198,6 +224,9 @@ auth.account.read() -> {
 
 - **人は 1 人で 1 つの identity を持つ**。3 台の instance を所有していても credential は origin と端末の数だけで、token も設定も 1 つに集まる
 - **instance を mesh に足しても、その instance には誰も入れない**。所有 record を書くまでは所有者が居ない。これは意図した性質で、mesh に加わることが入口を開けないための条件 (案 A の裏返し)
+- **HA の裏でも登録に順番が要らない**。どの instance に着弾しても成立するので、人は「発行した instance に当たるまで引く」ことをしない。代わりに **登録 op は全 origin から呼べる** — 守っているのは token と 6 桁と発行者の判定で、CORS はここでは何も守っていない
+- **mesh をローカルに閉じたまま運用できる**。browser から見えるのは HA の住所 1 つでよく、instance 個別の endpoint はピア同士が 1 対 1 で届くためだけに要る。ピア用の住所に HA の住所を書くことはできない
+- **endpoint を足す操作が無い**。新しい endpoint host に初めて繋いだ人は、cookie を貰うために 1 回 assert する。それは登録でも紐付けでもないので、記録も増えない
 - **endpoint は住所に戻る**。引っ越しても credential も token も無効にならない。DR-0018 の「id を鍵にする物は endpoint の変更を跨いで生き残る」が、認証にもそのまま及ぶ
 - **origin を移すことは全員の登録をやり直すこと**。ここは DR-0029 から変わらない。変わったのは endpoint 側で、そちらは動かしても登録が生きる
 - **1 つの host に複数 instance を出す形が無くなる**。必要なら host を分ける。運用の制約が増えるのではなく、元々見分けられていなかった物が契約から消える
@@ -237,7 +266,8 @@ auth.account.read() -> {
 | DR-0029: token family は credential の webui を引き継ぐ | **置き換わる** — `origin` を引き継ぐ |
 | DR-0029: WS の handshake は `Origin` と照合する | 残る (加えて所有を照らす) |
 | DR-0029: `Origin` の不在は不一致 | 残る |
-| DR-0029: CORS は登録済み credential の origin + 生きている登録 URL の origin | **置き換わる** — 前者が「所有者たちの credential の origin」になる |
+| DR-0029: CORS は登録済み credential の origin + 生きている登録 URL の origin | **置き換わる** — 前者は「所有者たちの credential の origin」になり、後者は登録 op を全 origin に開くことで不要になる |
+| DR-0029: 新しい webui での最初の登録は発行者に届いた時だけ通る | **置き換わる** — どの instance に着弾しても成立し、発行者に問うのは token と 6 桁だけ |
 | DR-0029: 認証しない手掛かりを持つ / それで判定しない | 残る |
 | DR-0029: webui の `connect-src` は契約の外 | 残る |
 | **daemon DR-0001** §2.2 登録はローカルからしかできない | 残る。「所有者を足す」経路が 1 本増える |
