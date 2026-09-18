@@ -203,7 +203,7 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 人の identity を確定させる 5 op (`auth.challenge` / `auth.register` / `auth.assert` / `auth.enroll` / `auth.token.refresh`) は **HTTP で運ぶ**。cookie の読み書きと、接続が成立する前に答えることが WS の frame では出来ないため。それでも属性表に居るのは、**認可の分岐を表の外に置かないため** — carrier が決めるのは「その op に何が出来るか」であって「誰が呼べるか」ではない。この 5 つは `needs_hello: false` で、挨拶と同じく identity 未確定の接続から呼べる (`request_id` は HTTP 側の carrier が合成する)。route は endpoint の下の `<endpoint>auth/*`。
 
-登録の操作は 2 つで、答えている問いが違う。`auth.register` は **ユーザを作る** (初回) — 成立した瞬間にユーザ・credential・所有 record の 3 つが同時に生まれる。`auth.enroll` は **instance をその人に紐付ける** (2 台目以降) — 運ぶのは新しい credential ではなく既存 passkey の assertion で、増えるのは所有 record 1 行だけ。2 つを 1 op にまとめて引数の有無で振る舞いを変えると、属性表からは同じ 1 行に見えるまま副作用が変わる (= 認可を表の外に置くのと同じ形になる)。
+登録の操作は 2 つで、答えている問いが違う。`auth.register` は **ユーザを作る** (初回) — 成立した瞬間にユーザ・credential・所有 record の 3 つが同時に生まれる。`auth.enroll` は **instance をその人に紐付ける** (2 台目以降) — 運ぶのは新しい credential ではなく既存 passkey の assertion で、増えるのは所有 record 1 行だけ。**既にその instance の所有者である人が通せば成功し、record は増えない** — 断ると page には `auth_invalid` としか見えず、6 桁の打ち間違いと区別が付かない。所有は持っているか否かであって回数ではない。2 つを 1 op にまとめて引数の有無で振る舞いを変えると、属性表からは同じ 1 行に見えるまま副作用が変わる (= 認可を表の外に置くのと同じ形になる)。
 
 **どちらも 6 桁のコードを要る**。URL を発行した CLI が表示した数字で、URL には含めない — 2 つが別の経路でブラウザに届くことが「URL を持っているだけでは登録できない」という性質そのもので、契約側はコードを必須の引数として持つことでこれを形にする。`auth.enroll` で assertion が確かめるのは「このユーザ本人か」であって「この instance を足してよいと本人が今その端末の前で判断したか」ではなく、後者を確かめる材料は 6 桁しかない。離席中に本人の同期 passkey で第三者が instance を足す経路がそこで閉じる。コード違いも URL 失効も返すのは既存の `auth_invalid` / `auth_expired` で、どちらの半分が失敗したかは名乗らない。
 

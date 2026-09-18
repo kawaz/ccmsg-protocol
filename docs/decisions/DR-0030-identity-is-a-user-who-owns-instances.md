@@ -133,6 +133,7 @@ EnrollClaims = {
 }
 ```
 
+- **既にその instance の所有者である人の `auth.enroll` は成功する**。所有 record は増えず、既にある granting もそのままで、応答は普通の `AuthSession`。拒否にすると page からは `auth_invalid` としか見えず (どれが合わなかったかは述べない規則)、人には「6 桁を打ち間違えた」と区別が付かない。所有は「持っているか否か」であって回数ではないので、2 度目を成立させても何も広がらない
 - **`endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、その URL を URL 自身が名乗る以外に知らせる手段が無い。hosting の FQDN でもよく、どの instance に落ちても成立する (下記)。**受け取った側は endpoint を何とも照合しない** — 照合する物が無いことがこの DR の眼目である
 - したがって **発行 instance の endpoint が browser から到達できなくてよい**。mesh がローカルに閉じ、HA の住所だけが公開されている構成でも、初回登録から全部その住所 1 つで済む
 - `user` を `create_user` の時だけ claims が運ぶのは、認証器が instance の手の届かない所でその値を保持するため (DR-0021 の理由はそのまま生きる)。page に決めさせれば、1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない
@@ -179,6 +180,8 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 - 接続が照らされるのは **family の origin と `Origin` ヘッダ**、そして **そのユーザが到達した instance の所有者であること**。到達した endpoint は見ない
 - **rotate は所有されているどの instance でも行える**。発行者 (`iss`) への転送は無くなり、`auth.rotate` の中継も要らない。family は単一 writer ではなくなり、**`iss` は mint した instance の記録として残るだけで、書き手を制限しない**。所有者ならどの instance でも書けるのが本 DR の形と揃い、`iss` が落ちている間だけ refresh が通らない、という穴が閉じる
 - **競合した時は負けた側の端末がサインインし直す**。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後、負けた側が client に渡した値は **family のどの世代にも無い値**になる — 今立っている `refresh` でも、猶予中の `previous_refresh` でも、`retired` の digest でもない。**family が知らない値の提示は `auth_invalid` で断るだけで、family は失効させない**。失効させるのは **`retired` の digest に一致した時だけ**で、それが replay の検知そのものである。両者を混ぜて「知らない値も replay 扱い」にすると、並行 rotate のたびに同じ family の他の端末まで巻き添えで落ちる。負けた側は passkey で入り直す。分断が起きるのは稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい
+
+**cookie の名前もユーザで決まり、instance を含めない** (`__Secure-ccmsg-<digest(user id)>`)。値は family の refresh token で、受けた instance は複製済みの family から値で引く。名前に instance が入っていると、HA の住所の裏で別の instance が置いた cookie を自分のものと認識できず、family が複製されていても refresh が通らない — rotate をどこでもできるようにしたことが、cookie の名前にもそのまま及ぶ。host は endpoint の host (host-only)、path は `<endpoint の path>auth/` まで (同じ origin の下の別 endpoint で cookie が分かれるため)。同じブラウザに複数の人の cookie が居る時は、受けた instance が自分の family に一致するものを値で選ぶ。綴りそのものは daemon の持ち物で、契約が持つのは「ユーザで決まり instance を含めない」という規則だけ ([DR-0020](DR-0020-auth-shape-on-the-wire.md) の境界)。
 
 ### 6. 保存の単位はユーザ
 
@@ -238,10 +241,6 @@ auth.account.read() -> {
 | H | ユーザ id と user handle を別の値にする | 同じ事実の 2 つ目の写しで、食い違えば認証器の中の人と record の人が別人になる。比較は全て文字列の一致なので、綴りを 1 つにして困る場面が無い |
 
 
-### cookie の名前
-
-refresh cookie の名前は **ユーザで決まり、instance を含めない** (`__Secure-ccmsg-<digest(user id)>`)。値は family の refresh token で、受けた instance は複製済みの family から値で引く。名前に instance が入っていると、HA の住所の裏で別の instance が置いた cookie を自分のものと認識できず、family が複製されていても refresh が通らない。host は endpoint の host (host-only)、path は `<endpoint の path>auth/` まで (同じ origin の下の別 endpoint で cookie が分かれるため)。同じブラウザに複数の人の cookie が居る時は、受けた instance が自分の family に一致するものを値で選ぶ。
-
 ## Consequences
 
 - **人は 1 人で 1 つの identity を持つ**。3 台の instance を所有していても credential は origin と端末の数だけで、token も設定も 1 つに集まる
@@ -295,12 +294,13 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 | 現行: `Origin` の不在は不一致 | 残る |
 | 現行: CORS は登録済み credential の origin + 生きている登録 URL の origin | **置き換わる** — 前者は「所有者たちの credential の origin」になり、後者は登録 op を全 origin に開くことで不要になる |
 | 現行: 新しい webui での最初の登録は発行者に届いた時だけ通る | **置き換わる** — どの instance に着弾しても成立し、発行者に問うのは token と 6 桁だけ |
+| 現行: cookie の名前が instance を含む | **置き換わる** — ユーザで決まり、instance を含めない (§5) |
 | 現行: 認証しない手掛かりを持つ / それで判定しない | 残る |
 | 現行: webui の `connect-src` は契約の外 | 残る |
 | **daemon DR-0001** §2.2 登録はローカルからしかできない | 残る。「所有者を足す」経路が 1 本増える |
 | daemon DR-0001 §2.3 credential が何に縛られるか | **置き換わる** (既に委譲済みの節) |
 | daemon DR-0001 §2.4 family は `sub` を持ち単一 writer | **置き換わる** — `sub` は `user` になり、単一 writer は無くなる (所有されているどの instance でも rotate できる) |
-| daemon DR-0001 §2.6 tombstone は sub 単位 | **置き換わる** — key が対象を言い、user / credential / ownership の 3 種になる |
+| daemon DR-0001 §2.6 tombstone は sub 単位 | **置き換わる** — key が対象を言い、user / credential / ownership / family の 4 種になる |
 | daemon DR-0001 §2.7 人の入口はパスの末尾で照合する | 残る。path mount を持たないので、prefix の下に別 instance が居る形は無くなる |
 
 **DR-0020 / DR-0021 / DR-0028 は立ったまま**で、上表の「置き換わる」行だけを本 DR が上書きする。daemon 側 DR の追従は daemon リポの作業。
@@ -313,7 +313,7 @@ refresh cookie の名前は **ユーザで決まり、instance を含めない**
 
 Decision の内容は下記の裁定を織り込んだ後の姿で、ここは問いと答えだけを残す (kawaz 裁定 2026-09-18)。
 
-**Q1. rotate をどこでもできるようにするか** (§5) — **どこでもできる**。所有されているどの instance でも family を書ける。並行 rotate が競合した時、負けた側の値の提示は replay と見分けが付かないので失効し、その端末は passkey でサインインし直す。猶予を広げて見分けようとはしない。
+**Q1. rotate をどこでもできるようにするか** (§5) — **どこでもできる**。所有されているどの instance でも family を書ける。並行 rotate が競合した時、負けた側の値は family のどの世代にも無い値になり、`auth_invalid` で断るだけで family は失効させない (失効は `retired` に一致した時 = replay の時だけ)。その端末は passkey でサインインし直す。猶予を広げて見分けようとはしない。
 
 **Q2. 一覧 op の名前** (§8) — **`auth.account.read`**。
 
@@ -332,11 +332,11 @@ Decision の内容は下記の裁定を織り込んだ後の姿で、ここは�
 | 項目 | 契約 / 本 DR が言うこと | daemon 側の現状 (DR-0001) |
 |---|---|---|
 | 「今使っているか」の判定 (`auth_in_use`) | 判定は daemon。契約は code を 1 つ持つだけ | 無し。「今の接続の instance」「この session が assert した credential」の定義から要る |
-| cookie の名前 | `__Secure-ccmsg-<digest(user id)>`、instance を含めない (本 DR の「cookie の名前」節) | §2.4 が `sha256(instance id + "\n" + sub)`。**矛盾** |
+| cookie の名前 | `__Secure-ccmsg-<digest(user id)>`、instance を含めない (§5)。綴りは daemon | §2.4 が `sha256(instance id + "\n" + sub)`。**矛盾** |
 | rotate の writer と競合 | 所有されているどの instance でも書ける。負けた側の値は family が知らない値として `auth_invalid`、family は失効させない (§5) | §2.4 が「単一 writer で LWW 衝突を避ける」。**矛盾** |
 | 所有の再付与と tombstone | granting ごとに id を持ち、外す = その granting の tombstone、足し直す = 新しい granting (§3) | 無し。§2.6 の tombstone は sub 単位 |
 | `owner add <user>` / `--all` の CLI | 経路として §4 (b) が決めている。線上には record の形しか現れない | 無し |
-| 既に所有者である人の `auth.enroll` | **成功として扱い、ownership を増やさない** (冪等)。拒否にすると page からは `auth_invalid` としか見えず、何が起きたか人に言えない | 無し |
+| 既に所有者である人の `auth.enroll` | **成功、ownership を増やさない** (§4)。契約が決めているので daemon は従うだけ | 無し |
 | 最後の credential を消した時 | 契約は禁じない。消えた credential で始まった family をどうするかは daemon (issue `passkey-list-for-people` の残論点) | §2.5 は「該当 sub の family を全部失効」で sub 前提 |
 | user の tombstone | ユーザを消す op を契約は持たない。key (`user/<user>`) だけが用意されている | 無し |
 | 6 桁の試行回数の上限 | 発行者だけが数える ([DR-0021](DR-0021-registration-in-two-halves.md)) | §2.10 にあり。現状維持 |
