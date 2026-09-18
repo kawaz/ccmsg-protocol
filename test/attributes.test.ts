@@ -84,6 +84,7 @@ describe("op attribute table", () => {
     expect(open.sort()).toEqual([
       "auth.assert",
       "auth.challenge",
+      "auth.enroll",
       "auth.register",
       "auth.token.refresh",
       "hello.instance",
@@ -99,6 +100,7 @@ describe("op attribute table", () => {
     expect(overHttp.sort()).toEqual([
       "auth.assert",
       "auth.challenge",
+      "auth.enroll",
       "auth.register",
       "auth.token.refresh",
     ]);
@@ -106,11 +108,11 @@ describe("op attribute table", () => {
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(15);
+    expect(opsOfPlane("common")).toHaveLength(16);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(48);
+    expect(OP_NAMES).toHaveLength(49);
     expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(14);
   });
 

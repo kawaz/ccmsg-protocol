@@ -61,13 +61,17 @@ export const OP_FIXTURES = {
     response: common.AUTH_REGISTER_RESPONSE,
   },
   "auth.assert": { request: common.AUTH_ASSERT_REQUEST, response: common.AUTH_ASSERT_RESPONSE },
+  "auth.enroll": { request: common.AUTH_ENROLL_REQUEST, response: common.AUTH_ENROLL_RESPONSE },
   "auth.token.refresh": {
     request: common.AUTH_TOKEN_REFRESH_REQUEST,
     response: common.AUTH_TOKEN_REFRESH_RESPONSE,
   },
   "auth.extend": { request: common.AUTH_EXTEND_REQUEST, response: common.AUTH_EXTEND_RESPONSE },
+  "auth.account.read": {
+    request: common.AUTH_ACCOUNT_READ_REQUEST,
+    response: common.AUTH_ACCOUNT_READ_RESPONSE,
+  },
   "auth.resolve": { request: common.AUTH_RESOLVE_REQUEST, response: common.AUTH_RESOLVE_RESPONSE },
-  "auth.rotate": { request: common.AUTH_ROTATE_REQUEST, response: common.AUTH_ROTATE_RESPONSE },
 
   "message.send": {
     request: messaging.MESSAGE_SEND_REQUEST,

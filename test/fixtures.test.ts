@@ -6,11 +6,10 @@ import {
   AuthAssertRequest,
   AuthChallengeResponse,
   AuthRecordsFrame,
+  AuthEnrollRequest,
   AuthRegisterRequest,
   AuthResolveRequest,
   AuthResolveResponse,
-  originOf,
-  rpIdOf,
   FAMILY_TOMBSTONE_RETENTION_MS,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
@@ -20,7 +19,7 @@ import {
   HelloSessionResponse,
   HelloUserRequest,
 } from "../src/common/hello.ts";
-import { Endpoint, Origin, WebUi } from "../src/identifiers.ts";
+import { Endpoint, Origin } from "../src/identifiers.ts";
 import { InstancePingResponse } from "../src/common/ping.ts";
 import { SessionStoppingRequest, SessionStoppingResponse } from "../src/common/shutdown.ts";
 import { TopicSubscribeRequest, TopicUnsubscribeRequest } from "../src/common/topics.ts";
@@ -35,6 +34,7 @@ import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
 import {
   AUTH_RECORDS_FAMILY_FRAME,
   AUTH_RECORDS_TOMBSTONE_FRAME,
+  AUTH_RESOLVE_ADD_OWNER_RESPONSE,
   AUTH_RESOLVE_CHALLENGE_REQUEST,
   AUTH_RESOLVE_CHALLENGE_RESPONSE,
   AUTH_RESOLVE_RESPONSE,
@@ -63,7 +63,33 @@ import {
 import { NotifyFrame } from "../src/messaging/notify.ts";
 import { isValid, OP_SCHEMAS, TOPIC_SCHEMAS, validationErrors } from "../src/schemas.ts";
 
-const { sid: SID, instance: INSTANCE, endpoint: INSTANCE_ENDPOINT } = FIXTURE_IDS;
+const {
+  sid: SID,
+  instance: INSTANCE,
+  other_instance: OTHER_INSTANCE,
+  endpoint: INSTANCE_ENDPOINT,
+} = FIXTURE_IDS;
+
+/** The credential records of the replicated set, in the order they are written.
+ * The set holds several kinds now, so a fixture that is about credentials picks
+ * them out rather than indexing into the whole. */
+function credentialRecords() {
+  return TOPIC_FIXTURES["auth.records"].data.records.flatMap((record) =>
+    record.body.kind === "credential" ? [{ ...record, body: record.body }] : [],
+  );
+}
+
+function ownershipRecords() {
+  return TOPIC_FIXTURES["auth.records"].data.records.flatMap((record) =>
+    record.body.kind === "ownership" ? [{ ...record, body: record.body }] : [],
+  );
+}
+
+/** The replicated set's frame carrying one record, for a check that one field
+ * is what makes a record valid. */
+function frameOf(record: { key: string; updated_at: number }, body: unknown) {
+  return { ...TOPIC_FIXTURES["auth.records"], data: { records: [{ ...record, body }] } };
+}
 
 /** Assert against the schema and say what failed when it does — a fixture is
  * only useful if a break in it names the field that broke. */
@@ -447,176 +473,110 @@ describe("authenticating a person", () => {
     ).toBe(false);
   });
 
-  test("a credential says which endpoint it admits its holder to, and cannot leave it out", () => {
-    const frame = TOPIC_FIXTURES["auth.records"];
-    const [record] = frame.data.records;
-    const { endpoint: _dropped, ...body } = record.body;
-    // A neighbour under the same host and the same relying party is a separate
-    // endpoint, so it takes a registration of its own.
-    expect(
-      isValid(AuthRecordsFrame, {
-        ...frame,
-        data: {
-          records: [{ ...record, body: { ...body, endpoint: "https://mba.example.ts.net/" } }],
-        },
-      }),
-    ).toBe(true);
-    expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
-      false,
-    );
+  test("an enrolment answered by an assertion still carries the typed code", () => {
+    // What the assertion proves is who is here; what the digits prove is that
+    // they asked for this instance. Neither stands in for the other.
+    const { code: _dropped, ...rest } = OP_FIXTURES["auth.enroll"].request;
+    expect(isValid(AuthEnrollRequest, rest)).toBe(false);
   });
 
-  test("a credential names the one web UI it was made at, and cannot leave it out", () => {
-    const frame = TOPIC_FIXTURES["auth.records"];
-    const [record] = frame.data.records;
-    const { webui: _dropped, ...body } = record.body;
-    expect(isValid(AuthRecordsFrame, { ...frame, data: { records: [{ ...record, body }] } })).toBe(
-      false,
-    );
+  test("an enrolment names no device — no credential is made by it", () => {
+    expect(OP_FIXTURES["auth.enroll"].request).not.toHaveProperty("device_label");
   });
 
-  test("where a credential was made is no part of the endpoint it admits to", () => {
-    // The UI may be published anywhere; neither value is read off the other,
-    // and the fixtures are written at UIs that are nobody's endpoint.
-    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(body.endpoint).not.toBe(body.webui);
-      expect(body.endpoint.startsWith(originOf(body.webui))).toBe(false);
-    }
+  test("a credential names the one origin it may be used at, and cannot leave it out", () => {
+    const record = credentialRecords()[0];
+    const { origin: _dropped, ...body } = record.body;
+    expect(isValid(AuthRecordsFrame, { ...frameOf(record, body) })).toBe(false);
   });
 
-  test("the two credentials differ in whether their UI is the endpoint's site", () => {
-    // What decides the shape of the refresh cookie, so the fixtures carry one
-    // of each: a UI that shares the endpoint's registrable domain, and one that
-    // does not.
-    const [crossSite, sameSite] = TOPIC_FIXTURES["auth.records"].data.records;
-    // The endpoints are published under one registrable domain; a UI is on
-    // their site when its host ends there. (Spelled out rather than computed:
-    // the rule is the public suffix list, which this contract does not carry.)
-    const endpointSite = "example.ts.net";
-    expect(new URL(crossSite.body.endpoint).host.endsWith(`.${endpointSite}`)).toBe(true);
-    expect(new URL(crossSite.body.webui).host.endsWith(`.${endpointSite}`)).toBe(false);
-    expect(new URL(sameSite.body.webui).host.endsWith(`.${endpointSite}`)).toBe(true);
-    expect(crossSite.body.credential_id).not.toBe(sameSite.body.credential_id);
-  });
-
-  test("the relying party is derived from the UI's URL and is never a field", () => {
-    // A suffix would be a relying party several origins share, which is the one
-    // thing holding a credential to a single UI rules out — so it is read off
-    // the URL rather than written down where it could say something else.
-    expect(rpIdOf(FIXTURE_IDS.webui)).toBe("ui.example.test");
-    expect(rpIdOf("https://UI.Example.Test:8443/ccmsg/")).toBe("ui.example.test");
-    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(rpIdOf(body.webui)).toBe(new URL(body.webui).hostname);
+  test("a credential says nothing about which instance its holder may enter", () => {
+    // The whole of this decision: an endpoint appears nowhere on a credential,
+    // and being admitted is what the ownership records answer.
+    for (const { body } of credentialRecords()) {
+      expect(body).not.toHaveProperty("endpoint");
+      expect(body).not.toHaveProperty("webui");
       expect(body).not.toHaveProperty("rp_id");
+      expect(body).not.toHaveProperty("user_handle");
     }
     expect(AUTH_RESOLVE_RESPONSE.claims).not.toHaveProperty("rp_id");
   });
 
-  test("a web UI is a base URL, spelled as an endpoint is", () => {
-    const frame = TOPIC_FIXTURES["auth.records"];
-    const [record] = frame.data.records;
-    for (const webui of [
-      // No trailing slash, so `/ccmsg` and `/ccmsg/` cannot be two spellings of
-      // one UI — the rule an endpoint is held to.
-      "https://ui.example.test/ccmsg",
-      "https://ui.example.test",
-      "https://ui.example.test/?x=1",
-      "https://ui.example.test/#top",
-      "wss://ui.example.test/",
+  test("the two credentials differ in whether their origin is the endpoints' site", () => {
+    // What decides the shape of the refresh cookie, so the fixtures carry one
+    // of each: an origin that shares the endpoints' registrable domain, and one
+    // that does not.
+    const [crossSite, sameSite] = credentialRecords();
+    // The endpoints are published under one registrable domain; an origin is on
+    // their site when its host ends there. (Spelled out rather than computed:
+    // the rule is the public suffix list, which this contract does not carry.)
+    const endpointSite = "example.ts.net";
+    expect(new URL(INSTANCE_ENDPOINT).host.endsWith(`.${endpointSite}`)).toBe(true);
+    expect(new URL(crossSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(false);
+    expect(new URL(sameSite.body.origin).host.endsWith(`.${endpointSite}`)).toBe(true);
+    expect(crossSite.body.credential_id).not.toBe(sameSite.body.credential_id);
+  });
+
+  test("an origin is a scheme and an authority, and a base URL is not one", () => {
+    const record = credentialRecords()[0];
+    for (const origin of [
+      // A path, a trailing slash, a query, a fragment: none of them is anything
+      // a browser writes into an `Origin` header.
+      "https://ui.example.test/",
+      "https://ui.example.test/ccmsg/",
+      "https://ui.example.test?x=1",
+      "https://ui.example.test#top",
+      "wss://ui.example.test",
+      // A second spelling of one site is a record that never matches it.
+      "https://UI.EXAMPLE.TEST",
+      "https://ui.example.test:443",
+      "http://ui.example.test:80",
+      "https://user@ui.example.test",
+      "https://ui.example.test:99999",
+      "https://-bad.example",
+      "https://a..example",
     ]) {
-      expect(
-        isValid(AuthRecordsFrame, {
-          ...frame,
-          data: { records: [{ ...record, body: { ...record.body, webui } }] },
-        }),
-      ).toBe(false);
+      expect(isValid(Origin, origin)).toBe(false);
+      expect(isValid(AuthRecordsFrame, frameOf(record, { ...record.body, origin }))).toBe(false);
     }
   });
 
-  test("a web UI a URL parser would refuse, or that spells one site twice, is refused", () => {
-    // The derivations are total over this type: anything that passes here has
-    // an origin and a relying party, and the origin is one the `Origin` schema
-    // takes. A value the parser throws on, or a second spelling of one site,
-    // would break that on a record that had already been accepted and
-    // replicated.
-    for (const webui of [
-      "https://ui.example.test:99999/ccmsg/",
-      "https://[fe80::1%25en0]/ccmsg/",
-      "https://-bad.example/ccmsg/",
-      "https://bad-.example/ccmsg/",
-      "https://a..example/ccmsg/",
-      "https://example.test./",
-      "https://user@ui.example.test/ccmsg/",
-      "https://UI.EXAMPLE.TEST/ccmsg/",
-      "https://ui.example.test:443/ccmsg/",
-      "http://ui.example.test:80/",
-    ]) {
-      expect(isValid(WebUi, webui)).toBe(false);
-      expect(isValid(Endpoint, webui)).toBe(false);
+  test("every origin the fixtures name is one the schema takes", () => {
+    for (const origin of [FIXTURE_IDS.origin, FIXTURE_IDS.same_site_origin]) {
+      expect(isValid(Origin, origin)).toBe(true);
+      // An endpoint is a base URL and an origin is not: neither type takes the
+      // other's values, which is why neither is read off the other.
+      expect(isValid(Endpoint, origin)).toBe(false);
     }
+    expect(isValid(Origin, INSTANCE_ENDPOINT)).toBe(false);
   });
 
-  test("a web UI is somewhere a ceremony could run, which an endpoint need not be", () => {
-    // The authenticator's conditions, not this contract's taste: a secure
-    // context, and a relying party that is a domain. An endpoint is neither a
-    // relying party nor a page, so it is held to none of it.
-    for (const url of [
-      // Plain http anywhere but a loopback name the browser trusts.
-      "http://ui.example.test/",
-      "http://ui.example.ts.net/ccmsg/",
-      // An address literal cannot be a relying party, https or not.
-      "https://198.51.100.9/",
-      "https://127.0.0.1:8443/",
-      "https://[::1]/",
-      "https://[fe80::1]/x/",
-    ]) {
-      expect(isValid(WebUi, url)).toBe(false);
-      expect(isValid(Endpoint, url)).toBe(true);
-    }
-    // The development exception, and only on the loopback names.
-    for (const url of ["http://localhost/", "http://localhost:5173/ccmsg/", "http://[::1]:8080/"]) {
-      expect(isValid(WebUi, url)).toBe(true);
-    }
-    expect(isValid(WebUi, "http://127.0.0.2/")).toBe(false);
+  test("a person is one user however many instances they own", () => {
+    const owned = ownershipRecords().filter((record) => record.body.user === FIXTURE_IDS.user);
+    expect(owned.length).toBeGreaterThan(1);
+    expect(new Set(owned.map((record) => record.body.instance)).size).toBe(owned.length);
+    // And one credential per origin, not per instance.
+    expect(credentialRecords().length).toBeLessThan(owned.length * credentialRecords().length + 1);
+    for (const { body } of credentialRecords()) expect(body.user).toBe(FIXTURE_IDS.user);
   });
 
-  test("every web UI this contract takes has an origin and a relying party", () => {
-    for (const webui of [
-      FIXTURE_IDS.webui,
-      FIXTURE_IDS.same_site_webui,
-      "http://localhost/",
-      "http://127.0.0.1:3000/",
-      "http://[::1]:8080/x/",
-      "https://xn--r8jz45g.xn--zckzah/ccmsg/",
-      "https://ui.example.test:8443/a/b/",
-    ]) {
-      expect(isValid(WebUi, webui)).toBe(true);
-      expect(isValid(Origin, originOf(webui))).toBe(true);
-      expect(rpIdOf(webui).length).toBeGreaterThan(0);
-    }
-  });
-
-  test("the origin held against a header is read off the URL, never stored beside it", () => {
-    // One fact, one place: what a person is sent to. The origin is what a
-    // browser will have serialized, so the derivation is the browser's own
-    // normalization — a lowercase scheme and host, no default port, an address
-    // literal in its brackets.
-    expect(originOf(FIXTURE_IDS.webui)).toBe("https://ui.example.test");
-    expect(originOf("https://UI.Example.Test:443/ccmsg/")).toBe("https://ui.example.test");
-    expect(originOf("http://ui.example.test:80/")).toBe("http://ui.example.test");
-    expect(originOf("https://ui.example.ts.net:8443/webui/")).toBe(
-      "https://ui.example.ts.net:8443",
+  test("one instance may be owned by more than one person", () => {
+    const owners = ownershipRecords().filter(
+      (record) => record.body.instance === FIXTURE_IDS.other_instance,
     );
-    expect(originOf("http://[::1]:8080/x/")).toBe("http://[::1]:8080");
-    for (const { body } of TOPIC_FIXTURES["auth.records"].data.records) {
-      expect(isValid(Origin, originOf(body.webui))).toBe(true);
-      expect(body).not.toHaveProperty("origin");
+    expect(new Set(owners.map((record) => record.body.user)).size).toBe(2);
+  });
+
+  test("an ownership is keyed by the instance and the person, and says nothing more", () => {
+    for (const record of ownershipRecords()) {
+      expect(record.key).toBe(`ownership/${record.body.instance}/${record.body.user}`);
+      expect(record.body).not.toHaveProperty("endpoint");
     }
   });
 
-  test("a token family states the web UI its connections are held to", () => {
+  test("a token family states the origin its connections are held to", () => {
     const [record] = AUTH_RECORDS_FAMILY_FRAME.data.records;
-    const { webui: _dropped, ...body } = record.body;
+    const { origin: _dropped, ...body } = record.body;
     expect(
       isValid(AuthRecordsFrame, {
         ...AUTH_RECORDS_FAMILY_FRAME,
@@ -625,9 +585,69 @@ describe("authenticating a person", () => {
     ).toBe(false);
   });
 
-  test("a registration URL says which web UI it will be opened at", () => {
-    const { webui: _dropped, ...claims } = AUTH_RESOLVE_RESPONSE.claims;
-    expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims })).toBe(false);
+  test("a family names the person, never a subject an instance made up", () => {
+    const [record] = AUTH_RECORDS_FAMILY_FRAME.data.records;
+    expect(record.body.user).toBe(FIXTURE_IDS.user);
+    expect(record.body).not.toHaveProperty("sub");
+  });
+
+  test("an enrolment URL names where the person goes and where the page posts", () => {
+    for (const field of ["origin", "endpoint", "purpose", "instance"] as const) {
+      const { [field]: _dropped, ...claims } = AUTH_RESOLVE_RESPONSE.claims;
+      expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims })).toBe(false);
+    }
+  });
+
+  test("the address a URL posts to is nobody's own — it is never compared", () => {
+    // The fixtures send both purposes to the address in front of the instances,
+    // which is not the issuer's endpoint. Whichever instance behind it receives
+    // the answer completes the enrolment.
+    for (const response of [AUTH_RESOLVE_RESPONSE, AUTH_RESOLVE_ADD_OWNER_RESPONSE]) {
+      expect(response.claims.endpoint).toBe(FIXTURE_IDS.hosting_endpoint);
+      expect(response.claims.endpoint).not.toBe(INSTANCE_ENDPOINT);
+      expect(isValid(AuthResolveResponse, response)).toBe(true);
+    }
+  });
+
+  test("only the URL that makes a person names one", () => {
+    // A creation settles the user handle before the authenticator ever sees it;
+    // an addition learns who arrived from the assertion, so naming anyone up
+    // front would be a claim the ceremony was not held to.
+    expect(AUTH_RESOLVE_RESPONSE.claims.purpose).toBe("create_user");
+    expect(AUTH_RESOLVE_RESPONSE.claims.user).toBe(FIXTURE_IDS.user);
+    expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims.purpose).toBe("add_owner");
+    expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims).not.toHaveProperty("user");
+  });
+
+  test("a removal says when and nothing else — its key says what", () => {
+    for (const record of AUTH_RECORDS_TOMBSTONE_FRAME.data.records) {
+      expect(record.body.kind).toBe("tombstone");
+      expect(record.body).not.toHaveProperty("sub");
+      expect(record.body).not.toHaveProperty("user");
+    }
+    // A credential's and an ownership's are kept without end; a family's is
+    // dropped once no refresh token could still arrive.
+    const kept = AUTH_RECORDS_TOMBSTONE_FRAME.data.records.filter(
+      (record) => !("expires_at" in record.body),
+    );
+    expect(kept.map((record) => record.key.split("/")[0])).toEqual(["credential", "ownership"]);
+  });
+
+  test("an account is read back as the person, their passkeys and their instances", () => {
+    const reply = OP_FIXTURES["auth.account.read"].response;
+    expect(reply.user.user).toBe(FIXTURE_IDS.user);
+    // The public keys are how an assertion is checked and are no part of this.
+    for (const credential of reply.credentials) {
+      expect(credential).not.toHaveProperty("public_key");
+      expect(credential.user).toBe(FIXTURE_IDS.user);
+    }
+    expect(reply.instances.map((entry) => entry.instance)).toEqual([INSTANCE, OTHER_INSTANCE]);
+  });
+
+  test("rotating a family is not an op — every owned instance writes it", () => {
+    expect(OP_NAMES).not.toContain("auth.rotate");
+    expect(OP_NAMES).toContain("auth.enroll");
+    expect(OP_NAMES).toContain("auth.account.read");
   });
 
   test("a retired generation is remembered as a digest and not as the token", () => {
@@ -655,7 +675,7 @@ describe("authenticating a person", () => {
       isValid(AuthRecordsFrame, {
         ...TOPIC_FIXTURES["auth.records"],
         data: {
-          records: [{ key: "k", updated_at: 1, body: { kind: "password", sub: "personal-1" } }],
+          records: [{ key: "k", updated_at: 1, body: { kind: "password", user: "x" } }],
         },
       }),
     ).toBe(false);

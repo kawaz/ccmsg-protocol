@@ -12,8 +12,10 @@ import type {
   AuthRegisterResponse,
   AuthResolveRequest,
   AuthResolveResponse,
-  AuthRotateRequest,
-  AuthRotateResponse,
+  AuthAccountReadRequest,
+  AuthAccountReadResponse,
+  AuthEnrollRequest,
+  AuthEnrollResponse,
 } from "../common/auth.ts";
 import type {
   HelloInstanceRequest,
@@ -36,7 +38,18 @@ import type {
 } from "../common/topics.ts";
 import { FIXTURE_IDS, FIXTURE_NOW } from "./ids.ts";
 
-const { sid, instance, other_instance, endpoint, other_endpoint, webui, request_id } = FIXTURE_IDS;
+const {
+  sid,
+  instance,
+  other_instance,
+  endpoint,
+  other_endpoint,
+  origin,
+  same_site_origin,
+  hosting_endpoint,
+  user: USER,
+  request_id,
+} = FIXTURE_IDS;
 
 export const HELLO_SESSION_REQUEST: Static<typeof HelloSessionRequest> = {
   request_id,
@@ -176,11 +189,8 @@ const CHALLENGE = {
 };
 
 const ACCESS = { value: "YWNjZXNzLXRva2Vu", expires_at: FIXTURE_NOW + 10_000_000 };
-const REFRESH = { value: "cmVmcmVzaA", expires_at: FIXTURE_NOW + 600_000_000 };
-const REGISTER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.e30.c2ln";
-const REGISTER_CODE = "048213";
-const SUBJECT = "personal-1";
-
+const ENROLL_TOKEN = "eyJhbGciOiJIUzI1NiJ9.e30.c2ln";
+const ENROLL_CODE = "048213";
 export const AUTH_CHALLENGE_REQUEST: Static<typeof AuthChallengeRequest> = {
   request_id,
   op: "auth.challenge",
@@ -195,8 +205,8 @@ export const AUTH_CHALLENGE_RESPONSE: Static<typeof AuthChallengeResponse> = {
 export const AUTH_REGISTER_REQUEST: Static<typeof AuthRegisterRequest> = {
   request_id,
   op: "auth.register",
-  token: REGISTER_TOKEN,
-  code: REGISTER_CODE,
+  token: ENROLL_TOKEN,
+  code: ENROLL_CODE,
   device_label: "work laptop",
   challenge: CHALLENGE,
   credential: {
@@ -210,7 +220,7 @@ export const AUTH_REGISTER_REQUEST: Static<typeof AuthRegisterRequest> = {
 export const AUTH_REGISTER_RESPONSE: Static<typeof AuthRegisterResponse> = {
   ok: true,
   request_id,
-  sub: SUBJECT,
+  user: USER,
   access: ACCESS,
 };
 
@@ -223,14 +233,38 @@ export const AUTH_ASSERT_REQUEST: Static<typeof AuthAssertRequest> = {
     client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
     authenticator_data: "YXV0aC1kYXRh",
     signature: "c2lnbmF0dXJl",
-    user_handle: "dXNlci1oYW5kbGU",
+    user_handle: USER,
   },
 };
 
 export const AUTH_ASSERT_RESPONSE: Static<typeof AuthAssertResponse> = {
   ok: true,
   request_id,
-  sub: SUBJECT,
+  user: USER,
+  access: ACCESS,
+};
+
+/** Taking a second instance as one's own: the same token and digits a
+ * registration carries, answered with the passkey that already exists. */
+export const AUTH_ENROLL_REQUEST: Static<typeof AuthEnrollRequest> = {
+  request_id,
+  op: "auth.enroll",
+  token: ENROLL_TOKEN,
+  code: ENROLL_CODE,
+  challenge: CHALLENGE,
+  credential: {
+    raw_id: "Y3JlZC1pZA",
+    client_data_json: "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+    authenticator_data: "YXV0aC1kYXRh",
+    signature: "c2lnbmF0dXJl",
+    user_handle: USER,
+  },
+};
+
+export const AUTH_ENROLL_RESPONSE: Static<typeof AuthEnrollResponse> = {
+  ok: true,
+  request_id,
+  user: USER,
   access: ACCESS,
 };
 
@@ -243,7 +277,7 @@ export const AUTH_TOKEN_REFRESH_REQUEST: Static<typeof AuthTokenRefreshRequest> 
 export const AUTH_TOKEN_REFRESH_RESPONSE: Static<typeof AuthTokenRefreshResponse> = {
   ok: true,
   request_id,
-  sub: SUBJECT,
+  user: USER,
   access: ACCESS,
 };
 
@@ -259,29 +293,104 @@ export const AUTH_EXTEND_RESPONSE: Static<typeof AuthExtendResponse> = {
   auth_expires_at: FIXTURE_NOW + 20_000_000,
 };
 
+/** The three things a person has, read back at once: who they are, what answers
+ * for them at each origin, and the instances they own. Two instances here, one
+ * of them granted by nobody (they made it) and one added by an owner. */
+export const AUTH_ACCOUNT_READ_REQUEST: Static<typeof AuthAccountReadRequest> = {
+  request_id,
+  op: "auth.account.read",
+};
+
+export const AUTH_ACCOUNT_READ_RESPONSE: Static<typeof AuthAccountReadResponse> = {
+  ok: true,
+  request_id,
+  user: {
+    kind: "user",
+    user: USER,
+    display_name: "kawaz",
+    created_at: FIXTURE_NOW - 900_000,
+  },
+  credentials: [
+    {
+      kind: "credential",
+      user: USER,
+      credential_id: "Y3JlZC1pZA",
+      origin,
+      sign_count: 0,
+      issued_label: "for kawaz",
+      device_label: "work laptop",
+      registered_at: FIXTURE_NOW - 600_000,
+      registered_ip: "203.0.113.7",
+      registered_user_agent: "Mozilla/5.0",
+      last_used_at: FIXTURE_NOW,
+      last_used_ip: "203.0.113.7",
+      last_used_user_agent: "Mozilla/5.0",
+    },
+    {
+      kind: "credential",
+      user: USER,
+      credential_id: "Y3JlZC1pZC0y",
+      origin: same_site_origin,
+      device_label: "phone",
+      registered_at: FIXTURE_NOW - 300_000,
+    },
+  ],
+  instances: [
+    { instance, endpoint, granted_at: FIXTURE_NOW - 600_000 },
+    {
+      instance: other_instance,
+      endpoint: other_endpoint,
+      granted_at: FIXTURE_NOW - 60_000,
+      granted_by: USER,
+    },
+  ],
+};
+
 export const AUTH_RESOLVE_REQUEST = {
   request_id,
   op: "auth.resolve",
   to_instance: instance,
-  kind: "register",
-  token: REGISTER_TOKEN,
-  code: REGISTER_CODE,
+  kind: "claims",
+  token: ENROLL_TOKEN,
+  code: ENROLL_CODE,
 } satisfies Static<typeof AuthResolveRequest>;
 
+/** What the issuer answers about a URL that makes a person. It names the user
+ * the credential will be created against, and posts to the address in front of
+ * the instances rather than to the issuer's own — whichever of them the answer
+ * lands on completes it. */
 export const AUTH_RESOLVE_RESPONSE = {
   ok: true,
   request_id,
-  kind: "register",
+  kind: "claims",
   claims: {
     iss: instance,
-    sub: SUBJECT,
-    unit: "personal",
-    endpoint,
-    webui,
+    purpose: "create_user",
+    instance,
+    origin,
+    endpoint: hosting_endpoint,
     expires_at: FIXTURE_NOW + 600_000,
     jti: "01J9Z3W2Q",
-    user_id: "dXNlci1oYW5kbGU",
+    user: USER,
     issued_label: "for kawaz",
+  },
+} satisfies Static<typeof AuthResolveResponse>;
+
+/** The other purpose: a URL that adds an instance to whoever asserts. It names
+ * no user — who arrives is what the assertion says. */
+export const AUTH_RESOLVE_ADD_OWNER_RESPONSE = {
+  ok: true,
+  request_id,
+  kind: "claims",
+  claims: {
+    iss: other_instance,
+    purpose: "add_owner",
+    instance: other_instance,
+    origin,
+    endpoint: hosting_endpoint,
+    expires_at: FIXTURE_NOW + 600_000,
+    jti: "01J9Z3W2R",
+    issued_label: "nuc, for kawaz",
   },
 } satisfies Static<typeof AuthResolveResponse>;
 
@@ -300,21 +409,3 @@ export const AUTH_RESOLVE_CHALLENGE_RESPONSE = {
   request_id,
   kind: "challenge",
 } satisfies Static<typeof AuthResolveResponse>;
-
-export const AUTH_ROTATE_REQUEST: Static<typeof AuthRotateRequest> = {
-  request_id,
-  op: "auth.rotate",
-  to_instance: instance,
-  refresh_token: REFRESH.value,
-  reason: "reconnect",
-  ip: "203.0.113.7",
-  user_agent: "Mozilla/5.0",
-};
-
-export const AUTH_ROTATE_RESPONSE: Static<typeof AuthRotateResponse> = {
-  ok: true,
-  request_id,
-  sub: SUBJECT,
-  access: ACCESS,
-  refresh: REFRESH,
-};

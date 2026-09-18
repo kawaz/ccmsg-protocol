@@ -21,8 +21,10 @@ const {
   other_instance,
   endpoint,
   other_endpoint,
-  webui,
-  same_site_webui,
+  origin,
+  same_site_origin,
+  user: USER,
+  other_user: OTHER_USER,
   mid,
 } = FIXTURE_IDS;
 
@@ -504,6 +506,8 @@ export const KV_FRAME: Static<typeof KvFrame> = {
   },
 };
 
+/** The person, the passkeys that answer for them, and the instances they own —
+ * the records an instance needs to admit somebody, all replicated. */
 export const AUTH_RECORDS_FRAME = {
   ev: "topic",
   topic: "auth.records",
@@ -512,16 +516,24 @@ export const AUTH_RECORDS_FRAME = {
   data: {
     records: [
       {
-        key: "credential/personal-1/Y3JlZC1pZA",
+        key: `user/${USER}`,
+        updated_at: FIXTURE_NOW - 900_000,
+        body: {
+          kind: "user",
+          user: USER,
+          display_name: "kawaz",
+          created_at: FIXTURE_NOW - 900_000,
+        },
+      },
+      {
+        key: "credential/Y3JlZC1pZA",
         updated_at: FIXTURE_NOW,
         body: {
           kind: "credential",
-          sub: "personal-1",
+          user: USER,
           credential_id: "Y3JlZC1pZA",
           public_key: "pQECAyYgASFYIA",
-          user_handle: "dXNlci1oYW5kbGU",
-          endpoint,
-          webui,
+          origin,
           sign_count: 0,
           issued_label: "for kawaz",
           device_label: "work laptop",
@@ -534,30 +546,66 @@ export const AUTH_RECORDS_FRAME = {
         },
       },
       {
-        // The same person at a second site, which shares the endpoint's
-        // registrable domain where the first does not. One credential per site,
-        // and the difference between the two is what decides whether the
-        // refresh cookie for a session made here is a partitioned one.
-        key: "credential/personal-1/Y3JlZC1pZC0y",
+        // The same person at a second origin, which shares the endpoints'
+        // registrable domain where the first does not. One credential per
+        // origin, and the difference between the two is what decides whether
+        // the refresh cookie for a session made here is a partitioned one.
+        key: "credential/Y3JlZC1pZC0y",
         updated_at: FIXTURE_NOW,
         body: {
           kind: "credential",
-          sub: "personal-1",
+          user: USER,
           credential_id: "Y3JlZC1pZC0y",
           public_key: "pQECAyYgASFYIB",
-          user_handle: "dXNlci1oYW5kbGU",
-          endpoint,
-          webui: same_site_webui,
+          origin: same_site_origin,
           device_label: "phone",
           registered_at: FIXTURE_NOW - 300_000,
+        },
+      },
+      {
+        // The instance this person made themselves: nobody granted it.
+        key: `ownership/${instance}/${USER}`,
+        updated_at: FIXTURE_NOW - 600_000,
+        body: {
+          kind: "ownership",
+          user: USER,
+          instance,
+          granted_at: FIXTURE_NOW - 600_000,
+        },
+      },
+      {
+        // A second instance, taken as their own afterwards. Neither credential
+        // is named here: which instances a person may enter is this record's
+        // answer, and which page may speak is the credential's.
+        key: `ownership/${other_instance}/${USER}`,
+        updated_at: FIXTURE_NOW - 60_000,
+        body: {
+          kind: "ownership",
+          user: USER,
+          instance: other_instance,
+          granted_at: FIXTURE_NOW - 60_000,
+          granted_by: USER,
+        },
+      },
+      {
+        // A second person owning that same instance. One instance may have
+        // several owners, and the two are told apart by the key alone.
+        key: `ownership/${other_instance}/${OTHER_USER}`,
+        updated_at: FIXTURE_NOW - 30_000,
+        body: {
+          kind: "ownership",
+          user: OTHER_USER,
+          instance: other_instance,
+          granted_at: FIXTURE_NOW - 30_000,
+          granted_by: USER,
         },
       },
     ],
   },
 } satisfies Static<typeof AuthRecordsFrame>;
 
-/** The token half of the same topic: one family, written by the instance that
- * issued it. */
+/** The token half of the same topic: one family, minted by one instance and
+ * writable at every instance its owner owns. */
 export const AUTH_RECORDS_FAMILY_FRAME = {
   ev: "topic",
   topic: "auth.records",
@@ -569,9 +617,9 @@ export const AUTH_RECORDS_FAMILY_FRAME = {
         updated_at: FIXTURE_NOW + 100_000,
         body: {
           kind: "token_family",
-          sub: "personal-1",
+          user: USER,
           iss: instance,
-          webui,
+          origin,
           access: { value: "YWNjZXNz", expires_at: FIXTURE_NOW + 10_000_000 },
           refresh: { value: "cmVmcmVzaA", expires_at: FIXTURE_NOW + 600_000_000 },
           last_refresh: {
@@ -588,8 +636,10 @@ export const AUTH_RECORDS_FAMILY_FRAME = {
   },
 } satisfies Static<typeof AuthRecordsFrame>;
 
-/** A removal travels as a record of its own. A credential's never expires; a
- * family's is kept only as long as a refresh token could still arrive. */
+/** A removal travels as a record of its own, and says nothing but when: what
+ * was removed is the key it arrives under. A credential's and an ownership's
+ * never expire; a family's is kept only as long as a refresh token could still
+ * arrive. */
 export const AUTH_RECORDS_TOMBSTONE_FRAME = {
   ev: "topic",
   topic: "auth.records",
@@ -597,16 +647,20 @@ export const AUTH_RECORDS_TOMBSTONE_FRAME = {
   data: {
     records: [
       {
-        key: "credential/personal-1/Y3JlZC1pZA",
+        key: "credential/Y3JlZC1pZA",
         updated_at: FIXTURE_NOW + 100_000,
-        body: { kind: "tombstone", sub: "personal-1", deleted_at: FIXTURE_NOW + 100_000 },
+        body: { kind: "tombstone", deleted_at: FIXTURE_NOW + 100_000 },
+      },
+      {
+        key: `ownership/${other_instance}/${OTHER_USER}`,
+        updated_at: FIXTURE_NOW + 100_000,
+        body: { kind: "tombstone", deleted_at: FIXTURE_NOW + 100_000 },
       },
       {
         key: "family/01J9Z3W2Q",
         updated_at: FIXTURE_NOW + 100_000,
         body: {
           kind: "tombstone",
-          sub: "personal-1",
           deleted_at: FIXTURE_NOW + 100_000,
           expires_at: FIXTURE_NOW + 604_900_000,
         },
