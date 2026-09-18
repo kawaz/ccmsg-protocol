@@ -41,9 +41,10 @@ export interface OpAttributes {
    *
    * Being reachable from a page is also what gives the four that settle an
    * identity the only headers this contract reads over HTTP: the `Origin` a
-   * browser states, held to the origin the credential names (the enrolment
-   * URL's, where the credential is the one being made), and `Sec-Fetch-Site`,
-   * which has to be one of
+   * browser states, held to the enrolment URL's origin on the two that spend one
+   * (`auth.register`, `auth.enroll`) and to the credential's or the family's on
+   * the two that do not (`auth.assert`, `auth.token.refresh`), and
+   * `Sec-Fetch-Site`, which has to be one of
    * `same-origin`, `same-site` or `cross-site` — the three that say a page made
    * the call. Anything else fails: `none`, which is a request with no initiator
    * at all, a header that is absent, and a value this contract does not know.
@@ -234,10 +235,6 @@ export const OP_ATTRIBUTES = {
   // secret and a challenge that may be spent once. `owner_instance` because
   // both live in one instance's memory, and it is reached by `to_instance`
   // being that instance's id.
-  //
-  // Rotating a token family is not here. A family is replicated and every
-  // instance its owner owns may write it, so the rotation happens where the
-  // request landed rather than being carried to the instance that minted it.
   "auth.resolve": {
     plane: "common",
     roles: INSTANCE_ONLY,
