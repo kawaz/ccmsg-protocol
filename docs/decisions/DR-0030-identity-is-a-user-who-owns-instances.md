@@ -73,6 +73,7 @@ CredentialRecord = {
 - **endpoint は 2 種類あり、mesh のピアが使うものは instance に 1 対 1 で届く住所でなければならない**。HA の住所 (hosting の FQDN) は、そこへ送っても load balancer がどれに落とすか決めるので、ピアが特定のピアへ届ける用途には使えない。人が繋ぐ住所としての HA の住所は、それとは別に持つ。`iss` は endpoint ではなく instance id なので ([DR-0018](DR-0018-instance-id-apart-from-endpoint.md))、HA の裏に何台居ても発行者は一意に指せる
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
 - 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい。`granted_by` はその前提の手掛かりで、複数居る一覧を人が読む時に誰が足したかを言う
+- **所有 record は、書く instance 自身の分に限らずピアの分も書ける**。ピアは互いを同じだけ信頼する同格の存在なので (Context)、iA の操作者が iB / iC の所有 record を書いてよい。書いた instance と所有される instance が同じである必要は無く、「自分の分しか書けない」は所有が mesh に依らないことと両立しない (それを課すと、新しい instance を足すたびに人がそこへ物理的に行かねばならなくなる)。CLI の `user create --all` / `user add <user> --all` はこれを使い、**その時点で知っている peers 全部に所有を付ける**
 - **所有を外す経路は CLI と認証済みチャンネルの両方**。線上は `auth.ownership.remove(instance)` で、持っていない物を名指せば `not_found` (既存の語彙が record を含む)。名指すのは外す対象だけ (誰の物かは接続が言っているので、ユーザを引数に取れば他人の物を外す形ができる)。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove (`auth.credential.remove(credential_id)`) が「今使っている物は消せない」のと同型で、どちらも `auth_in_use` で断り、外す先を他の経路から選び直せば済む。`forbidden` と別の code にするのは、呼び手の資格の問題ではない (本人の物である) から。「今使っているか」の判定は daemon
 
 ```ts

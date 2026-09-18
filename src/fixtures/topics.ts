@@ -585,6 +585,11 @@ export const AUTH_RECORDS_FRAME = {
         // A second instance, taken as their own afterwards. Neither credential
         // is named here: which instances a person may enter is this record's
         // answer, and which page may speak is the credential's.
+        //
+        // The frame is this instance's, and what it carries is an ownership of
+        // its peer: a granting is written wherever the operator is standing and
+        // replicated from there, peers trusting one another equally. Nothing
+        // requires the instance that wrote a granting to be the one granted.
         key: `ownership/${other_instance}/${USER}/${OTHER_GRANT}`,
         updated_at: FIXTURE_NOW - 60_000,
         body: {

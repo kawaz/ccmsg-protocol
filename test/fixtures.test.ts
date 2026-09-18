@@ -561,6 +561,15 @@ describe("authenticating a person", () => {
     );
   });
 
+  test("a granting may be of a peer rather than of the instance that holds it", () => {
+    // Being made an owner of every instance at once is the ordinary case, and
+    // it cannot mean going to each machine in turn. What replicates is a
+    // record, and the frame carrying one need not be the granted instance's.
+    const frame = TOPIC_FIXTURES["auth.records"];
+    expect(frame.instance).toBe(INSTANCE);
+    expect(ownershipRecords().map((record) => record.body.instance)).toContain(OTHER_INSTANCE);
+  });
+
   test("one instance may be owned by more than one person", () => {
     const owners = ownershipRecords().filter(
       (record) => record.body.instance === FIXTURE_IDS.other_instance,
