@@ -74,7 +74,7 @@ CredentialRecord = {
 - **mesh は束縛の単位ではない**。mesh は record を運ぶ経路であって、「mesh に居ること」は何も許さない。mesh id のような値は持たない — 持てば「同じ mesh なら入れる」という 2 枚目の認可ができ、instance を 1 つ足すたびに全ユーザの権限が黙って広がる
 - 1 つの instance が複数のユーザを所有者に持ってよい。1 人のユーザが複数の instance を所有してよい。`granted_by` はその前提の手掛かりで、複数居る一覧を人が読む時に誰が足したかを言う
 - **`granted_by` は「人」と「instance」の 2 形を持つ**。認証済みチャンネルからの granting は足した人 (`{ kind: "user", … }`)、CLI からの granting はその CLI の instance (`{ kind: "instance", … }`)。**どの instance にとっても最初の granting は端末から作られ、そこには名指せる人が居ない** — 人しか入らない欄にすると、一覧を最初に読む場面でちょうど空になる。裸の id 1 本にしないのは、読み手がどちらを持っているか判らなくなるため。役割は **人が読む手掛かりのまま**で、決定には一切使わない。**「実際にどの instance が書いたか」の保証はこの欄の仕事ではなく**、複製する record への署名 (Consequences の「後続の拡張」) が担う
-- **所有 record は、書く instance 自身の分に限らずピアの分も書ける**。ピアは互いを同じだけ信頼する同格の存在なので (Context)、iA の操作者が iB / iC の所有 record を書いてよい。書いた instance と所有される instance が同じである必要は無く、「自分の分しか書けない」は所有が mesh に依らないことと両立しない (それを課すと、新しい instance を足すたびに人がそこへ物理的に行かねばならなくなる)。CLI の `user create --all` / `user add <user> --all` はこれを使い、**その時点で知っている peers 全部に所有を付ける**
+- **所有 record は、書く instance 自身の分に限らずピアの分も書ける**。ピアは互いを同じだけ信頼する同格の存在なので (Context)、iA の操作者が iB / iC の所有 record を書いてよい。書いた instance と所有される instance が同じである必要は無く、「自分の分しか書けない」は所有が mesh に依らないことと両立しない (それを課すと、新しい instance を足すたびに人がそこへ物理的に行かねばならなくなる)。CLI の `user create --all` / `user add <user> --all` はこれを使い、**その時点で知っている peers 全部に所有を付ける** (URL を経由する経路では、その集合を claims の `instances` が運び、書くのは ceremony が成立した時 — §4)
 - **所有を外す経路は CLI と認証済みチャンネルの両方**。線上は `auth.ownership.remove(instance)` で、持っていない物を名指せば `not_found` (既存の語彙が record を含む)。名指すのは外す対象だけ (誰の物かは接続が言っているので、ユーザを引数に取れば他人の物を外す形ができる)。ただし **今繋いでいる instance の自分の所有は外せない** — 自分の足元を外す操作になる。credential の remove (`auth.credential.remove(credential_id)`) が「今使っている物は消せない」のと同型で、どちらも `auth_in_use` で断り、外す先を他の経路から選び直せば済む。`forbidden` と別の code にするのは、呼び手の資格の問題ではない (本人の物である) から。「今使っているか」の判定は daemon
 
 ```ts
@@ -133,6 +133,7 @@ EnrollClaims = {
   jti: string,
   user?: UserId,             // purpose が create_user の時だけ。発行者が先に決める
   issued_label?: string,
+  instances?: InstanceId[],  // この URL が渡す instance 全部。着弾した instance が書く
 }
 ```
 
@@ -141,6 +142,7 @@ EnrollClaims = {
 - したがって **発行 instance の endpoint が browser から到達できなくてよい**。mesh がローカルに閉じ、HA の住所だけが公開されている構成でも、初回登録から全部その住所 1 つで済む
 - `user` を `create_user` の時だけ claims が運ぶのは、認証器が instance の手の届かない所でその値を保持するため (DR-0021 の理由はそのまま生きる)。page に決めさせれば、1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない
 - 登録 URL の送り先は **origin の直下**。path mount は持たない (§7)
+- **`instances` は、この URL が渡す instance 全部を名乗る**。所有 record を書くのは **ceremony が成立した時**で、書くのは着弾した instance (`granted_by` は発行 instance)。集合を端末で決めて claims で運ぶのは、「この instance が知っている peers」が端末でだけ人に見える問いだからで、着弾側が自分の知識で書くと、`--all` が問うたのとは違う問いに答えることになる。**発行時に書かない**のは、登録されなかった URL の granting が、どの user record も答えない人を名指したまま複製の集合に残るため — 誰も認証できないので無害だが、意味のある granting と見分けが付かない。省略は発行者自身の 1 台だけ (= `instance` が既に言っていること) を意味し、2 台以上を渡す時にここで名乗る。`add_owner` も同じく運ぶ (どちらも instance を渡す操作で、違うのは誰が来るかの決まり方だけ)
 
 op の形:
 
@@ -291,7 +293,7 @@ auth.account.read() -> {
 | 現行: 保持は URL、比べるのは origin | **消える** — origin を持つので導出が無い |
 | 現行: `originOf` / `rpIdOf` と `WebUi` 型 | **消える** — `Origin` 型 1 つに戻る |
 | 現行: relying party は host に固定する | 残る (origin の host) |
-| 現行: 登録 URL は webui と発行者の endpoint を名指す | **置き換わる** — origin (人を送る先) と endpoint (宛先) を名乗る |
+| 現行: 登録 URL は webui と発行者の endpoint を名指す | **置き換わる** — origin (人を送る先) と endpoint (宛先)、そして渡す instance 全部を名乗る |
 | 現行: token family は credential の webui を引き継ぐ | **置き換わる** — `origin` を引き継ぐ |
 | 現行: WS の handshake は `Origin` と照合する | 残る (加えて所有を照らす) |
 | 現行: `Origin` の不在は不一致 | 残る |

@@ -758,6 +758,33 @@ describe("authenticating a person", () => {
     expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims).not.toHaveProperty("user");
   });
 
+  test("the URL names every instance it hands over, and both purposes may", () => {
+    // The set is decided at the terminal that made the URL and travels with it,
+    // because behind a load balancer the ceremony lands wherever it lands — an
+    // instance writing the grantings it happened to know of would answer a
+    // different question than the one that was asked. Carried by an addition as
+    // well as by a creation: both hand instances over, and only who arrives
+    // differs.
+    expect(AUTH_RESOLVE_RESPONSE.claims.instances).toEqual([
+      FIXTURE_IDS.instance,
+      FIXTURE_IDS.other_instance,
+    ]);
+    expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims.instances).toEqual([FIXTURE_IDS.other_instance]);
+    // Absent is the issuer's own instance alone, which `instance` already says.
+    const { instances: _dropped, ...withoutInstances } = AUTH_RESOLVE_RESPONSE.claims;
+    expect(
+      isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims: withoutInstances }),
+    ).toBe(true);
+    // Instance ids, not endpoints: a granting names the instance, and an
+    // address is not one (DR-0018).
+    expect(
+      isValid(AuthResolveResponse, {
+        ...AUTH_RESOLVE_RESPONSE,
+        claims: { ...AUTH_RESOLVE_RESPONSE.claims, instances: [FIXTURE_IDS.hosting_endpoint] },
+      }),
+    ).toBe(false);
+  });
+
   test("a removal says when and nothing else — its key says what", () => {
     const tombstones = AUTH_RECORDS_TOMBSTONE_FRAME.data.records.filter(
       (record) => record.body.kind === "tombstone",

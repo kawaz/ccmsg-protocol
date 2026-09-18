@@ -390,9 +390,10 @@ export const AUTH_RESOLVE_REQUEST = {
 } satisfies Static<typeof AuthResolveRequest>;
 
 /** What the issuer answers about a URL that makes a person. It names the user
- * the credential will be created against, and posts to the address in front of
- * the instances rather than to the issuer's own — whichever of them the answer
- * lands on completes it. */
+ * the credential will be created against, posts to the address in front of the
+ * instances rather than to the issuer's own — whichever of them the answer
+ * lands on completes it — and names both instances the person is to own, which
+ * the receiver writes the grantings for. */
 export const AUTH_RESOLVE_RESPONSE = {
   ok: true,
   request_id,
@@ -407,6 +408,7 @@ export const AUTH_RESOLVE_RESPONSE = {
     jti: "01J9Z3W2Q",
     user: USER,
     issued_label: "for kawaz",
+    instances: [instance, other_instance],
   },
 } satisfies Static<typeof AuthResolveResponse>;
 
@@ -425,6 +427,7 @@ export const AUTH_RESOLVE_ADD_OWNER_RESPONSE = {
     expires_at: FIXTURE_NOW + 600_000,
     jti: "01J9Z3W2R",
     issued_label: "nuc, for kawaz",
+    instances: [other_instance],
   },
 } satisfies Static<typeof AuthResolveResponse>;
 

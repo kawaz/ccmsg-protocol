@@ -146,6 +146,24 @@ const ENROLL_CLAIMS_FIELDS = {
    * own device is `device_label` on the record, and the two are worth telling
    * apart when a list is read back later. */
   issued_label: Type.Optional(Type.String({ maxLength: 128 })),
+  /** Every instance this enrolment hands the person, written by whichever one
+   * the ceremony lands on once it succeeds.
+   *
+   * The set is decided at the terminal that made the URL, because that is where
+   * "the instances this one knows of" is a question anybody can see the answer
+   * to. It has to travel, for the same reason the rest of the claims do: behind
+   * a load balancer the ceremony lands wherever it lands, and an instance that
+   * wrote the grantings it happened to know of would answer a different
+   * question than the one that was asked.
+   *
+   * Written when the enrolment succeeds and not before. A granting for somebody
+   * who never registered would sit in the replicated set naming a person no
+   * user record answers for — inert, since nothing could authenticate as them,
+   * but there to be read and impossible to tell from one that means something.
+   *
+   * Absent is the issuer's own instance alone, which is what `instance` already
+   * says. Naming it here as well is how a URL hands over more than one. */
+  instances: Type.Optional(Type.Array(InstanceId)),
 } as const;
 
 /** What an enrolment URL carries, as the instance that issued it reads it back.
