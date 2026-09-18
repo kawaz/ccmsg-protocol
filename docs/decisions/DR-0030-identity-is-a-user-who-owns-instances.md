@@ -188,6 +188,8 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 - **rotate は所有されているどの instance でも行える**。発行者 (`iss`) への転送は無くなり、`auth.rotate` の中継も要らない。family は単一 writer ではなくなり、**`iss` は mint した instance の記録として残るだけで、書き手を制限しない**。所有者ならどの instance でも書けるのが本 DR の形と揃い、`iss` が落ちている間だけ refresh が通らない、という穴が閉じる
 - **競合した時は負けた側の端末がサインインし直す**。2 つの instance が同じ family を並行に rotate すれば世代は競合し、収束の後、負けた側が client に渡した値は **family のどの世代にも無い値**になる — 今立っている `refresh` でも、猶予中の `previous_refresh` でも、`retired` の digest でもない。**family が知らない値の提示は `auth_invalid` で断るだけで、family は失効させない**。失効させるのは **`retired` の digest に一致した時だけ**で、それが replay の検知そのものである。両者を混ぜて「知らない値も replay 扱い」にすると、並行 rotate のたびに同じ family の他の端末まで巻き添えで落ちる。負けた側は passkey で入り直す。分断が起きるのは稀で、代償は user verification 1 回であり、replay 検知を弱める代償より小さい
 
+**ログアウトは family の失効で、cookie の期限切れはその応答でしか起こせない**。`auth.signout` は HTTP の認証 op (`carrier: "http"`、route は `<endpoint>auth/*`) で、引数を取らない — family を名指すのは cookie で、値を本文に書ける呼び手は cookie を読める呼び手だから。rotate と同じく **所有されているどの instance でも答えられる** (family は複製されていて単一 writer ではない)。応答は本文が空で、代わりに cookie を期限切れにする: cookie は HttpOnly なので page 側からは消せず、page が消せたとしても family は立ったままで、人はどこからもログアウトしていない。**family がその値を知らなければ `auth_invalid` で断り、何も書かない** (refresh で知らない値を出した時と同じ答え)。**期限切れの値は断らない** — それが名指すのは mint された時のその family であり、出ていく人が求めているのは期限切れが結局もたらす物と同じだから。**既に配った access token は呼び戻さない**。失効するのは family なので新しい対が作れなくなるだけで、立っている接続は自分の期限まで生きる。接続をその場で切る形は持たない (そこまで要る場面は `session.kill` 側の問題で、認証の形が答える物ではない)。
+
 **cookie の名前もユーザで決まり、instance を含めない** (`__Secure-ccmsg-<digest(user id)>`)。値は family の refresh token で、受けた instance は複製済みの family から値で引く。名前に instance が入っていると、HA の住所の裏で別の instance が置いた cookie を自分のものと認識できず、family が複製されていても refresh が通らない — rotate をどこでもできるようにしたことが、cookie の名前にもそのまま及ぶ。host は endpoint の host (host-only)、path は `<endpoint の path>auth/` まで (同じ origin の下の別 endpoint で cookie が分かれるため)。同じブラウザに複数の人の cookie が居る時は、受けた instance が自分の family に一致するものを値で選ぶ。綴りそのものは daemon の持ち物で、契約が持つのは「ユーザで決まり instance を含めない」という規則だけ ([DR-0020](DR-0020-auth-shape-on-the-wire.md) の境界)。
 
 ### 6. 保存の単位はユーザ
@@ -224,15 +226,17 @@ auth.account.read() -> {
 | `auth.enroll` | claims の `origin` | 列挙 | credential の `origin` | sha256(同 host) | この登録で**足す** |
 | `auth.assert` | credential の `origin` | 列挙 | credential の `origin` | sha256(同 host) | ユーザが到達 instance の所有者か |
 | `auth.token.refresh` | family の `origin` | 列挙 | — | — | 同上 |
+| `auth.signout` | family の `origin` | 列挙 | — | — | — |
 | WS upgrade | family の `origin` | — | — | — | 同上 |
 | `auth.extend` | — | — | — | — | 接続時に済んでいる |
 | `auth.account.read` | — | — | — | — | 接続時に済んでいる |
 
 - 「列挙」は `same-origin` / `same-site` / `cross-site` のいずれかであること。`none`・不在・知らない値は通さない (DR-0028 のまま)
 - **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない
+- **`auth.signout` だけ所有を見ない**。所有が答えるのは「その人が入ってよいか」で、出ていくのに入る資格は要らない。所有を外された人の cookie が期限まで残り続ける方が、閉じられない扉として悪い
 - **`endpoint` の列は無い**。どの列にも現れないことがこの DR である
 - どの検査で落ちても答えは `auth_invalid` で、どれが合わなかったかは述べない
-- CORS は op で 2 通り。**`auth.register` と `auth.challenge` は全 origin に開く** — 人を作る ceremony は、その origin の credential がまだ 1 つも無い所から始まるので、照らせる集合が存在しない。守っているのは token と 6 桁と発行者の判定であって CORS ではない。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は「その instance が持っている credential record の origin」**。所有で絞らないのは、この集合が「その page を知っているか」を答える物であって「その人が入ってよいか」を答える物ではないから — 後者は所有が答え、両方を CORS に負わせると、複製で credential を知っているのに所有がまだ無い instance (= enroll が成立すべきちょうどその場面) で preflight が落ちる。生きている登録 URL の origin を発行者だけが足す形は、`register` が全 origin に開いたことで要らなくなり、**消える**
+- CORS は op で 2 通り。**`auth.register` と `auth.challenge` は全 origin に開く** — 人を作る ceremony は、その origin の credential がまだ 1 つも無い所から始まるので、照らせる集合が存在しない。守っているのは token と 6 桁と発行者の判定であって CORS ではない。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh` / `auth.signout`) の許可集合は「その instance が持っている credential record の origin」**。所有で絞らないのは、この集合が「その page を知っているか」を答える物であって「その人が入ってよいか」を答える物ではないから — 後者は所有が答え、両方を CORS に負わせると、複製で credential を知っているのに所有がまだ無い instance (= enroll が成立すべきちょうどその場面) で preflight が落ちる。生きている登録 URL の origin を発行者だけが足す形は、`register` が全 origin に開いたことで要らなくなり、**消える**
 
 ## Alternatives Considered
 

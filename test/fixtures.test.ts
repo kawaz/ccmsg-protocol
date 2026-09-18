@@ -465,6 +465,16 @@ describe("authenticating a person", () => {
     expect(OP_FIXTURES["auth.token.refresh"].response).not.toHaveProperty("refresh");
   });
 
+  test("a sign-out names the family with the cookie and nothing in the body", () => {
+    // Stating the token would be a shape only a caller that had read it could
+    // fill, and the reply carries no body because what it is for — the family
+    // revoked, the cookie expired — happens beside it.
+    const { request_id: _id, op: _op, ...args } = OP_FIXTURES["auth.signout"].request;
+    expect(args).toEqual({});
+    const { ok: _ok, request_id: _rid, ...body } = OP_FIXTURES["auth.signout"].response;
+    expect(body).toEqual({});
+  });
+
   test("a forwarded registration without the typed code is refused", () => {
     const { code: _dropped, ...rest } = OP_FIXTURES["auth.resolve"].request;
     expect(isValid(AuthResolveRequest, rest)).toBe(false);

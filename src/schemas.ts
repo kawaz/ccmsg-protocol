@@ -9,6 +9,8 @@ import {
   AuthRecordsFrame,
   AuthExtendRequest,
   AuthExtendResponse,
+  AuthSignoutRequest,
+  AuthSignoutResponse,
   AuthTokenRefreshRequest,
   AuthTokenRefreshResponse,
   AuthRegisterRequest,
@@ -159,6 +161,7 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   "auth.assert": { request: AuthAssertRequest, response: AuthAssertResponse },
   "auth.enroll": { request: AuthEnrollRequest, response: AuthEnrollResponse },
   "auth.token.refresh": { request: AuthTokenRefreshRequest, response: AuthTokenRefreshResponse },
+  "auth.signout": { request: AuthSignoutRequest, response: AuthSignoutResponse },
   "auth.extend": { request: AuthExtendRequest, response: AuthExtendResponse },
   "auth.account.read": { request: AuthAccountReadRequest, response: AuthAccountReadResponse },
   "auth.ownership.remove": {

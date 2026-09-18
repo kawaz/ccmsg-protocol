@@ -39,11 +39,12 @@ export interface OpAttributes {
    * cannot, and they answer before any identity is settled. The route each is
    * published at belongs to the instance, not here.
    *
-   * Being reachable from a page is also what gives the four that settle an
-   * identity the only headers this contract reads over HTTP: the `Origin` a
-   * browser states, held to the enrolment URL's origin on the two that spend one
-   * (`auth.register`, `auth.enroll`) and to the credential's or the family's on
-   * the two that do not (`auth.assert`, `auth.token.refresh`), and
+   * Being reachable from a page is also what gives the five that have something
+   * to be held against the only headers this contract reads over HTTP: the
+   * `Origin` a browser states, held to the enrolment URL's origin on the two
+   * that spend one (`auth.register`, `auth.enroll`) and to the credential's or
+   * the family's on the three that do not (`auth.assert`,
+   * `auth.token.refresh`, `auth.signout`), and
    * `Sec-Fetch-Site`, which has to be one of
    * `same-origin`, `same-site` or `cross-site` — the three that say a page made
    * the call. Anything else fails: `none`, which is a request with no initiator
@@ -56,7 +57,7 @@ export interface OpAttributes {
    * Which pages may read the answers at all is a second question, and it too
    * splits in two. `auth.register` and `auth.challenge` answer every origin:
    * making a person begins where no credential names that origin yet, so there
-   * is no set to compare a caller against. The other three answer the origins of
+   * is no set to compare a caller against. The other four answer the origins of
    * the credential records the instance holds — not narrowed by who owns the
    * instance, that being what the ownership record answers and not what a
    * preflight can. */
@@ -148,9 +149,10 @@ export const OP_ATTRIBUTES = {
     errors: ["topic_unknown"],
   },
 
-  // The five ops that authenticate a person are open to every role for the
+  // The six ops a page reaches over HTTP are open to every role for the
   // same reason the greetings are: they run before there is an identity to
-  // check, and what they answer is what settles one. They are `any_instance` because whichever
+  // check, and what they answer is what settles one — or, on the last of them,
+  // what ends one. They are `any_instance` because whichever
   // instance is reached answers — behind a load balancer that is not a choice
   // the caller makes — and each asks the issuing instance itself for the parts
   // only it holds.
@@ -199,6 +201,22 @@ export const OP_ATTRIBUTES = {
     locality: "any_instance",
     carrier: "http",
     errors: ["auth_invalid", "auth_expired", "auth_unknown_issuer"],
+  },
+  // The end of a family, carried over HTTP for the same two reasons a refresh
+  // is: the cookie names the subject, and the reply is where that cookie is
+  // expired. Answered wherever it lands, as a rotation is — the family is
+  // replicated and every instance its owner owns may write it. `auth_invalid`
+  // is the whole of its vocabulary: a cookie naming no family this instance
+  // knows is refused, and a value past its own expiry is not, what it names
+  // being the family it was minted for and leaving being what an expiry would
+  // have come to anyway.
+  "auth.signout": {
+    plane: "common",
+    roles: ALL_ROLES,
+    needs_hello: false,
+    locality: "any_instance",
+    carrier: "http",
+    errors: ["auth_invalid"],
   },
   // Addresses the connection it arrives on, which is on the instance that
   // received it: nothing to forward, as with a greeting.

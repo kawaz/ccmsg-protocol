@@ -423,6 +423,27 @@ export type AuthTokenRefreshResult = Static<typeof AuthTokenRefreshResult>;
 export const AuthTokenRefreshRequest = request("auth.token.refresh", AuthTokenRefreshArgs);
 export const AuthTokenRefreshResponse = response("auth.token.refresh", AuthTokenRefreshResult);
 
+// --- ending a family -------------------------------------------------------
+
+/** Signing out takes nothing, for the reason a refresh takes no token: the
+ * cookie already names the family, and a caller that could state it is a caller
+ * that could read it. Nor is there a reason to state — a refresh keeps one on
+ * the family it rotates, and this is the call that leaves no family to keep it
+ * on. */
+export const AuthSignoutArgs = Type.Object({});
+export type AuthSignoutArgs = Static<typeof AuthSignoutArgs>;
+
+/** Nothing comes back in the body. What the call is for happens beside it: the
+ * family is revoked and the reply expires the cookie, which is the only place
+ * that cookie can be expired at all — it is HttpOnly, so the page that asked
+ * cannot clear it, and a page that could would leave the family standing and
+ * the person signed out of nothing. */
+export const AuthSignoutResult = Type.Object({});
+export type AuthSignoutResult = Static<typeof AuthSignoutResult>;
+
+export const AuthSignoutRequest = request("auth.signout", AuthSignoutArgs);
+export const AuthSignoutResponse = response("auth.signout", AuthSignoutResult);
+
 // --- extending a live connection ------------------------------------------
 
 /** Carries a token got from `auth.token.refresh`, on the connection whose life

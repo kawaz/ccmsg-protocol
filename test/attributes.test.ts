@@ -79,13 +79,14 @@ describe("op attribute table", () => {
     ]);
   });
 
-  test("what is callable before hello is the greeting and what settles an identity", () => {
+  test("what is callable before hello is the greeting, and what settles or ends an identity", () => {
     const open = OP_NAMES.filter((op) => !OP_ATTRIBUTES[op].needs_hello);
     expect(open.sort()).toEqual([
       "auth.assert",
       "auth.challenge",
       "auth.enroll",
       "auth.register",
+      "auth.signout",
       "auth.token.refresh",
       "hello.instance",
       "hello.session",
@@ -102,17 +103,18 @@ describe("op attribute table", () => {
       "auth.challenge",
       "auth.enroll",
       "auth.register",
+      "auth.signout",
       "auth.token.refresh",
     ]);
     for (const op of overHttp) expect(OP_ATTRIBUTES[op].needs_hello).toBe(false);
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(18);
+    expect(opsOfPlane("common")).toHaveLength(19);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(51);
+    expect(OP_NAMES).toHaveLength(52);
     expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(14);
   });
 

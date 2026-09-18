@@ -8,6 +8,8 @@ import type {
   AuthExtendResponse,
   AuthTokenRefreshRequest,
   AuthTokenRefreshResponse,
+  AuthSignoutRequest,
+  AuthSignoutResponse,
   AuthRegisterRequest,
   AuthRegisterResponse,
   AuthResolveRequest,
@@ -284,6 +286,16 @@ export const AUTH_TOKEN_REFRESH_RESPONSE: Static<typeof AuthTokenRefreshResponse
   request_id,
   user: USER,
   access: ACCESS,
+};
+
+export const AUTH_SIGNOUT_REQUEST: Static<typeof AuthSignoutRequest> = {
+  request_id,
+  op: "auth.signout",
+};
+
+export const AUTH_SIGNOUT_RESPONSE: Static<typeof AuthSignoutResponse> = {
+  ok: true,
+  request_id,
 };
 
 export const AUTH_EXTEND_REQUEST: Static<typeof AuthExtendRequest> = {

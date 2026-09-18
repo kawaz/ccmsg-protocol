@@ -66,6 +66,7 @@ export const OP_FIXTURES = {
     request: common.AUTH_TOKEN_REFRESH_REQUEST,
     response: common.AUTH_TOKEN_REFRESH_RESPONSE,
   },
+  "auth.signout": { request: common.AUTH_SIGNOUT_REQUEST, response: common.AUTH_SIGNOUT_RESPONSE },
   "auth.extend": { request: common.AUTH_EXTEND_REQUEST, response: common.AUTH_EXTEND_RESPONSE },
   "auth.account.read": {
     request: common.AUTH_ACCOUNT_READ_REQUEST,
