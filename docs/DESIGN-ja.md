@@ -221,7 +221,7 @@ credential record が持つ束縛は **`origin` 1 つ**で、「どの page か�
 
 数えるのは **ユーザ × origin × 認証器**。1 人が 2 つの origin の page を使うなら credential は 2 つ、2 台の端末を使うならさらに 2 つで、instance の数も endpoint の本数も掛からない。**origin が許可集合に入るのは明示の操作ではない** — その origin で最初の credential が成立した時点で入り、その origin の credential を全部消せば許可からも消える。origin を足す op も設定項目も無い。
 
-**保持するのも比べるのも origin** で、URL を持って毎回導く形は無い。browser が `Origin` にも `clientDataJSON` にも path を書かない以上、同じ origin の下の別 path はこの契約の全ての検査から見分けられない。したがって **path mount は非対応** — `https://h/` の下に `/personal/` を切って別 instance を出す形は持たない。1 つの host で複数 instance を出す必要があるなら **host を分ける** (`a.example` / `b.example`)。それが browser が見分けられる唯一の単位である。
+**保持するのも比べるのも origin** で、URL を持って毎回導く形は無い。型は browser の綴り方 (小文字の scheme と host、既定でない port だけ) に加えて **ceremony が成立する範囲** も縛る — secure context なので `https`、例外は browser が信頼する loopback 名の `http` だけ、relying party は domain なので address literal の host は取らない。ここを型で言わないと、どの ceremony も走らせられない origin を持つ credential を契約上正当なものとして受理・複製してしまう。browser が `Origin` にも `clientDataJSON` にも path を書かない以上、同じ origin の下の別 path はこの契約の全ての検査から見分けられない。したがって **path mount は非対応** — `https://h/` の下に `/personal/` を切って別 instance を出す形は持たない。1 つの host で複数 instance を出す必要があるなら **host を分ける** (`a.example` / `b.example`)。それが browser が見分けられる唯一の単位である。
 
 token family はユーザの物で、認証した credential の `origin` を引き継ぐ。WS の handshake は接続の `Origin` ヘッダをこれと照合し、加えて **そのユーザが到達した instance の所有者であること**を照らす。到達した endpoint は見ない。token は「誰か」を言うだけで「何が持っているか」を言わないので、漏れた token を別の page から出しても通らない。通らない時は接続が成立しない (upgrade の拒否) のであって、繋がった上で error を返すのではない。**`Origin` の不在は不一致**で、handshake でも HTTP の op でも同じ — 全てのゲートを通ることが条件であり、比べる物が無い呼び手はこのゲートを通っていない。
 
@@ -255,7 +255,7 @@ family は退役させた refresh の値を `retired` にダイジェストだ�
 - 開いた 3 つの item 族 (`tool.<Name>` / `system.attachment.<kind>` / `hook.<Event>`) の最終セグメントは harness の綴りで、この規約の外にある。文字集合は `[A-Za-z0-9_-]+` で `.` を含まない (harness 名に `.` があれば型を coin する側が `_` へ写す) ので、読み手は型名を `.` で分割して階層を得てよい
 - 根 (prefix 無し) に置けるのは特定の対象に属さない名前だけ = 挨拶と、全体の集合である topic (`peers` / `agents` / `instances` / `inbox` / `notify`)。これらの topic が複数形なのは集合だからで、単数の `instance.*` op (呼び手が到達した当の instance を指す) と対になる
 - 「不明」は省略、「無い」は空配列
-- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`origin` は browser が `Origin` や `clientDataJSON` に綴る形そのもの (scheme + authority、末尾スラッシュ無し)、`user` は 16 byte の乱数を base64url で綴った WebAuthn の user handle、`mid` は `<instance>/<連番>`
+- 識別子: `sid` は uuid でグローバル、`instance` は instance が自分に発行する不透明な乱数 (16 byte の hex)、`endpoint` は dial 先の URL でパスまで含めた完全一致、`origin` は browser が `Origin` や `clientDataJSON` に綴る形そのもの (scheme + authority、末尾スラッシュ無し)、`user` は 16 byte の乱数を base64url で綴った WebAuthn の user handle (22 文字、綴りは 1 つ)、`mid` は `<instance>/<連番>`
 
 形の検査は `test/conventions.test.ts` が全 schema を走査して行い、`_` の規則は同じ名前の一覧に対して別に検査する — 形だけでは 1 語と 2 語を区別できないので、2 語のセグメントは「1 語として読む」と書き出すまで落ちる。
 
