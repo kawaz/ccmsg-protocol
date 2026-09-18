@@ -9,13 +9,13 @@ export const FIXTURE_IDS = {
   other_instance: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
   endpoint: "https://mba.example.ts.net/ccmsg/personal/",
   other_endpoint: "https://nuc.example.ts.net/ccmsg/personal/",
-  /** The person every auth fixture is about: sixteen random bytes spelled
-   * base64url, which is at once their id in these records and the user handle
-   * their authenticator holds. */
-  user: "d2hvLWlzLXRoaXMtcGVyc29u",
+  /** The person every auth fixture is about: sixteen bytes spelled base64url,
+   * which is at once their id in these records and the user handle their
+   * authenticator holds. Twenty-two characters, as sixteen bytes always are. */
+  user: "d2hvLWlzLXRoaXMtdXNlcg",
   /** A second person, so that an instance with two owners can be written down.
    * Nothing but the id distinguishes them here. */
-  other_user: "c29tZWJvZHktZWxzZS1oZXJl",
+  other_user: "c29tZWJvZHktZWxzZS1oaQ",
   /** Where the page a person opens is served from, which is nobody's endpoint:
    * a credential is made here and used at whichever instance the person owns.
    * Its registrable domain is not the endpoints' — so the two are cross-site

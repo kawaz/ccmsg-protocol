@@ -25,11 +25,18 @@ export type Base64Url = Static<typeof Base64Url>;
  *
  * It names a person and nothing about where they connected. An instance, an
  * endpoint and a mesh are all things a person may have or reach, and none of
- * them is who they are. */
+ * them is who they are.
+ *
+ * Sixteen bytes is stated by the pattern rather than left to the issuer, this
+ * being the one canonical form of an identity: twenty-two base64url characters,
+ * whose last one carries the four bits that have nowhere to go and so is one of
+ * `A`, `Q`, `g`, `w`. Anything else is either a different length or a second
+ * spelling of the same bytes, and a record keyed by one of those would be a
+ * person no assertion could ever find — the authenticator answers with the
+ * bytes it was given, and every comparison here is of the string. */
 export const UserId = Type.String({
   $id: "UserId",
-  minLength: 1,
-  pattern: "^[A-Za-z0-9_-]+$",
+  pattern: "^[A-Za-z0-9_-]{21}[AQgw]$",
 });
 export type UserId = Static<typeof UserId>;
 
@@ -98,6 +105,44 @@ export const EnrollPurpose = Type.Union([Type.Literal("create_user"), Type.Liter
 });
 export type EnrollPurpose = Static<typeof EnrollPurpose>;
 
+/** What every enrolment URL carries, whichever of the two it is. */
+const ENROLL_CLAIMS_FIELDS = {
+  /** The instance that issued the URL and holds the secret. */
+  iss: InstanceId,
+  /** The instance the person will own once this is spent. The issuer's own:
+   * an instance hands out the right to enter itself, and nothing here lets
+   * one instance open a door into another. */
+  instance: InstanceId,
+  /** Where the person is being sent, and so the only place the ceremony may
+   * be held: the `clientDataJSON.origin` is compared with this, the `Origin`
+   * header with this, and the relying party is this origin's host.
+   *
+   * An origin rather than a URL because that is the size of everything
+   * compared against it. Where under the origin the page is served is the
+   * operator's business and no part of any check made here. */
+  origin: Origin,
+  /** Where the page posts what it made: the base URL the `auth` routes hang
+   * under.
+   *
+   * **A destination and not a binding.** The page has to send its answer
+   * somewhere, and a URL a person carries from a terminal has no other way to
+   * say where. Nothing on the receiving side compares this with anything —
+   * not with its own endpoint, not with the issuer's. It may be the address
+   * of a load balancer with several instances behind it, and whichever of
+   * them the answer lands on completes the enrolment: it checks the ceremony
+   * itself and asks the issuer only for what the issuer alone holds. Having
+   * nothing to compare here is the point rather than an omission. */
+  endpoint: Endpoint,
+  expires_at: Timestamp,
+  /** Names this enrolment, so it can be spent once. */
+  jti: Type.String({ minLength: 1 }),
+  /** What the administrator who issued the URL wrote down about who it was
+   * for. Their words, not the holder's — the label the person gives their
+   * own device is `device_label` on the record, and the two are worth telling
+   * apart when a list is read back later. */
+  issued_label: Type.Optional(Type.String({ maxLength: 128 })),
+} as const;
+
 /** What an enrolment URL carries, as the instance that issued it reads it back.
  * On the wire between a browser and an instance the whole of it is one opaque
  * string; this shape is what `auth.resolve` answers with, so the two instances
@@ -106,54 +151,35 @@ export type EnrollPurpose = Static<typeof EnrollPurpose>;
  * Its integrity rests on a secret made for this one enrolment and held only in
  * the issuing instance's memory. Nothing outlives the window: a restart loses
  * the secret, and the remedy is to issue another URL rather than to keep a key
- * that could sign anything later. */
-export const EnrollClaims = Type.Object(
-  {
-    /** The instance that issued the URL and holds the secret. */
-    iss: InstanceId,
-    purpose: EnrollPurpose,
-    /** The instance the person will own once this is spent. The issuer's own:
-     * an instance hands out the right to enter itself, and nothing here lets
-     * one instance open a door into another. */
-    instance: InstanceId,
-    /** Where the person is being sent, and so the only place the ceremony may
-     * be held: the `clientDataJSON.origin` is compared with this, the `Origin`
-     * header with this, and the relying party is this origin's host.
-     *
-     * An origin rather than a URL because that is the size of everything
-     * compared against it. Where under the origin the page is served is the
-     * operator's business and no part of any check made here. */
-    origin: Origin,
-    /** Where the page posts what it made: the base URL the `auth` routes hang
-     * under.
-     *
-     * **A destination and not a binding.** The page has to send its answer
-     * somewhere, and a URL a person carries from a terminal has no other way to
-     * say where. Nothing on the receiving side compares this with anything —
-     * not with its own endpoint, not with the issuer's. It may be the address
-     * of a load balancer with several instances behind it, and whichever of
-     * them the answer lands on completes the enrolment: it checks the ceremony
-     * itself and asks the issuer only for what the issuer alone holds. Having
-     * nothing to compare here is the point rather than an omission. */
-    endpoint: Endpoint,
-    expires_at: Timestamp,
-    /** Names this enrolment, so it can be spent once. */
-    jti: Type.String({ minLength: 1 }),
-    /** The user handle the credential will be created against, on a
-     * `create_user` and only there.
-     *
-     * The issuer settles it rather than the page because the authenticator
-     * keeps it beyond any instance's reach — a second value for one person
-     * would be a second account on their device that nothing here could undo.
-     * An `add_owner` names nobody: who arrives is what the assertion says, and
-     * a claim stated up front would be a name the ceremony was not held to. */
-    user: Type.Optional(UserId),
-    /** What the administrator who issued the URL wrote down about who it was
-     * for. Their words, not the holder's — the label the person gives their
-     * own device is `device_label` on the record, and the two are worth telling
-     * apart when a list is read back later. */
-    issued_label: Type.Optional(Type.String({ maxLength: 128 })),
-  },
+ * that could sign anything later.
+ *
+ * A union on `purpose` rather than one shape with an optional `user`, because
+ * the two purposes do not carry the same claims and a schema that accepted
+ * either field with either purpose would leave the issuing and the receiving
+ * instance free to read one value two ways. The correlation is the claim. */
+export const EnrollClaims = Type.Union(
+  [
+    Type.Object({
+      ...ENROLL_CLAIMS_FIELDS,
+      purpose: Type.Literal("create_user"),
+      /** The user handle the credential will be created against.
+       *
+       * The issuer settles it rather than the page because the authenticator
+       * keeps it beyond any instance's reach — a second value for one person
+       * would be a second account on their device that nothing here could
+       * undo. */
+      user: UserId,
+    }),
+    Type.Object({
+      ...ENROLL_CLAIMS_FIELDS,
+      purpose: Type.Literal("add_owner"),
+      /** Named here only to be refused. Who arrives is what the assertion
+       * says, so a handle stated up front would be a name the ceremony was
+       * never held to — and a claim that is merely unread is one an issuer and
+       * a receiver can still disagree about. */
+      user: Type.Optional(Type.Never()),
+    }),
+  ],
   { $id: "EnrollClaims" },
 );
 export type EnrollClaims = Static<typeof EnrollClaims>;

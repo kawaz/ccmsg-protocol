@@ -11,6 +11,7 @@ import {
   AuthResolveRequest,
   AuthResolveResponse,
   FAMILY_TOMBSTONE_RETENTION_MS,
+  UserId,
   REGISTER_TTL_MS,
 } from "../src/common/auth.ts";
 import {
@@ -607,6 +608,93 @@ describe("authenticating a person", () => {
       expect(response.claims.endpoint).toBe(FIXTURE_IDS.hosting_endpoint);
       expect(response.claims.endpoint).not.toBe(INSTANCE_ENDPOINT);
       expect(isValid(AuthResolveResponse, response)).toBe(true);
+    }
+  });
+
+  test("a user id is sixteen bytes and has one spelling", () => {
+    // The identity's canonical form: twenty-two base64url characters, the last
+    // carrying the four bits with nowhere to go. A record keyed by anything
+    // else is a person no assertion could find, the authenticator answering
+    // with the bytes it was given.
+    for (const id of [FIXTURE_IDS.user, FIXTURE_IDS.other_user]) {
+      expect(isValid(UserId, id)).toBe(true);
+      expect(id).toHaveLength(22);
+    }
+    for (const id of [
+      // Fifteen bytes and seventeen bytes.
+      "d2hvLWlzLXRoaXMtdXNlc",
+      "d2hvLWlzLXRoaXMtdXNlcgg",
+      // Eighteen bytes: base64url, and past what this contract issues.
+      "d2hvLWlzLXRoaXMtcGVyc29u",
+      // Sixty-five characters, which no user handle may be.
+      "a".repeat(65),
+      // A second spelling of the same sixteen bytes: the unused bits set.
+      "d2hvLWlzLXRoaXMtdXNlch",
+      // Not base64url at all, and the empty string.
+      "who-is-this-user!!!!!!",
+      "",
+    ]) {
+      expect(isValid(UserId, id)).toBe(false);
+    }
+  });
+
+  test("a user id that is not the canonical form is refused wherever it stands", () => {
+    // Not only on the user record: the same value keys a credential, an
+    // ownership and a family, and answers an assertion.
+    const record = credentialRecords()[0];
+    expect(
+      isValid(AuthRecordsFrame, frameOf(record, { ...record.body, user: "not-base64url!" })),
+    ).toBe(false);
+    const request = OP_FIXTURES["auth.assert"].request;
+    expect(
+      isValid(AuthAssertRequest, {
+        ...request,
+        credential: { ...request.credential, user_handle: "d2hvLWlzLXRoaXMtdXNlc" },
+      }),
+    ).toBe(false);
+  });
+
+  test("the two purposes carry different claims, and no other combination passes", () => {
+    // The correlation is the claim. A schema that took either field with
+    // either purpose would leave the issuing and the receiving instance free
+    // to read one URL two ways.
+    const { user: _dropped, ...withoutUser } = AUTH_RESOLVE_RESPONSE.claims;
+    const withUser = AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims;
+    expect(isValid(AuthResolveResponse, AUTH_RESOLVE_RESPONSE)).toBe(true);
+    expect(isValid(AuthResolveResponse, AUTH_RESOLVE_ADD_OWNER_RESPONSE)).toBe(true);
+    // create_user without the handle it settles.
+    expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims: withoutUser })).toBe(
+      false,
+    );
+    // add_owner naming somebody the assertion has not named yet.
+    expect(
+      isValid(AuthResolveResponse, {
+        ...AUTH_RESOLVE_ADD_OWNER_RESPONSE,
+        claims: { ...withUser, user: FIXTURE_IDS.user },
+      }),
+    ).toBe(false);
+  });
+
+  test("an origin has to be somewhere a ceremony could be held", () => {
+    // The authenticator's conditions rather than this contract's taste: a
+    // secure context, and a relying party that is a domain. An endpoint is
+    // neither a page nor a relying party, so it is held to none of it.
+    for (const origin of [
+      "http://example.com",
+      "http://ui.example.ts.net",
+      "https://192.0.2.1",
+      "https://198.51.100.9:8443",
+      "https://[::1]",
+      "http://127.0.0.2",
+    ]) {
+      expect(isValid(Origin, origin)).toBe(false);
+    }
+    // The development exception, and only on the loopback names.
+    for (const origin of ["http://localhost", "http://localhost:5173", "http://[::1]:8080"]) {
+      expect(isValid(Origin, origin)).toBe(true);
+    }
+    for (const origin of ["https://xn--r8jz45g.xn--zckzah", "https://ui.example.test:8443"]) {
+      expect(isValid(Origin, origin)).toBe(true);
     }
   });
 

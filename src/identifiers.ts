@@ -72,6 +72,14 @@ function authority(tail: string): string {
  * carries no query or fragment. */
 const BASE_URL = authority("(?:/[^?#\\s]*)?/$");
 
+/** An origin a WebAuthn ceremony can be held at: `https` on a host that is a
+ * domain, or `http` on one of the loopback names a browser trusts. The
+ * lookahead is what keeps an IPv4 literal out, a bracketed IPv6 one being
+ * outside `HOST_NAME` already. */
+const CEREMONY_ORIGIN =
+  `^(?:https://(?!\\d{1,3}(?:\\.\\d{1,3}){3}(?::|$))${HOST_NAME}${port("443")}` +
+  `|http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])${port("80")})$`;
+
 /** Where an instance is published: the base URL everything it serves hangs
  * under, ending in a slash and naming no route of its own.
  *
@@ -124,12 +132,24 @@ export type Endpoint = Static<typeof Endpoint>;
  * lowercase host, and a port only where it is not the scheme's own. No
  * userinfo, no path, no trailing slash, nothing else a URL may carry.
  *
+ * Held to somewhere a WebAuthn ceremony could actually be held, too, which is
+ * narrower than what a URL parser takes and is the authenticator's rule rather
+ * than this contract's taste. A ceremony needs a secure context, so the scheme
+ * is `https` — with `http` on the loopback names browsers treat as trustworthy,
+ * which is what makes a page runnable on a development machine. And a relying
+ * party is a domain, so the host may not be an address literal: `https://198.51.100.9`
+ * is a perfectly good origin that could never hold a passkey. Writing it into
+ * the type rather than leaving it to the daemon is what keeps the relying party
+ * total over the values a record may carry — an origin no ceremony could run at
+ * would be a credential that could never have been made, accepted and
+ * replicated before anything noticed.
+ *
  * The narrowness is the point rather than pedantry. Every use of this value is
  * a whole-string comparison — against an `Origin` header, against a
  * `clientDataJSON.origin`, against the members of a CORS answer — so a second
  * spelling of one site would be a record that never matches the site it names,
  * or an allowed origin that quietly admits nothing. */
-export const Origin = Type.String({ $id: "Origin", pattern: authority("$") });
+export const Origin = Type.String({ $id: "Origin", pattern: CEREMONY_ORIGIN });
 export type Origin = Static<typeof Origin>;
 
 /** A delivery-frame id: `<instance id>/<counter>`, numbered by the instance
