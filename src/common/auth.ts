@@ -146,6 +146,25 @@ const ENROLL_CLAIMS_FIELDS = {
    * own device is `device_label` on the record, and the two are worth telling
    * apart when a list is read back later. */
   issued_label: Type.Optional(Type.String({ maxLength: 128 })),
+  /** What to call the account in the authenticator, as the administrator who
+   * made the URL wrote it.
+   *
+   * It has to travel, because the page has to name the account before anything
+   * is created and has no other way to learn it: a passkey manager keeps the
+   * name the ceremony was given and shows it wherever the key is listed, so a
+   * URL that carried none would put the user handle — sixteen random bytes — in
+   * front of the person at every sign-in.
+   *
+   * Apart from `issued_label`, which is a note about who the URL was handed to
+   * and stays on the credential as exactly that. One value answering both would
+   * be an administrator's private memo shown to the person as their own name,
+   * with no way to correct either without the other.
+   *
+   * A starting point and not the answer: the registration form shows it and the
+   * person may say otherwise, and `auth.register.display_name` is what they
+   * settled. For a URL adding a passkey to somebody who exists, it is the name
+   * they already read themselves by, so a second key joins the same account. */
+  display_name: Type.Optional(Type.String({ maxLength: 128 })),
   /** Every instance this enrolment hands the person, written by whichever one
    * the ceremony lands on once it succeeds.
    *
@@ -238,6 +257,19 @@ export const AuthRegisterArgs = Type.Object({
   /** What the person calls the device they are registering, for their own use
    * when they later read back a list of several. Nothing is decided by it. */
   device_label: Type.Optional(Type.String({ maxLength: 128 })),
+  /** What the person settled on being called, from the form the registration
+   * page showed them with the URL's `display_name` already in it.
+   *
+   * Here rather than left to the claims because the person is the one it is
+   * about: an administrator issuing the URL guesses at a name, and the person
+   * in front of the browser is who can say. It is what the authenticator was
+   * given as the account name, so what they see in their passkey manager and
+   * what they read themselves by here are the same string.
+   *
+   * Unstated leaves the claims' value standing. It authenticates nothing, like
+   * every other name here. Adding a passkey to somebody who already exists does
+   * not rename them — the account it joins is one they have already named. */
+  display_name: Type.Optional(Type.String({ maxLength: 128 })),
   /** The challenge this registration answers, with the instance that can spend
    * it — the same pairing an assertion carries, and for the same reason: the
    * value also sits inside `client_data_json`, but who may consume it does not,

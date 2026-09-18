@@ -211,7 +211,7 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `claims` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。2 つの登録経路で `auth.resolve` を割らないのは、検証する物 (token・6 桁・試行回数) が同じで、どちらだったかは返る claims が言うため。
 
-登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。`instances` はその URL が渡す instance 全部で、URL を作った端末で決まり、着弾した instance が ceremony の成立後に書く — 着弾側が自分で数えると LB の裏では別の問いに答えることになり、成立前に書くと、どの user record も答えない人を名指した granting が残る。
+登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。`display_name` は認証器に見せるアカウント名で、page は credential を作る前にそれを決めねばならず知る手段が URL しか無いので運ぶ。`issued_label` と分けてあるのは、管理者が「誰に渡した URL か」を書いたメモを本人の名前として見せないためで、これは初期値にすぎない — 登録画面がこの値を入れた欄を見せ、人が確定した値が `auth.register.display_name` になる。`instances` はその URL が渡す instance 全部で、URL を作った端末で決まり、着弾した instance が ceremony の成立後に書く — 着弾側が自分で数えると LB の裏では別の問いに答えることになり、成立前に書くと、どの user record も答えない人を名指した granting が残る。
 
 **`EnrollClaims.endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、端末から運ばれる URL が行き先を言う手段は他に無い。受け取った側はこれを何とも照合しない — 自分の endpoint とも、発行者のものとも。HA の住所 (裏に複数 instance が居る FQDN) でもよく、どれに着弾しても登録は成立する: 受けた instance が自分で ceremony を検査し、自分で record を書き、発行者に問うのは発行者のメモリにしか無い物 (token の真正・`jti` の未消費・6 桁と試行回数) だけである。したがって **発行 instance の endpoint が browser から到達できなくてよい**。
 
@@ -231,7 +231,7 @@ refresh token は `<endpoint>auth/*` が置く HttpOnly cookie で、応答の�
 
 **CORS は op で 2 通り**。登録 op (`auth.register` / `auth.challenge`) は **全 origin に開く** — HA の裏でどれに着弾しても登録が成立する必要があり、登録を守っているのは token と 6 桁と発行者の判定であって CORS ではない。それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh`) の許可集合は **その instance の所有者たちの credential の origin**。管理すべき一覧は無く、登録することが origin を許すことで、最後の credential を消すことが外すことである。
 
-登録には名前が 2 つ載る。`EnrollClaims.issued_label` は管理者が「誰宛の URL か」を書いたもので、`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。`display_name` と `granted_by` も同じ側にある。
+登録には名前が 3 つ載り、それぞれ別の問いに答える。`EnrollClaims.issued_label` は管理者が「誰に渡した URL か」を書いたもので、credential にそのまま残る。`auth.register` の `device_label` は利用者が「どの端末か」を書いたもの。`display_name` はアカウントの名前で、URL が初期値を出し、人が確定し、認証器に渡り、user record に残る — 3 つのうち passkey manager が本人に見せるのはこれである。credential record は両方と、登録時・最終使用時の IP と User-Agent を持つ。これらは認証の材料ではなく **記憶の手がかり** で、判定には一切使われない (IP は要求側が自由に選べる)。自分の一覧を読んだ人が「自宅のプロバイダの IP でいつも使うブラウザだから自分だ」と置ける、あるいは置けない、という判断のためだけに置く。`display_name` と `granted_by` も同じ側にある。
 
 credential record は登録時の authenticator data の BE / BS フラグ (`backup_eligible` / `backup_state`) も持ち、token family は直近の rotate (`last_refresh`: 時刻・IP・User-Agent と、client が名乗った `reason`) を持つ。どちらも上の IP / User-Agent と同じ **手がかり** で、**認証の可否には一切使わない**。BE / BS が言えるのは「その passkey が端末間で同期されるものか、作った端末に束縛されたものか」までで、これは一覧から 1 行消すことの重さの手がかりになる。`reason` は client の自己申告で検証しない (名乗らない refresh も同じく正当)。
 

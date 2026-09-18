@@ -212,6 +212,7 @@ export const AUTH_REGISTER_REQUEST: Static<typeof AuthRegisterRequest> = {
   token: ENROLL_TOKEN,
   code: ENROLL_CODE,
   device_label: "work laptop",
+  display_name: "kawaz",
   challenge: CHALLENGE,
   credential: {
     id: "Y3JlZC1pZA",
@@ -408,6 +409,7 @@ export const AUTH_RESOLVE_RESPONSE = {
     jti: "01J9Z3W2Q",
     user: USER,
     issued_label: "for kawaz",
+    display_name: "kawaz",
     instances: [instance, other_instance],
   },
 } satisfies Static<typeof AuthResolveResponse>;
@@ -427,6 +429,7 @@ export const AUTH_RESOLVE_ADD_OWNER_RESPONSE = {
     expires_at: FIXTURE_NOW + 600_000,
     jti: "01J9Z3W2R",
     issued_label: "nuc, for kawaz",
+    display_name: "kawaz",
     instances: [other_instance],
   },
 } satisfies Static<typeof AuthResolveResponse>;

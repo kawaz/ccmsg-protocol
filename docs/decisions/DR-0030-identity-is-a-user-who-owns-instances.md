@@ -133,6 +133,7 @@ EnrollClaims = {
   jti: string,
   user?: UserId,             // purpose が create_user の時だけ。発行者が先に決める
   issued_label?: string,
+  display_name?: string,     // 認証器に見せるアカウント名の初期値
   instances?: InstanceId[],  // この URL が渡す instance 全部。着弾した instance が書く
 }
 ```
@@ -141,6 +142,7 @@ EnrollClaims = {
 - **`endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、その URL を URL 自身が名乗る以外に知らせる手段が無い。hosting の FQDN でもよく、どの instance に落ちても成立する (下記)。**受け取った側は endpoint を何とも照合しない** — 照合する物が無いことがこの DR の眼目である
 - したがって **発行 instance の endpoint が browser から到達できなくてよい**。mesh がローカルに閉じ、HA の住所だけが公開されている構成でも、初回登録から全部その住所 1 つで済む
 - `user` を `create_user` の時だけ claims が運ぶのは、認証器が instance の手の届かない所でその値を保持するため (DR-0021 の理由はそのまま生きる)。page に決めさせれば、1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない
+- **`display_name` は認証器に見せるアカウント名で、claims が初期値を運び、人が確定した値を `auth.register` が返す**。page は credential を作る前にアカウント名を決めねばならず、それを知る手段は URL しか無い (passkey manager は ceremony で渡された名前を保存して一覧に出すので、運ばなければ 16 byte の乱数が本人の前に出続ける)。`issued_label` と分けるのは、あちらが「誰に渡した URL か」という管理者のメモで credential に残る物だからで、1 つの値に両方を兼ねさせると管理者の私的なメモが本人の名前として表示され、どちらも片方を巻き込まずには直せなくなる。登録画面はこの値を入れた入力欄を見せ、**人が確定した値が `auth.register.display_name`**、それが user record の `display_name` になる (省略すれば claims の値が立つ)。既に居る人に passkey を足す URL では、その人が既に読んでいる名前を claims が運び、**登録は改名しない** (足される先は本人が既に名付けた account である)
 - 登録 URL の送り先は **origin の直下**。path mount は持たない (§7)
 - **`instances` は、この URL が渡す instance 全部を名乗る**。所有 record を書くのは **ceremony が成立した時**で、書くのは着弾した instance (`granted_by` は発行 instance)。集合を端末で決めて claims で運ぶのは、「この instance が知っている peers」が端末でだけ人に見える問いだからで、着弾側が自分の知識で書くと、`--all` が問うたのとは違う問いに答えることになる。**発行時に書かない**のは、登録されなかった URL の granting が、どの user record も答えない人を名指したまま複製の集合に残るため — 誰も認証できないので無害だが、意味のある granting と見分けが付かない。省略は発行者自身の 1 台だけ (= `instance` が既に言っていること) を意味し、2 台以上を渡す時にここで名乗る。`add_owner` も同じく運ぶ (どちらも instance を渡す操作で、違うのは誰が来るかの決まり方だけ)
 
@@ -148,7 +150,7 @@ op の形:
 
 ```ts
 // ユーザを作る。現行と同じ引数
-auth.register(token, code, device_label?, challenge?, credential: RegistrationCredential) -> AuthSession
+auth.register(token, code, device_label?, display_name?, challenge?, credential: RegistrationCredential) -> AuthSession
 
 // instance を足す。既存 passkey の assert を運ぶ
 auth.enroll(token, code, challenge: AuthChallenge, credential: AssertionCredential) -> AuthSession

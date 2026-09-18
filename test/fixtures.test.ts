@@ -36,6 +36,7 @@ import { ERROR_CODES } from "../src/errors.ts";
 import {
   AUTH_RECORDS_FAMILY_FRAME,
   AUTH_RECORDS_TOMBSTONE_FRAME,
+  AUTH_REGISTER_REQUEST,
   AUTH_RESOLVE_ADD_OWNER_RESPONSE,
   AUTH_RESOLVE_CHALLENGE_REQUEST,
   AUTH_RESOLVE_CHALLENGE_RESPONSE,
@@ -756,6 +757,28 @@ describe("authenticating a person", () => {
     expect(AUTH_RESOLVE_RESPONSE.claims.user).toBe(FIXTURE_IDS.user);
     expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims.purpose).toBe("add_owner");
     expect(AUTH_RESOLVE_ADD_OWNER_RESPONSE.claims).not.toHaveProperty("user");
+  });
+
+  test("the name a person is called travels apart from the note about who the URL was for", () => {
+    // The page has to name the account before anything is created and has no
+    // other way to learn it, so the URL carries a starting point; the person in
+    // front of the browser is who settles it, and that is what `auth.register`
+    // sends back. The administrator's note about who the URL was handed to is a
+    // different thing and stays one — a single value would show an operator's
+    // private memo to the person as their own name.
+    expect(AUTH_RESOLVE_RESPONSE.claims.display_name).toBe("kawaz");
+    expect(AUTH_RESOLVE_RESPONSE.claims.issued_label).toBe("for kawaz");
+    expect(AUTH_REGISTER_REQUEST.display_name).toBe("kawaz");
+    // Both are optional: a URL made without a name is answered by whatever the
+    // instance calls a person it was told nothing about.
+    const { display_name: _dropped, ...unnamed } = AUTH_RESOLVE_RESPONSE.claims;
+    expect(isValid(AuthResolveResponse, { ...AUTH_RESOLVE_RESPONSE, claims: unnamed })).toBe(true);
+    const { display_name: _unsaid, ...silent } = AUTH_REGISTER_REQUEST;
+    expect(isValid(AuthRegisterRequest, silent)).toBe(true);
+    // A name is a string a person reads, not an id: nothing here is keyed by it.
+    expect(
+      isValid(AuthRegisterRequest, { ...AUTH_REGISTER_REQUEST, display_name: "x".repeat(129) }),
+    ).toBe(false);
   });
 
   test("the URL names every instance it hands over, and both purposes may", () => {
