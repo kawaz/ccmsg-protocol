@@ -211,7 +211,7 @@ mesh の断絶は購読からも見える。`instances` topic が発生元 insta
 
 コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `claims` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。2 つの登録経路で `auth.resolve` を割らないのは、検証する物 (token・6 桁・試行回数) が同じで、どちらだったかは返る claims が言うため。
 
-登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。
+登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。`instances` はその URL が渡す instance 全部で、URL を作った端末で決まり、着弾した instance が ceremony の成立後に書く — 着弾側が自分で数えると LB の裏では別の問いに答えることになり、成立前に書くと、どの user record も答えない人を名指した granting が残る。
 
 **`EnrollClaims.endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、端末から運ばれる URL が行き先を言う手段は他に無い。受け取った側はこれを何とも照合しない — 自分の endpoint とも、発行者のものとも。HA の住所 (裏に複数 instance が居る FQDN) でもよく、どれに着弾しても登録は成立する: 受けた instance が自分で ceremony を検査し、自分で record を書き、発行者に問うのは発行者のメモリにしか無い物 (token の真正・`jti` の未消費・6 桁と試行回数) だけである。したがって **発行 instance の endpoint が browser から到達できなくてよい**。
 
