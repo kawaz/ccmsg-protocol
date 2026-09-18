@@ -108,11 +108,11 @@ describe("op attribute table", () => {
   });
 
   test("the planes hold the op counts the contract states", () => {
-    expect(opsOfPlane("common")).toHaveLength(16);
+    expect(opsOfPlane("common")).toHaveLength(18);
     expect(opsOfPlane("messaging")).toHaveLength(4);
     expect(opsOfPlane("control")).toHaveLength(29);
     expect(opsOfPlane("mesh")).toHaveLength(0);
-    expect(OP_NAMES).toHaveLength(49);
+    expect(OP_NAMES).toHaveLength(51);
     expect(Object.keys(TOPIC_SCHEMAS)).toHaveLength(14);
   });
 

@@ -71,7 +71,7 @@ const INSTANCE_ONLY = ["instance"] as const;
  * facts live: authorization, capability gating and forwarding all read it
  * rather than each carrying their own copy. */
 export const OP_ATTRIBUTES = {
-  // --- common: connect, declare the end, and subscribe (16) ---
+  // --- common: connect, declare the end, and subscribe (18) ---
   // A greeting settles what the connection is, and there is one per role: what
   // each must carry is then the op's own schema rather than a rule read off a
   // field, and a connection cannot be settled as something neither side meant.
@@ -208,6 +208,27 @@ export const OP_ATTRIBUTES = {
     locality: "any_instance",
     scope: "role",
     errors: [],
+  },
+  // Letting go of one of the two things a person holds. Both act on the
+  // caller's own records and nobody else's, which is what `scope: "role"` says
+  // here as it does on the read; what is removed is named, and who it belongs
+  // to is the connection. `auth_in_use` is the refusal when the thing named is
+  // what the call is being made with.
+  "auth.ownership.remove": {
+    plane: "common",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "any_instance",
+    scope: "role",
+    errors: ["not_found", "auth_in_use"],
+  },
+  "auth.credential.remove": {
+    plane: "common",
+    roles: USER_ONLY,
+    needs_hello: true,
+    locality: "any_instance",
+    scope: "role",
+    errors: ["not_found", "auth_in_use"],
   },
   // Between instances: what an issuer alone can answer — an enrolment URL's
   // secret and a challenge that may be spent once. `owner_instance` because

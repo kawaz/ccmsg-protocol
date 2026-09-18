@@ -17,6 +17,10 @@ import {
   AuthResolveResponse,
   AuthAccountReadRequest,
   AuthAccountReadResponse,
+  AuthCredentialRemoveRequest,
+  AuthCredentialRemoveResponse,
+  AuthOwnershipRemoveRequest,
+  AuthOwnershipRemoveResponse,
   AuthEnrollRequest,
   AuthEnrollResponse,
 } from "./common/auth.ts";
@@ -157,6 +161,14 @@ export const OP_SCHEMAS: Record<OpName, OpSchemas> = {
   "auth.token.refresh": { request: AuthTokenRefreshRequest, response: AuthTokenRefreshResponse },
   "auth.extend": { request: AuthExtendRequest, response: AuthExtendResponse },
   "auth.account.read": { request: AuthAccountReadRequest, response: AuthAccountReadResponse },
+  "auth.ownership.remove": {
+    request: AuthOwnershipRemoveRequest,
+    response: AuthOwnershipRemoveResponse,
+  },
+  "auth.credential.remove": {
+    request: AuthCredentialRemoveRequest,
+    response: AuthCredentialRemoveResponse,
+  },
   "auth.resolve": { request: AuthResolveRequest, response: AuthResolveResponse },
   "message.send": { request: MessageSendRequest, response: MessageSendResponse },
   "say.post": { request: SayPostRequest, response: SayPostResponse },

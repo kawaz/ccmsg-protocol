@@ -14,6 +14,10 @@ import type {
   AuthResolveResponse,
   AuthAccountReadRequest,
   AuthAccountReadResponse,
+  AuthCredentialRemoveRequest,
+  AuthCredentialRemoveResponse,
+  AuthOwnershipRemoveRequest,
+  AuthOwnershipRemoveResponse,
   AuthEnrollRequest,
   AuthEnrollResponse,
 } from "../common/auth.ts";
@@ -344,6 +348,31 @@ export const AUTH_ACCOUNT_READ_RESPONSE: Static<typeof AuthAccountReadResponse> 
       granted_by: USER,
     },
   ],
+};
+
+/** Giving up an instance, named from another one the person owns — the
+ * connection's own instance is the one call that is refused. */
+export const AUTH_OWNERSHIP_REMOVE_REQUEST: Static<typeof AuthOwnershipRemoveRequest> = {
+  request_id,
+  op: "auth.ownership.remove",
+  instance: other_instance,
+};
+
+export const AUTH_OWNERSHIP_REMOVE_RESPONSE: Static<typeof AuthOwnershipRemoveResponse> = {
+  ok: true,
+  request_id,
+};
+
+/** Removing a passkey that is not the one this session authenticated with. */
+export const AUTH_CREDENTIAL_REMOVE_REQUEST: Static<typeof AuthCredentialRemoveRequest> = {
+  request_id,
+  op: "auth.credential.remove",
+  credential_id: "Y3JlZC1pZC0y",
+};
+
+export const AUTH_CREDENTIAL_REMOVE_RESPONSE: Static<typeof AuthCredentialRemoveResponse> = {
+  ok: true,
+  request_id,
 };
 
 export const AUTH_RESOLVE_REQUEST = {

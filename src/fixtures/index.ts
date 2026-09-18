@@ -71,6 +71,14 @@ export const OP_FIXTURES = {
     request: common.AUTH_ACCOUNT_READ_REQUEST,
     response: common.AUTH_ACCOUNT_READ_RESPONSE,
   },
+  "auth.ownership.remove": {
+    request: common.AUTH_OWNERSHIP_REMOVE_REQUEST,
+    response: common.AUTH_OWNERSHIP_REMOVE_RESPONSE,
+  },
+  "auth.credential.remove": {
+    request: common.AUTH_CREDENTIAL_REMOVE_REQUEST,
+    response: common.AUTH_CREDENTIAL_REMOVE_RESPONSE,
+  },
   "auth.resolve": { request: common.AUTH_RESOLVE_REQUEST, response: common.AUTH_RESOLVE_RESPONSE },
 
   "message.send": {

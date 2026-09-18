@@ -714,6 +714,53 @@ export type AuthAccountReadResult = Static<typeof AuthAccountReadResult>;
 export const AuthAccountReadRequest = request("auth.account.read", AuthAccountReadArgs);
 export const AuthAccountReadResponse = response("auth.account.read", AuthAccountReadResult);
 
+// --- letting go of an instance and of a passkey ---------------------------
+
+/** Gives up one instance: the ownership that admitted this person to it is
+ * removed, and nothing else of theirs changes.
+ *
+ * Named by the instance alone. An ownership is keyed by the instance and the
+ * person, and the person is the caller — there is no shape here for removing
+ * somebody else's ownership, an instance's owners not being its administrators
+ * of one another.
+ *
+ * Removing the ownership of the instance the connection is on is refused
+ * (`auth_in_use`). It is theirs to remove; asking from another instance they
+ * own, or from the command line, is all it takes. */
+export const AuthOwnershipRemoveArgs = Type.Object({ instance: InstanceId });
+export type AuthOwnershipRemoveArgs = Static<typeof AuthOwnershipRemoveArgs>;
+
+export const AuthOwnershipRemoveResult = Type.Object({});
+export type AuthOwnershipRemoveResult = Static<typeof AuthOwnershipRemoveResult>;
+
+export const AuthOwnershipRemoveRequest = request("auth.ownership.remove", AuthOwnershipRemoveArgs);
+export const AuthOwnershipRemoveResponse = response(
+  "auth.ownership.remove",
+  AuthOwnershipRemoveResult,
+);
+
+/** Removes one passkey. The origin it was made at leaves the allowed set with
+ * the last credential naming it, which is the only way an origin ever leaves.
+ *
+ * The credential this session authenticated with is refused (`auth_in_use`),
+ * for the same reason an ownership underfoot is: a person removing the key they
+ * are holding would be locking themselves out mid-sentence. Another passkey, or
+ * another session, removes it. */
+export const AuthCredentialRemoveArgs = Type.Object({ credential_id: Base64Url });
+export type AuthCredentialRemoveArgs = Static<typeof AuthCredentialRemoveArgs>;
+
+export const AuthCredentialRemoveResult = Type.Object({});
+export type AuthCredentialRemoveResult = Static<typeof AuthCredentialRemoveResult>;
+
+export const AuthCredentialRemoveRequest = request(
+  "auth.credential.remove",
+  AuthCredentialRemoveArgs,
+);
+export const AuthCredentialRemoveResponse = response(
+  "auth.credential.remove",
+  AuthCredentialRemoveResult,
+);
+
 /** The `auth.records` topic: how users, credentials, ownerships and token
  * families reach every instance.
  *

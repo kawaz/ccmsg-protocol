@@ -1,6 +1,6 @@
 import type { TSchema } from "@sinclair/typebox";
 import { describe, expect, test } from "bun:test";
-import { OP_NAMES } from "../src/attributes.ts";
+import { OP_NAMES, opErrors } from "../src/attributes.ts";
 import {
   AUTH_CHALLENGE_TTL_MS,
   AuthAssertRequest,
@@ -31,6 +31,7 @@ import {
   PeersFrame,
 } from "../src/control/peers.ts";
 import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
+import { ERROR_CODES } from "../src/errors.ts";
 import {
   AUTH_RECORDS_FAMILY_FRAME,
   AUTH_RECORDS_TOMBSTONE_FRAME,
@@ -648,6 +649,25 @@ describe("authenticating a person", () => {
     expect(OP_NAMES).not.toContain("auth.rotate");
     expect(OP_NAMES).toContain("auth.enroll");
     expect(OP_NAMES).toContain("auth.account.read");
+  });
+
+  test("letting go names what is removed and never whose it is", () => {
+    // The caller is who the connection settled, so an op that took a user
+    // would be a shape for removing somebody else's.
+    const ownership = OP_FIXTURES["auth.ownership.remove"].request;
+    const credential = OP_FIXTURES["auth.credential.remove"].request;
+    expect(Object.keys(ownership).sort()).toEqual(["instance", "op", "request_id"]);
+    expect(Object.keys(credential).sort()).toEqual(["credential_id", "op", "request_id"]);
+    for (const request of [ownership, credential]) expect(request).not.toHaveProperty("user");
+  });
+
+  test("removing what the call is being made with is refused by a code of its own", () => {
+    for (const op of ["auth.ownership.remove", "auth.credential.remove"] as const) {
+      expect(opErrors(op)).toContain("auth_in_use");
+      // Not a question of standing: it is the caller's to remove from anywhere
+      // else, so this is apart from `forbidden`.
+      expect(ERROR_CODES).toContain("auth_in_use");
+    }
   });
 
   test("a retired generation is remembered as a digest and not as the token", () => {

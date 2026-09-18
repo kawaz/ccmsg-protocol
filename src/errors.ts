@@ -79,6 +79,16 @@ export const ERROR_CODES = [
    * spend it, is not one this mesh knows or could reach just now. The client
    * asks for a fresh one, which the instance it is talking to can issue. */
   "auth_unknown_issuer",
+  /** What the caller asked to remove is what they are using to ask. Removing
+   * the ownership of the instance this connection is on, or the credential this
+   * session was authenticated with, would be cutting the branch underneath — so
+   * it is refused rather than half-applied.
+   *
+   * Apart from `forbidden` because nothing about the caller's standing is
+   * wrong: it is theirs to remove, and doing it from somewhere else is all it
+   * takes. Stated as a code of its own so a client can say that rather than
+   * showing a refusal it cannot explain. */
+  "auth_in_use",
   // --- translate ---
   /** The helper process is present but failed on this call. (Its absence is
    * `capability_unavailable` instead.) */
