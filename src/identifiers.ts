@@ -72,25 +72,6 @@ function authority(tail: string): string {
  * carries no query or fragment. */
 const BASE_URL = authority("(?:/[^?#\\s]*)?/$");
 
-/** The path part of a base URL, as above. */
-const BASE_PATH = "(?:/[^?#\\s]*)?/$";
-
-/** A base URL a WebAuthn ceremony can actually run at.
- *
- * Narrower than `BASE_URL` on two counts, both of them the authenticator's
- * rules rather than this contract's taste. A ceremony needs a secure context,
- * so the scheme is `https` — with `http` on the loopback names browsers treat
- * as trustworthy, which is what makes a web UI runnable on a development
- * machine. And a relying party is a domain, so the host may not be an address
- * literal: `https://198.51.100.9/` parses fine and could never hold a passkey.
- *
- * Writing it into the type rather than leaving it to the daemon is what keeps
- * `rpIdOf` total over the values a record may carry. A URL that no ceremony can
- * run at would be a credential that could never have been made. */
-const WEBUI_URL =
-  `^(?:https://(?!\\d{1,3}(?:\\.\\d{1,3}){3}(?:[:/]))${HOST_NAME}${port("443")}` +
-  `|http://(?:localhost|127\\.0\\.0\\.1|\\[::1\\])${port("80")})${BASE_PATH}`;
-
 /** Where an instance is published: the base URL everything it serves hangs
  * under, ending in a slash and naming no route of its own.
  *
@@ -120,43 +101,24 @@ const WEBUI_URL =
 export const Endpoint = Type.String({ $id: "Endpoint", pattern: BASE_URL });
 export type Endpoint = Static<typeof Endpoint>;
 
-/** Where the web UI is published: the base URL a person opens it at, ending in
- * a slash and naming no route of its own (`https://ui.example/ccmsg/`).
- *
- * The counterpart of `Endpoint` on the other side of the wire. An endpoint says
- * where an instance is dialed; this says where the page doing the dialing came
- * from, and one of each is what a credential is made against. Spelled to the
- * same rule as an endpoint, path and trailing slash included, because it is the
- * same kind of value: a base URL that something is published under — but held
- * to a narrower set of them: `https`, or `http` on a loopback name a browser
- * treats as trustworthy, and never an address literal for a host. Those are the
- * authenticator's conditions, not this contract's taste: a ceremony wants a
- * secure context, and a relying party is a domain. A URL outside them is one no
- * credential could have been made at.
- *
- * **What is kept and what is compared are different sizes.** The whole URL is
- * kept: it is where a person is sent, what an operator configures, and what
- * they read back in a list of their own credentials. Every comparison this
- * contract makes is of the origin (`originOf`) or the host (`rpIdOf`), because
- * a browser writes neither a path in an `Origin` header nor one in a
- * `clientDataJSON` — there is nothing finer on the wire to compare. Two web UIs
- * under one origin are therefore one place to everything here. The origin is
- * read off the URL where a header has to be matched rather than kept beside it
- * as a second field that could disagree. */
-export const WebUi = Type.String({ $id: "WebUi", pattern: WEBUI_URL });
-export type WebUi = Static<typeof WebUi>;
-
 /** Where a page was served from: a scheme and an authority and nothing else,
  * spelled as a browser spells it in the `Origin` header and in a credential's
  * `clientDataJSON` — no path, no trailing slash.
  *
+ * The one unit this contract holds a page to. A credential names one of these
+ * and a token family carries it over; nothing finer exists to name, a browser
+ * writing a path into neither header nor `clientDataJSON`. Serving two
+ * instances under one origin at different paths is therefore not a shape this
+ * contract has: the two would be one place to every check made here. Where that
+ * separation is wanted, the hosts are what a browser tells apart.
+ *
  * Apart from `Endpoint` because the two are units of different size and answer
- * different questions. An endpoint says which instance a person is admitted to
- * and is compared with its path; an origin says which site the page in front of
- * them came from, which is all the browser's same-origin rules know about and
- * all a page's own script cannot lie about. One site may be the page for many
- * endpoints, and one origin may carry many instances, so neither is derivable
- * from the other.
+ * different questions. An endpoint says where an instance is dialed; an origin
+ * says which site the page in front of a person came from, which is all the
+ * browser's same-origin rules know about and all a page's own script cannot lie
+ * about. One site may be the page for many endpoints, and one origin may carry
+ * many instances, so neither is derivable from the other — and which instance a
+ * person may enter is answered by ownership rather than by either of them.
  *
  * Held to the one spelling a browser serializes: a lowercase scheme, a
  * lowercase host, and a port only where it is not the scheme's own. No

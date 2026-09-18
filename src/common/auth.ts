@@ -1,34 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { request, response, topicFrame } from "../envelope.ts";
-import { Endpoint, InstanceId, type Origin, Timestamp, WebUi } from "../identifiers.ts";
-
-/** The origin of a web UI's URL: what a browser puts in an `Origin` header and
- * in a credential's `clientDataJSON`, which is the URL's scheme and authority
- * and no more.
- *
- * Derived rather than stored, and derived here rather than once per
- * implementation, because every use of it is an exact comparison against a
- * value a browser serialized. The normalization that makes those comparisons
- * hold — a lowercase scheme and host, a port only where it is not the scheme's
- * own, an address literal in its brackets — is the URL parser's, and this is
- * the one place the contract says so. */
-export function originOf(webui: string): Origin {
-  return new URL(webui).origin;
-}
-
-/** The WebAuthn relying party a credential made at a web UI is created under:
- * the host of its URL, port and scheme left off, as a relying party is a domain
- * and not an origin.
- *
- * Derived for the same reason as the origin, and held to the host exactly. A
- * client will accept a relying party that is the page's effective domain or a
- * registrable suffix of it, so anything shorter than the host would be one
- * credential several sites could answer with — which is the single thing
- * binding a credential to one web UI rules out. An assertion's `rpIdHash` is
- * the SHA-256 of what this returns. */
-export function rpIdOf(webui: string): string {
-  return new URL(webui).hostname;
-}
+import { Endpoint, InstanceId, Origin, Timestamp } from "../identifiers.ts";
 
 /** A value that is nothing but bytes to everyone who handles it: a token, a
  * challenge, a credential id, a signature. Spelled base64url without padding so
@@ -40,6 +12,26 @@ export const Base64Url = Type.String({
   pattern: "^[A-Za-z0-9_-]+$",
 });
 export type Base64Url = Static<typeof Base64Url>;
+
+/** Who a person is: sixteen random bytes the instance that registered them
+ * settled on once, and never anything else after.
+ *
+ * This is the WebAuthn user handle itself rather than a name derived beside it.
+ * The same value keys the person's records, is stored in the authenticator, and
+ * comes back as an assertion's `user_handle` — one spelling, because every use
+ * of it is a string comparison and a second copy of one fact is only a thing
+ * that can disagree. Two values for one person would be two accounts in their
+ * authenticator, which no instance could reach in to merge.
+ *
+ * It names a person and nothing about where they connected. An instance, an
+ * endpoint and a mesh are all things a person may have or reach, and none of
+ * them is who they are. */
+export const UserId = Type.String({
+  $id: "UserId",
+  minLength: 1,
+  pattern: "^[A-Za-z0-9_-]+$",
+});
+export type UserId = Static<typeof UserId>;
 
 /** How long a challenge is good for. Short because a challenge is consumed
  * within one interaction at a keyboard; the window is only what covers the
@@ -55,13 +47,10 @@ export const REGISTER_TTL_MS = 10 * 60 * 1000;
  *
  * A credential's tombstone has no counterpart here on purpose: it is kept
  * without end, because a peer returning from a partition longer than any
- * retention would otherwise carry the removed credential back as news. */
+ * retention would otherwise carry the removed credential back as news. The same
+ * holds of an ownership's — a removed owner brought back would be an instance
+ * someone was let into again. */
 export const FAMILY_TOMBSTONE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** Who a person is to this mesh. Issued when the registration URL is made
- * (`<unit>-<counter>` by default) and carried by every record they own. */
-export const Subject = Type.String({ $id: "Subject", minLength: 1, maxLength: 128 });
-export type Subject = Static<typeof Subject>;
 
 // --- challenge -------------------------------------------------------------
 
@@ -94,60 +83,82 @@ export type AuthChallengeResult = Static<typeof AuthChallengeResult>;
 export const AuthChallengeRequest = request("auth.challenge", AuthChallengeArgs);
 export const AuthChallengeResponse = response("auth.challenge", AuthChallengeResult);
 
-// --- registration ----------------------------------------------------------
+// --- enrolment URLs --------------------------------------------------------
 
-/** What the registration URL carries, as the instance that issued it reads it
- * back. On the wire between a browser and an instance the whole of it is one
- * opaque string; this shape is what `auth.resolve` answers with, so the two
- * instances involved agree on what was authorized.
+/** What the URL a person is sent authorizes: making the user, or adding an
+ * instance to one that exists.
  *
- * Its integrity rests on a secret made for this one registration and held only
- * in the issuing instance's memory. Nothing outlives the window: a restart
- * loses the secret, and the remedy is to issue another URL rather than to keep
- * a key that could sign anything later. */
-export const RegisterClaims = Type.Object(
+ * The two are told apart here rather than by which fields happen to be set,
+ * because they are answered by different ceremonies — a creation makes a
+ * credential, an addition asserts with one that exists — and an op whose effect
+ * is read off the shape of its arguments is authorization written outside the
+ * table that decides it. */
+export const EnrollPurpose = Type.Union([Type.Literal("create_user"), Type.Literal("add_owner")], {
+  $id: "EnrollPurpose",
+});
+export type EnrollPurpose = Static<typeof EnrollPurpose>;
+
+/** What an enrolment URL carries, as the instance that issued it reads it back.
+ * On the wire between a browser and an instance the whole of it is one opaque
+ * string; this shape is what `auth.resolve` answers with, so the two instances
+ * involved agree on what was authorized.
+ *
+ * Its integrity rests on a secret made for this one enrolment and held only in
+ * the issuing instance's memory. Nothing outlives the window: a restart loses
+ * the secret, and the remedy is to issue another URL rather than to keep a key
+ * that could sign anything later. */
+export const EnrollClaims = Type.Object(
   {
     /** The instance that issued the URL and holds the secret. */
     iss: InstanceId,
-    sub: Subject,
-    /** The instance's name as a person operates it, for display. */
-    unit: Type.String({ minLength: 1 }),
-    /** The endpoint the credential is being registered for. The base URL: the
-     * registration is posted to `<endpoint>auth/register`, and the cookie set
-     * for it hangs under the same prefix. */
-    endpoint: Endpoint,
-    /** Where the URL sends the person: the web UI they will open it at, and so
-     * the page the credential will be made by. It is not read off the endpoint,
-     * the UI being publishable anywhere, and a registration URL that did not
-     * name it would not be a URL anyone could open.
+    purpose: EnrollPurpose,
+    /** The instance the person will own once this is spent. The issuer's own:
+     * an instance hands out the right to enter itself, and nothing here lets
+     * one instance open a door into another. */
+    instance: InstanceId,
+    /** Where the person is being sent, and so the only place the ceremony may
+     * be held: the `clientDataJSON.origin` is compared with this, the `Origin`
+     * header with this, and the relying party is this origin's host.
      *
-     * Its origin (`originOf`) is what the ceremony is then held to, and it is
-     * also what lets a first registration be answered across sites at all: an
-     * instance answers CORS for the origins its credentials name, and the first
-     * registration at a new UI has no credential yet — the URL it issued and
-     * still holds stands in for one until it does. That is the issuer's own
-     * knowledge and travels nowhere, which is why a registration is only
-     * completed where it was issued. */
-    webui: WebUi,
+     * An origin rather than a URL because that is the size of everything
+     * compared against it. Where under the origin the page is served is the
+     * operator's business and no part of any check made here. */
+    origin: Origin,
+    /** Where the page posts what it made: the base URL the `auth` routes hang
+     * under.
+     *
+     * **A destination and not a binding.** The page has to send its answer
+     * somewhere, and a URL a person carries from a terminal has no other way to
+     * say where. Nothing on the receiving side compares this with anything —
+     * not with its own endpoint, not with the issuer's. It may be the address
+     * of a load balancer with several instances behind it, and whichever of
+     * them the answer lands on completes the enrolment: it checks the ceremony
+     * itself and asks the issuer only for what the issuer alone holds. Having
+     * nothing to compare here is the point rather than an omission. */
+    endpoint: Endpoint,
     expires_at: Timestamp,
-    /** Names this registration, so it can be spent once. */
+    /** Names this enrolment, so it can be spent once. */
     jti: Type.String({ minLength: 1 }),
-    /** The WebAuthn user handle for this subject: sixteen random bytes the
-     * issuing instance settles on once per `sub`. The page creates the
-     * credential against it, the record keeps it, and an assertion that names a
-     * handle is held to it. It is here rather than left to the page because the
-     * authenticator stores it beyond this instance's reach — a second value for
-     * one person would be a second account on their device. */
-    user_id: Base64Url,
+    /** The user handle the credential will be created against, on a
+     * `create_user` and only there.
+     *
+     * The issuer settles it rather than the page because the authenticator
+     * keeps it beyond any instance's reach — a second value for one person
+     * would be a second account on their device that nothing here could undo.
+     * An `add_owner` names nobody: who arrives is what the assertion says, and
+     * a claim stated up front would be a name the ceremony was not held to. */
+    user: Type.Optional(UserId),
     /** What the administrator who issued the URL wrote down about who it was
      * for. Their words, not the holder's — the label the person gives their
      * own device is `device_label` on the record, and the two are worth telling
      * apart when a list is read back later. */
     issued_label: Type.Optional(Type.String({ maxLength: 128 })),
   },
-  { $id: "RegisterClaims" },
+  { $id: "EnrollClaims" },
 );
-export type RegisterClaims = Static<typeof RegisterClaims>;
+export type EnrollClaims = Static<typeof EnrollClaims>;
+
+// --- making a user ---------------------------------------------------------
 
 /** What `navigator.credentials.create()` produced, in this contract's spelling.
  * The browser's own field names are camelCase; they are written snake_case here
@@ -167,8 +178,8 @@ export const RegistrationCredential = Type.Object(
 export type RegistrationCredential = Static<typeof RegistrationCredential>;
 
 export const AuthRegisterArgs = Type.Object({
-  /** The registration URL's token, opaque to the caller and to any instance
-   * but its issuer. */
+  /** The enrolment URL's token, opaque to the caller and to any instance but
+   * its issuer. */
   token: Type.String({ minLength: 1 }),
   /** The six digits the command line showed when the URL was made, typed in by
    * the person registering. It is not in the URL and never travels with it, so
@@ -182,7 +193,7 @@ export const AuthRegisterArgs = Type.Object({
    * it — the same pairing an assertion carries, and for the same reason: the
    * value also sits inside `client_data_json`, but who may consume it does not,
    * and behind a load balancer the instance that issued it, the one that made
-   * the registration URL and the one receiving this may all be different.
+   * the enrolment URL and the one receiving this may all be different.
    *
    * Omitting it leaves the receiver with a value and no issuer, so it can only
    * be honoured where the receiver itself holds the challenge; anywhere else
@@ -202,13 +213,14 @@ export type AuthRegisterArgs = Static<typeof AuthRegisterArgs>;
  * does not own only as a partitioned one, which keeps a session taken at one
  * site from being carried to another. That partition is by site, where a
  * credential is by origin, so it is the `Origin` held against this family's
- * `webui` that keeps a session to the one place it was made — the cookie's
- * partition answers for sites and nothing finer. Sending it at all across sites takes a browser that partitions
- * cookies, which is a premise of this contract rather than a case it
- * accommodates: one that does not is not an environment this is spoken over. */
+ * `origin` that keeps a session to the one place it was made — the cookie's
+ * partition answers for sites and nothing finer. Sending it at all across sites
+ * takes a browser that partitions cookies, which is a premise of this contract
+ * rather than a case it accommodates: one that does not is not an environment
+ * this is spoken over. */
 export const AuthSession = Type.Object(
   {
-    sub: Subject,
+    user: UserId,
     /** The access token and when it stops being accepted. It is presented on
      * the WebSocket handshake, and a connection lives until this instant unless
      * it is renewed on the connection itself. */
@@ -227,15 +239,15 @@ export const AuthRegisterResponse = response("auth.register", AuthRegisterResult
 // --- assertion -------------------------------------------------------------
 
 /** What `navigator.credentials.get()` produced. `user_handle` is what a
- * resident credential answers with when the person named no account, so a
- * signed-in subject can be found without the browser having been told one. */
+ * resident credential answers with when the person named no account, so the
+ * person can be found without the browser having been told who they are. */
 export const AssertionCredential = Type.Object(
   {
     raw_id: Base64Url,
     client_data_json: Base64Url,
     authenticator_data: Base64Url,
     signature: Base64Url,
-    user_handle: Type.Optional(Base64Url),
+    user_handle: Type.Optional(UserId),
   },
   { $id: "AssertionCredential" },
 );
@@ -256,6 +268,40 @@ export type AuthAssertResult = Static<typeof AuthAssertResult>;
 export const AuthAssertRequest = request("auth.assert", AuthAssertArgs);
 export const AuthAssertResponse = response("auth.assert", AuthAssertResult);
 
+// --- adding an instance to a user ------------------------------------------
+
+/** Adds one instance to the user the assertion names.
+ *
+ * Apart from `auth.assert` because it answers a different question. An
+ * assertion says who is here; this says that the person in front of the
+ * authenticator decided, now, to take an instance as theirs — and only the six
+ * digits shown at that instance's terminal can say the second thing. Folding it
+ * into the assertion as optional arguments would be an op whose effect changes
+ * with which fields are present, which is authorization decided outside the
+ * table.
+ *
+ * No credential is created: the person already has one, and an instance is not
+ * something a passkey is made for. */
+export const AuthEnrollArgs = Type.Object({
+  /** The enrolment URL's token, as `auth.register` carries one. */
+  token: Type.String({ minLength: 1 }),
+  /** The six digits, required here exactly as they are for a registration. What
+   * the assertion proves is that this is the person; what the digits prove is
+   * that they are the one asking for this instance. Without them a synced
+   * passkey left unattended is enough for someone else to hand themselves an
+   * instance in the person's name. */
+  code: Type.String({ pattern: "^[0-9]{6}$" }),
+  challenge: AuthChallenge,
+  credential: AssertionCredential,
+});
+export type AuthEnrollArgs = Static<typeof AuthEnrollArgs>;
+
+export const AuthEnrollResult = AuthSession;
+export type AuthEnrollResult = Static<typeof AuthEnrollResult>;
+
+export const AuthEnrollRequest = request("auth.enroll", AuthEnrollArgs);
+export const AuthEnrollResponse = response("auth.enroll", AuthEnrollResult);
+
 // --- refreshing a token pair ----------------------------------------------
 
 /** Why a client asked for a fresh pair. Stated by the caller and never checked,
@@ -269,7 +315,15 @@ export type AuthRefreshReason = Static<typeof AuthRefreshReason>;
 
 /** The refresh token is not among the arguments: it is a cookie the carrier
  * already holds, and a caller that could state it is a caller that could read
- * it. What is left is why the caller is asking, which nothing is decided by. */
+ * it. What is left is why the caller is asking, which nothing is decided by.
+ *
+ * Answered wherever it lands. The family is replicated and every instance its
+ * owner owns may write it, so a rotation is not carried anywhere. Two instances
+ * rotating one family at once is a collision the losing value does not survive:
+ * it is a value the family retired, which is indistinguishable from a replay,
+ * and the contract has nothing that would tell the two apart. The person signs
+ * in again, which costs one verification and keeps replay detection as sharp as
+ * it was. */
 export const AuthTokenRefreshArgs = Type.Object({
   /** What prompted this refresh, as the client knows it: the page was loaded
    * again, the access token was about to expire, or a dropped connection is
@@ -310,14 +364,19 @@ export const AuthExtendResponse = response("auth.extend", AuthExtendResult);
 
 /** Asks the instance that issued something to check it and spend it.
  *
- * Two things are only knowable at their issuer: a registration URL, whose
- * secret never left it, and a challenge, which is good once and so has to be
- * spent somewhere single. Everything else about the exchange — the WebAuthn
- * verification, the record lookup — the receiving instance does itself. */
+ * Two things are only knowable at their issuer: an enrolment URL, whose secret
+ * never left it, and a challenge, which is good once and so has to be spent
+ * somewhere single. Everything else about the exchange — the WebAuthn
+ * verification, the record lookup, writing what was authorized — the receiving
+ * instance does itself.
+ *
+ * One kind covers both enrolments rather than one each. What is checked is the
+ * same in both — the token, the digits, the count of attempts against them —
+ * and what tells them apart is in the claims that come back. */
 export const AuthResolveArgs = Type.Union(
   [
     Type.Object({
-      kind: Type.Literal("register"),
+      kind: Type.Literal("claims"),
       token: Type.String({ minLength: 1 }),
       /** The digits the person typed, forwarded unchecked. The issuer holds
        * both the code and the count of attempts against it, so it is the only
@@ -332,11 +391,11 @@ export const AuthResolveArgs = Type.Union(
 );
 export type AuthResolveArgs = Static<typeof AuthResolveArgs>;
 
-/** What was authorized, for a registration; nothing beyond the acknowledgement
+/** What was authorized, for an enrolment; nothing beyond the acknowledgement
  * for a challenge, whose whole answer is that it was unspent and now is not. */
 export const AuthResolveResult = Type.Union(
   [
-    Type.Object({ kind: Type.Literal("register"), claims: RegisterClaims }),
+    Type.Object({ kind: Type.Literal("claims"), claims: EnrollClaims }),
     Type.Object({ kind: Type.Literal("challenge") }),
   ],
   { $id: "AuthResolveResult" },
@@ -346,146 +405,149 @@ export type AuthResolveResult = Static<typeof AuthResolveResult>;
 export const AuthResolveRequest = request("auth.resolve", AuthResolveArgs);
 export const AuthResolveResponse = response("auth.resolve", AuthResolveResult);
 
-/** Rotates a token family at the one instance allowed to write it.
- *
- * A family is written by its `iss` alone. Two instances rotating one family in
- * parallel would merge by last write and lose a generation, which reads exactly
- * like a stolen token being replayed — so the rotation is forwarded rather than
- * done where the request landed. */
-export const AuthRotateArgs = Type.Object({
-  refresh_token: Base64Url,
-  /** What the receiving instance observed of the caller, carried to the issuer
-   * for `last_refresh`. The person is at the other end of the receiver's
-   * connection, not the issuer's, so these are only knowable there; forwarded
-   * without them, a rotation would be remembered as a time and nothing else.
-   *
-   * Stated by the receiver and never checked by the issuer — the same standing
-   * as the values on a rotation that was not forwarded, which the client and
-   * its connection are equally the only source of. Nothing may be decided by
-   * them. */
-  reason: Type.Optional(AuthRefreshReason),
-  ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
-  user_agent: Type.Optional(Type.String({ maxLength: 512 })),
-});
-export type AuthRotateArgs = Static<typeof AuthRotateArgs>;
-
-/** Both halves, unlike the person-facing ops: the instance that asked for the
- * rotation is the one that has to put the new refresh token in a cookie. */
-export const AuthRotateResult = Type.Object({
-  sub: Subject,
-  access: Type.Object({ value: Base64Url, expires_at: Timestamp }),
-  refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
-});
-export type AuthRotateResult = Static<typeof AuthRotateResult>;
-
-export const AuthRotateRequest = request("auth.rotate", AuthRotateArgs);
-export const AuthRotateResponse = response("auth.rotate", AuthRotateResult);
-
 // --- the replicated records ------------------------------------------------
+
+/** A person, as every instance in the mesh holds them.
+ *
+ * The root of everything else here: credentials answer for this user, families
+ * belong to it, and ownerships say which instances it may enter. It is keyed by
+ * a value the authenticator also holds, so the person on a device and the
+ * person in these records are the same one by construction. */
+export const UserRecord = Type.Object(
+  {
+    kind: Type.Literal("user"),
+    user: UserId,
+    /** What the person calls themselves, for their own sake when they read
+     * their account back or when several people share an instance.
+     *
+     * A hint like the labels on a credential: nothing is admitted, refused or
+     * matched by it, and the contract says nothing about what it may contain.
+     * The identity is the id beside it, which no display name ever stands in
+     * for. */
+    display_name: Type.Optional(Type.String({ maxLength: 128 })),
+    created_at: Timestamp,
+  },
+  { $id: "UserRecord" },
+);
+export type UserRecord = Static<typeof UserRecord>;
+
+/** The fields of a credential that are a person's to read: everything but the
+ * public key, which is how an assertion is checked and nothing a list needs. */
+const CREDENTIAL_PUBLIC_FIELDS = {
+  kind: Type.Literal("credential"),
+  user: UserId,
+  /** The credential's id as the authenticator names it, which is also what an
+   * assertion is looked up by. */
+  credential_id: Base64Url,
+  /** The one place a ceremony with this credential may be held.
+   *
+   * Registration and assertion alike are held to it: the `clientDataJSON.origin`
+   * has to equal this, the `Origin` header has to equal this, and the relying
+   * party is this origin's host so that the authenticator's own binding says
+   * the same thing rather than something wider. That last part is this
+   * contract's rule and not WebAuthn's — a passkey is bound to a relying party,
+   * which may be a suffix of the host, so the authenticator alone would answer
+   * for every origin under that suffix.
+   *
+   * It says nothing about which instance the holder may enter. That is the
+   * ownership record's answer, and keeping the two apart is what lets one
+   * credential work against every instance a person owns and against a load
+   * balancer in front of them. A person using web UIs at two origins holds two
+   * credentials; using three instances behind one origin holds one. */
+  origin: Origin,
+  /** The authenticator's counter, when it keeps one. Synced passkeys report
+   * zero forever, so only a pair of non-zero readings says anything, and a
+   * reading below the last one is a refusal. */
+  sign_count: Type.Optional(Type.Integer({ minimum: 0 })),
+  /** The BE flag of the authenticator data at registration: whether this
+   * credential is one the authenticator may back up, which in practice is
+   * what separates a passkey synced across a person's devices from one that
+   * lives on the single device it was made on.
+   *
+   * A hint and nothing else, like the address and the user agent beside it:
+   * nothing is admitted or refused by it. It is here so the person reading
+   * their own list can tell "this is my iCloud passkey, it is on every device
+   * I own" from "this is the key on the stick in my drawer" — which decides
+   * what removing the line actually costs them. */
+  backup_eligible: Type.Optional(Type.Boolean()),
+  /** The BS flag of the same authenticator data: whether the credential was
+   * backed up at that moment. Read beside `backup_eligible` — eligible and
+   * not yet backed up is an ordinary state on a device that has just made the
+   * key, and it too decides nothing. */
+  backup_state: Type.Optional(Type.Boolean()),
+  /** The label the administrator put on the enrolment URL, carried over from
+   * the claims it was spent against. */
+  issued_label: Type.Optional(Type.String({ maxLength: 128 })),
+  /** The label the person put on this device as they registered it. */
+  device_label: Type.Optional(Type.String({ maxLength: 128 })),
+  registered_at: Timestamp,
+  /** Where the registration came from and what browser sent it.
+   *
+   * None of this authenticates anything, and nothing is ever admitted or
+   * refused by it — an address is trivially chosen by whoever is making the
+   * request. They are here to be recognised by the one person reading their
+   * own list: an address that is their home provider's and a browser that is
+   * the one they use is how they place a line as theirs, or fail to, which is
+   * the whole reason to keep it. The same holds of the pair below. */
+  registered_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+  registered_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
+  /** When this credential last answered a challenge, and from where. A
+   * credential the person no longer recognises is one they remove. */
+  last_used_at: Type.Optional(Timestamp),
+  last_used_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
+  last_used_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
+} as const;
+
+/** A credential as a person reads it back: what an instance holds, less the
+ * public key. */
+export const CredentialRecordPublic = Type.Object(CREDENTIAL_PUBLIC_FIELDS, {
+  $id: "CredentialRecordPublic",
+});
+export type CredentialRecordPublic = Static<typeof CredentialRecordPublic>;
 
 /** A registered passkey, as every instance in the mesh holds it.
  *
  * Complete once it is written: the instance that registered it is not asked
- * about it again, which is what lets a person authenticate anywhere in the
- * mesh while the instance they registered at is down. */
+ * about it again, which is what lets a person authenticate at any instance they
+ * own while the one they registered at is down. */
 export const CredentialRecord = Type.Object(
   {
-    kind: Type.Literal("credential"),
-    sub: Subject,
-    /** The credential's id as the authenticator names it, which is also what an
-     * assertion is looked up by. */
-    credential_id: Base64Url,
+    ...CREDENTIAL_PUBLIC_FIELDS,
     /** The public key, COSE-encoded. */
     public_key: Base64Url,
-    /** The `user_id` of the registration's claims, which is what the credential
-     * was created against and what an assertion naming a handle is checked
-     * against. */
-    user_handle: Base64Url,
-    /** The endpoint this credential was registered for, as the registration's
-     * claims stated it.
-     *
-     * Which instance the credential admits its holder to: an assertion is
-     * accepted only where the request arrived at this base URL — the same
-     * scheme and authority, and a path below it. (The authority the request
-     * reached, which is a property of the connection; where the page asking was
-     * served from is `webui` below and a separate question.)
-     * `https://h.example/` and `https://h.example/personal/` are
-     * two endpoints and take two registrations, even on one host and one
-     * relying party — the RP ID says which domain an authenticator will answer
-     * for, which is a coarser thing than which instance a person has been
-     * admitted to. Binding to the base URL rather than the origin is what keeps
-     * one instance's credential from being a way into its neighbour. */
-    endpoint: Endpoint,
-    /** The web UI the page that created this credential was served from, whose
-     * origin is the one it may ever be used from.
-     *
-     * Holding it to one origin is this contract's rule rather than WebAuthn's. A
-     * passkey is bound to its relying party, which may be a suffix of the host,
-     * so the authenticator alone would answer for every origin under that
-     * suffix. What holds a credential to one is the check made against
-     * this: the `clientDataJSON.origin` of every ceremony, registration and
-     * assertion alike, has to equal `originOf` this URL. The relying party is
-     * `rpIdOf` the same URL, which is what makes the authenticator's own
-     * binding say the same thing rather than something wider.
-     *
-     * The URL is what is kept, and the origin read off it where a header is
-     * matched — a token minted here carries the same URL and its connection's
-     * `Origin` is held to the origin of it, and the origins of an endpoint's
-     * credentials are the set the HTTP auth ops answer CORS for. Keeping the
-     * origin alongside instead would be a second copy of one fact, able to
-     * disagree with the URL a person is actually sent to. A person using web
-     * UIs at two origins holds two credentials, one per origin; two UIs under
-     * one origin are one place to every check here, there being no path in an
-     * `Origin` header to tell them apart by.
-     *
-     * Apart from `endpoint` because the two answer different questions: which
-     * page may speak, and which instance it may speak to. */
-    webui: WebUi,
-    /** The authenticator's counter, when it keeps one. Synced passkeys report
-     * zero forever, so only a pair of non-zero readings says anything, and a
-     * reading below the last one is a refusal. */
-    sign_count: Type.Optional(Type.Integer({ minimum: 0 })),
-    /** The BE flag of the authenticator data at registration: whether this
-     * credential is one the authenticator may back up, which in practice is
-     * what separates a passkey synced across a person's devices from one that
-     * lives on the single device it was made on.
-     *
-     * A hint and nothing else, like the address and the user agent beside it:
-     * nothing is admitted or refused by it. It is here so the person reading
-     * their own list can tell "this is my iCloud passkey, it is on every device
-     * I own" from "this is the key on the stick in my drawer" — which decides
-     * what removing the line actually costs them. */
-    backup_eligible: Type.Optional(Type.Boolean()),
-    /** The BS flag of the same authenticator data: whether the credential was
-     * backed up at that moment. Read beside `backup_eligible` — eligible and
-     * not yet backed up is an ordinary state on a device that has just made the
-     * key, and it too decides nothing. */
-    backup_state: Type.Optional(Type.Boolean()),
-    /** The label the administrator put on the registration URL, carried over
-     * from the claims it was spent against. */
-    issued_label: Type.Optional(Type.String({ maxLength: 128 })),
-    /** The label the person put on this device as they registered it. */
-    device_label: Type.Optional(Type.String({ maxLength: 128 })),
-    registered_at: Timestamp,
-    /** Where the registration came from and what browser sent it.
-     *
-     * None of this authenticates anything, and nothing is ever admitted or
-     * refused by it — an address is trivially chosen by whoever is making the
-     * request. They are here to be recognised by the one person reading their
-     * own list: an address that is their home provider's and a browser that is
-     * the one they use is how they place a line as theirs, or fail to, which is
-     * the whole reason to keep it. The same holds of the pair below. */
-    registered_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
-    registered_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
-    /** When this credential last answered a challenge, and from where. A
-     * credential the person no longer recognises is one they remove. */
-    last_used_at: Type.Optional(Timestamp),
-    last_used_ip: Type.Optional(Type.String({ minLength: 1, maxLength: 45 })),
-    last_used_user_agent: Type.Optional(Type.String({ maxLength: 512 })),
   },
   { $id: "CredentialRecord" },
 );
 export type CredentialRecord = Static<typeof CredentialRecord>;
+
+/** That one person owns one instance, which is the whole of what admits them to
+ * it.
+ *
+ * A record rather than something read off the mesh. Belonging to a mesh admits
+ * nobody: if it did, adding an instance would widen every person's reach at
+ * once and there would be no way to take one instance back. Here, granting and
+ * revoking are each one line, and neither says anything about how the instances
+ * are wired to each other.
+ *
+ * Several people may own one instance and one person may own several. Which
+ * endpoint a request arrived at is not part of this and is not compared with
+ * anything: an instance reached through a load balancer it shares with its
+ * peers admits the same people as one reached directly. */
+export const OwnershipRecord = Type.Object(
+  {
+    kind: Type.Literal("ownership"),
+    user: UserId,
+    instance: InstanceId,
+    granted_at: Timestamp,
+    /** Who added this owner, when an owner did rather than the command line. A
+     * hint, as the labels are: it decides nothing, and it is here so that a
+     * person reading a list of several owners can see how each came to be
+     * there. */
+    granted_by: Type.Optional(UserId),
+  },
+  { $id: "OwnershipRecord" },
+);
+export type OwnershipRecord = Static<typeof OwnershipRecord>;
 
 /** One person's tokens, in the generation that stands and the one before it.
  *
@@ -496,24 +558,30 @@ export type CredentialRecord = Static<typeof CredentialRecord>;
 export const TokenFamily = Type.Object(
   {
     kind: Type.Literal("token_family"),
-    sub: Subject,
-    /** The instance that minted the family and the only one that may write it. */
+    user: UserId,
+    /** The instance that minted the family.
+     *
+     * A record of where it came from and not a restriction on who may write it:
+     * any instance the person owns rotates the family where the request landed,
+     * which is what keeps a refresh working while the minting instance is down.
+     * Two of them rotating at once is a collision the losing generation does not
+     * survive, and the client it belonged to signs in again. */
     iss: InstanceId,
-    /** The web UI the page that authenticated was served from, carried over
-     * from the credential that answered.
+    /** The origin of the page that authenticated, carried over from the
+     * credential that answered.
      *
      * What a connection presenting one of these tokens is held to: the
-     * handshake compares `originOf` this with the `Origin` the browser states,
-     * and a page from anywhere else is refused however good the token is —
-     * refused as an upgrade that does not happen, there being no connection yet
-     * to answer an error on. A handshake that states no `Origin` at all is
-     * refused the same way: every gate has to be passed, and a caller with
-     * nothing to compare has not passed this one. Without it a token that leaked would be usable
-     * from any page at all, since it says who the person is and nothing about
-     * what is holding it. It lives on the family rather than inside the token's
-     * own spelling because every instance has the family and none of them has
-     * the minting instance's reading of an opaque value. */
-    webui: WebUi,
+     * handshake compares this with the `Origin` the browser states, and a page
+     * from anywhere else is refused however good the token is — refused as an
+     * upgrade that does not happen, there being no connection yet to answer an
+     * error on. A handshake that states no `Origin` at all is refused the same
+     * way: every gate has to be passed, and a caller with nothing to compare has
+     * not passed this one. Without it a token that leaked would be usable from
+     * any page at all, since it says who the person is and nothing about what is
+     * holding it. It lives on the family rather than inside the token's own
+     * spelling because every instance has the family and none of them has the
+     * minting instance's reading of an opaque value. */
+    origin: Origin,
     access: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     refresh: Type.Object({ value: Base64Url, expires_at: Timestamp }),
     /** When the family was last rotated, and what the client said prompted it.
@@ -544,9 +612,9 @@ export const TokenFamily = Type.Object(
      * asked of it, that a value presented now was once issued here and is no
      * longer, which fails the whole family.
      *
-     * Written by the `iss` alone, like the rest of the family, and replicated,
-     * so the memory survives that instance restarting and holds wherever the
-     * reused value is presented. */
+     * Written by whichever owned instance rotated, like the rest of the family,
+     * and replicated, so the memory survives an instance restarting and holds
+     * wherever the reused value is presented. */
     retired: Type.Optional(
       Type.Array(
         Type.Object({
@@ -568,41 +636,93 @@ export type TokenFamily = Static<typeof TokenFamily>;
  * a set of changes says nothing.
  *
  * A tombstone refuses every later write to its key, so a returning peer cannot
- * bring back what a person revoked. */
+ * bring back what a person revoked. It names no subject of its own: the key it
+ * arrives under says what was removed, and a field repeating it would be a
+ * second answer able to disagree with the first. */
 export const AuthTombstone = Type.Object(
   {
     kind: Type.Literal("tombstone"),
-    sub: Subject,
     deleted_at: Timestamp,
-    /** When the mark itself may be dropped. Absent on a credential's, which is
-     * kept without end because the credential it refuses has none either. */
+    /** When the mark itself may be dropped. Absent on a credential's and an
+     * ownership's, which are kept without end because what they refuse has no
+     * expiry of its own to fall back on. */
     expires_at: Type.Optional(Timestamp),
   },
   { $id: "AuthTombstone" },
 );
 export type AuthTombstone = Static<typeof AuthTombstone>;
 
-/** One entry of the replicated set, under the key it is matched by. */
+/** One entry of the replicated set, under the key it is matched by.
+ *
+ * The keys are `user/<user>`, `credential/<credential_id>`,
+ * `ownership/<instance>/<user>` and `family/<id>`. What a key names is what a
+ * tombstone under it removes. */
 export const AuthRecord = Type.Object(
   {
     /** What this entry is, mesh-wide. Two instances writing one key hold the
      * same thing, and the later `updated_at` is what stands. */
     key: Type.String({ minLength: 1, maxLength: 256 }),
     updated_at: Timestamp,
-    body: Type.Union([CredentialRecord, TokenFamily, AuthTombstone]),
+    body: Type.Union([UserRecord, CredentialRecord, OwnershipRecord, TokenFamily, AuthTombstone]),
   },
   { $id: "AuthRecord" },
 );
 export type AuthRecord = Static<typeof AuthRecord>;
 
-/** The `auth.records` topic: how credentials and token families reach every
- * instance.
+// --- reading one's own account --------------------------------------------
+
+export const AuthAccountReadArgs = Type.Object({});
+export type AuthAccountReadArgs = Static<typeof AuthAccountReadArgs>;
+
+/** Who the caller is, what answers for them, and what they own — the three
+ * things a person has, in one reply.
+ *
+ * One op rather than three because they are one picture: a person reading this
+ * is deciding whether a line is theirs and whether to remove it, and a passkey
+ * read apart from the instances it opens does not answer that. Named for the
+ * account instead of for any of the three, so none of them reads as an
+ * appendage of another.
+ *
+ * It answers about the caller and nobody else. There is no shape here for
+ * reading another person's account: owning an instance with someone else does
+ * not make either of them an administrator of the other. */
+export const AuthAccountReadResult = Type.Object(
+  {
+    user: UserRecord,
+    /** Every passkey that answers for this person, at every origin. Without the
+     * public keys: a public key is how an assertion is verified and is of no
+     * use to a person reading a list, and what a reply does not carry cannot be
+     * read out of one. */
+    credentials: Type.Array(CredentialRecordPublic),
+    /** The instances this person owns, with where each is reached when it
+     * publishes an address at all. The endpoint is stated for the person's sake
+     * — an instance id names but does not locate — and it is read off the
+     * instance rather than out of the ownership, which holds no address. */
+    instances: Type.Array(
+      Type.Object({
+        instance: InstanceId,
+        endpoint: Type.Optional(Endpoint),
+        granted_at: Timestamp,
+        granted_by: Type.Optional(UserId),
+      }),
+    ),
+  },
+  { $id: "AuthAccountReadResult" },
+);
+export type AuthAccountReadResult = Static<typeof AuthAccountReadResult>;
+
+export const AuthAccountReadRequest = request("auth.account.read", AuthAccountReadArgs);
+export const AuthAccountReadResponse = response("auth.account.read", AuthAccountReadResult);
+
+/** The `auth.records` topic: how users, credentials, ownerships and token
+ * families reach every instance.
  *
  * Apart from the store because of who may read it. The store is the person's to
  * read and write, and these are secrets that authenticate them — a token read
- * out of the store would be the person's session, and a credential written into
- * it would be a new way in. Only instances subscribe, and a relay carries the
- * frames as the instance it is rather than on a person's behalf. */
+ * out of the store would be the person's session, and a credential or an
+ * ownership written into it would be a new way in. Only instances subscribe,
+ * and a relay carries the frames as the instance it is rather than on a
+ * person's behalf. */
 export const AuthRecordsFrame = topicFrame(
   "auth.records",
   Type.Object({ records: Type.Array(AuthRecord) }),
