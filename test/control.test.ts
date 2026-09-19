@@ -15,9 +15,11 @@ import {
   FileFindResponse,
   FileReadRequest,
   FileReadResponse,
+  FileReadResult,
   FileStatRequest,
   FileStatResponse,
   FileWriteRequest,
+  MAX_FILE_READ_BYTES,
 } from "../src/control/files.ts";
 import {
   DumpPresetsReadResponse,
@@ -87,6 +89,13 @@ import {
 } from "../src/control/transcript.ts";
 import { TranslateRunRequest, TranslateRunResponse } from "../src/control/translate.ts";
 import {
+  FILE_CREATE_REQUEST,
+  FILE_EDIT_REQUEST,
+  FILE_READ_BEYOND_END_RESPONSE,
+  FILE_READ_BINARY_RESPONSE,
+  FILE_READ_PAST_END_RESPONSE,
+  FILE_READ_RESPONSE,
+  FILE_WRITE_REQUEST,
   SESSION_DUMP_FILE,
   TRANSCRIPT_ITEMS,
   TRANSCRIPT_ITEMS_AGENT_SUBJECT,
@@ -779,12 +788,98 @@ describe("file access", () => {
         sid: SID,
         path: "a",
         size: 1,
-        truncated: false,
+        offset: 0,
+        length: 1,
         binary: false,
-        content: "x",
+        content: "eA==",
         mtime_at: "2026-09-08T00:00:00Z",
       }),
     ).toBe(false);
+  });
+
+  test("a read asks for a range, and no range at all reads from the start", () => {
+    expect(
+      isValid(FileReadRequest, {
+        request_id: "9",
+        op: "file.read",
+        sid: SID,
+        kind: "workspace",
+        path: "docs/logo.png",
+        offset: 524_288,
+        length: 524_288,
+      }),
+    ).toBe(true);
+    expect(
+      isValid(FileReadRequest, {
+        request_id: "9",
+        op: "file.read",
+        sid: SID,
+        kind: "workspace",
+        path: "docs/logo.png",
+      }),
+    ).toBe(true);
+  });
+
+  test("a caller may not ask for more than one reply can carry", () => {
+    expect(
+      isValid(FileReadRequest, {
+        request_id: "9",
+        op: "file.read",
+        sid: SID,
+        kind: "workspace",
+        path: "docs/logo.png",
+        length: MAX_FILE_READ_BYTES + 1,
+      }),
+    ).toBe(false);
+  });
+
+  test("a read says where it read and how much, and never that it was cut", () => {
+    const reply = {
+      ok: true,
+      request_id: "9",
+      sid: SID,
+      path: "docs/logo.png",
+      size: 4_096,
+      offset: 4_080,
+      length: 16,
+      binary: true,
+      content: "iVBORw0KGgoAAAANSUhEUg==",
+      mtime_at: NOW,
+    };
+    expect(isValid(FileReadResponse, reply)).toBe(true);
+    // The end of the file is `offset + length === size`, so a flag saying the
+    // same thing would be a second voice on one fact.
+    expect(Object.keys(FileReadResult.properties)).not.toContain("truncated");
+  });
+
+  test("bytes travel base64 whether or not they read as text", () => {
+    const { binary: _dropped, ...rest } = FILE_READ_RESPONSE;
+    expect(isValid(FileReadResponse, rest)).toBe(false);
+    expect(FILE_READ_BINARY_RESPONSE.content.length).toBeGreaterThan(0);
+    expect(atob(FILE_READ_BINARY_RESPONSE.content).length).toBe(FILE_READ_BINARY_RESPONSE.length);
+    expect(atob(FILE_READ_RESPONSE.content)).toBe("export const OP_FIXTURES = {} as const;\n");
+  });
+
+  test("a range wholly past the end answers nothing rather than an error", () => {
+    expect(isValid(FileReadResponse, FILE_READ_BEYOND_END_RESPONSE)).toBe(true);
+    expect(FILE_READ_BEYOND_END_RESPONSE.length).toBe(0);
+    expect(FILE_READ_BEYOND_END_RESPONSE.offset).toBe(FILE_READ_BEYOND_END_RESPONSE.size);
+  });
+
+  test("a range meeting the end answers the part that overlaps", () => {
+    expect(isValid(FileReadResponse, FILE_READ_PAST_END_RESPONSE)).toBe(true);
+    expect(FILE_READ_PAST_END_RESPONSE.offset + FILE_READ_PAST_END_RESPONSE.length).toBe(
+      FILE_READ_PAST_END_RESPONSE.size,
+    );
+    expect(atob(FILE_READ_PAST_END_RESPONSE.content).length).toBe(
+      FILE_READ_PAST_END_RESPONSE.length,
+    );
+  });
+
+  test("what is written back travels in the same container as what was read", () => {
+    for (const request of [FILE_WRITE_REQUEST, FILE_CREATE_REQUEST, FILE_EDIT_REQUEST]) {
+      expect(btoa(atob(request.content))).toBe(request.content);
+    }
   });
 
   test("an edit carries the lock the read handed it", () => {

@@ -1,6 +1,25 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { request, response } from "../envelope.ts";
+import { MAX_FRAME_BYTES, request, response } from "../envelope.ts";
 import { Sid, Timestamp } from "../identifiers.ts";
+
+/** The most bytes of a file one reply carries, and so the default and the
+ * ceiling of `file.read`'s `length`.
+ *
+ * Derived from `MAX_FRAME_BYTES` rather than chosen: base64 grows by 4/3, so
+ * half a frame's worth of bytes leaves the encoded body at about two thirds of
+ * the frame and the envelope and the path with the rest. The contract states
+ * the derived value because a caller has to know what it may ask for before it
+ * asks. */
+export const MAX_FILE_READ_BYTES = MAX_FRAME_BYTES / 2;
+
+/** Bytes as they travel: base64, whatever the file holds.
+ *
+ * One spelling for text and for anything else, so a caller decodes the same
+ * way every time instead of branching on what the instance sniffed the content
+ * to be. Reading and writing share the container, so anything that can be read
+ * can be written back. */
+export const Base64Bytes = Type.String();
+export type Base64Bytes = Static<typeof Base64Bytes>;
 
 /** Which authorization surface a path is reached through, and with it the
  * shape the path takes.
@@ -73,24 +92,43 @@ export type DirListResult = Static<typeof DirListResult>;
 export const DirListRequest = request("dir.list", DirListArgs);
 export const DirListResponse = response("dir.list", DirListResult);
 
+/** Reads one range of one file's bytes.
+ *
+ * A range rather than the whole file because a frame is bounded
+ * (`MAX_FRAME_BYTES`), so a large file could never travel in one reply at all.
+ * A range that runs past the end returns the part that overlaps, and one
+ * entirely past it returns nothing — a caller reading to the end lands there on
+ * its last step, and the end of a correct read is not an error. */
 export const FileReadArgs = Type.Object({
   sid: Sid,
   kind: FileKind,
   path: Type.String({ minLength: 1 }),
+  /** Bytes from the start of the file. Absent reads from the start. */
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
+  /** How many bytes to read. Absent asks for as many as a reply can carry, so
+   * reading a small file whole needs nothing but its path. */
+  length: Type.Optional(
+    Type.Integer({ minimum: 0, maximum: MAX_FILE_READ_BYTES, default: MAX_FILE_READ_BYTES }),
+  ),
 });
 export type FileReadArgs = Static<typeof FileReadArgs>;
 
 export const FileReadResult = Type.Object({
   sid: Sid,
   path: Type.String(),
-  /** Size on disk, which may exceed what `content` carries. */
+  /** The whole file, not this range. With `offset` and `length` it says whether
+   * anything follows, which is why no separate "there is more" flag exists: two
+   * ways to say one thing leaves one of them free to lie. */
   size: Type.Integer({ minimum: 0 }),
-  /** The content was cut at the instance's read limit. */
-  truncated: Type.Boolean(),
-  /** The head of the file sniffed as binary, so no text is sent. */
+  /** Where this range starts, as the instance read it. */
+  offset: Type.Integer({ minimum: 0 }),
+  /** How many bytes `content` decodes to, which is at most what was asked for
+   * and less where the range met the end. */
+  length: Type.Integer({ minimum: 0 }),
+  /** The head of the file sniffed as binary: do not read these bytes as text.
+   * The bytes travel either way. */
   binary: Type.Boolean(),
-  /** Empty when `binary`. */
-  content: Type.String(),
+  content: Base64Bytes,
   /** Also the token an edit passes back: an edit whose file has moved on since
    * this read is refused instead of overwriting the newer copy. */
   mtime_at: Timestamp,
@@ -109,7 +147,7 @@ export const FileWriteArgs = Type.Object({
   sid: Sid,
   /** Relative to the session's working directory. */
   path: Type.String({ minLength: 1 }),
-  content: Type.String(),
+  content: Base64Bytes,
 });
 export type FileWriteArgs = Static<typeof FileWriteArgs>;
 
@@ -133,7 +171,7 @@ export const FileCreateArgs = Type.Object({
   kind: DirKind,
   path: Type.String({ minLength: 1 }),
   /** Usually empty: a client creates the file and lets the user fill it in. */
-  content: Type.String(),
+  content: Base64Bytes,
 });
 export type FileCreateArgs = Static<typeof FileCreateArgs>;
 
@@ -157,7 +195,7 @@ export const FileEditArgs = Type.Object({
   sid: Sid,
   kind: FileKind,
   path: Type.String({ minLength: 1 }),
-  content: Type.String(),
+  content: Base64Bytes,
   /** The modification time the editor read. */
   expected_mtime_at: Timestamp,
   /** Guards a change that happened to leave the modification time alone, which

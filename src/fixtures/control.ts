@@ -80,6 +80,7 @@ const { sid, other_sid, instance, request_id } = FIXTURE_IDS;
 
 const WORKSPACE = "/repos/kawaz/ccmsg-protocol/main";
 const FILE_PATH = "src/fixtures/index.ts";
+const BINARY_PATH = "docs/logo.png";
 
 export const SESSION_KILL_REQUEST: Static<typeof SessionKillRequest> = {
   request_id,
@@ -545,17 +546,97 @@ export const FILE_READ_REQUEST: Static<typeof FileReadRequest> = {
   sid,
   kind: "workspace",
   path: FILE_PATH,
+  offset: 0,
+  length: 40,
 };
 
+/** The head of a text file. The bytes are base64 like every other read: text is
+ * one way of reading them, not a second shape on the wire. */
 export const FILE_READ_RESPONSE: Static<typeof FileReadResponse> = {
   ok: true,
   request_id,
   sid,
   path: FILE_PATH,
   size: 2_048,
-  truncated: false,
+  offset: 0,
+  length: 40,
   binary: false,
-  content: "export const OP_FIXTURES = {} as const;\n",
+  content: "ZXhwb3J0IGNvbnN0IE9QX0ZJWFRVUkVTID0ge30gYXMgY29uc3Q7Cg==",
+  mtime_at: FIXTURE_NOW,
+};
+
+/** One range of a file whose head sniffed as binary — the PNG signature and the
+ * start of its first chunk. `binary` warns against reading it as text; the
+ * bytes come all the same. */
+export const FILE_READ_BINARY_REQUEST: Static<typeof FileReadRequest> = {
+  request_id,
+  op: "file.read",
+  sid,
+  kind: "workspace",
+  path: BINARY_PATH,
+  offset: 0,
+  length: 16,
+};
+
+export const FILE_READ_BINARY_RESPONSE: Static<typeof FileReadResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: BINARY_PATH,
+  size: 4_096,
+  offset: 0,
+  length: 16,
+  binary: true,
+  content: "iVBORw0KGgoAAAANSUhEUg==",
+  mtime_at: FIXTURE_NOW,
+};
+
+/** A range that runs past the end: asked for as much as a reply can carry,
+ * answered with the three bytes that were left. */
+export const FILE_READ_PAST_END_REQUEST: Static<typeof FileReadRequest> = {
+  request_id,
+  op: "file.read",
+  sid,
+  kind: "workspace",
+  path: FILE_PATH,
+  offset: 2_045,
+};
+
+export const FILE_READ_PAST_END_RESPONSE: Static<typeof FileReadResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: FILE_PATH,
+  size: 2_048,
+  offset: 2_045,
+  length: 3,
+  binary: false,
+  content: "fTsK",
+  mtime_at: FIXTURE_NOW,
+};
+
+/** A range wholly past the end: nothing overlaps, so nothing comes back, and
+ * that is a reply rather than an error — a caller walking to the end steps here
+ * last. */
+export const FILE_READ_BEYOND_END_REQUEST: Static<typeof FileReadRequest> = {
+  request_id,
+  op: "file.read",
+  sid,
+  kind: "workspace",
+  path: FILE_PATH,
+  offset: 2_048,
+};
+
+export const FILE_READ_BEYOND_END_RESPONSE: Static<typeof FileReadResponse> = {
+  ok: true,
+  request_id,
+  sid,
+  path: FILE_PATH,
+  size: 2_048,
+  offset: 2_048,
+  length: 0,
+  binary: false,
+  content: "",
   mtime_at: FIXTURE_NOW,
 };
 
@@ -564,7 +645,7 @@ export const FILE_WRITE_REQUEST: Static<typeof FileWriteRequest> = {
   op: "file.write",
   sid,
   path: FILE_PATH,
-  content: "export const OP_FIXTURES = {} as const;\n",
+  content: "ZXhwb3J0IGNvbnN0IE9QX0ZJWFRVUkVTID0ge30gYXMgY29uc3Q7Cg==",
 };
 
 export const FILE_WRITE_RESPONSE: Static<typeof FileWriteResponse> = {
@@ -580,7 +661,7 @@ export const FILE_CREATE_REQUEST: Static<typeof FileCreateRequest> = {
   sid,
   kind: "workspace",
   path: "src/fixtures/ids.ts",
-  content: "export const FIXTURE_IDS = {} as const;\n",
+  content: "ZXhwb3J0IGNvbnN0IEZJWFRVUkVfSURTID0ge30gYXMgY29uc3Q7Cg==",
 };
 
 export const FILE_CREATE_RESPONSE: Static<typeof FileCreateResponse> = {
@@ -596,7 +677,7 @@ export const FILE_EDIT_REQUEST: Static<typeof FileEditRequest> = {
   sid,
   kind: "workspace",
   path: FILE_PATH,
-  content: "export const OP_FIXTURES = {} as const;\n",
+  content: "ZXhwb3J0IGNvbnN0IE9QX0ZJWFRVUkVTID0ge30gYXMgY29uc3Q7Cg==",
   expected_mtime_at: FIXTURE_NOW,
   expected_size: 2_048,
 };
