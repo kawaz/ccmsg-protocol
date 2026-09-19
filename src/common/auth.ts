@@ -63,7 +63,28 @@ export const FAMILY_TOMBSTONE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 // --- challenge -------------------------------------------------------------
 
-export const AuthChallengeArgs = Type.Object({});
+/** Nothing is needed to ask for a challenge, unless the page asking is about to
+ * answer an enrolment URL: then the URL's token comes with it, and a challenge
+ * is handed out only if that URL is still one that could be spent.
+ *
+ * Here rather than left to the ceremony, because this is the first call a page
+ * opened from such a URL makes and the last moment before a person is asked to
+ * type anything. Whether a URL is still good is knowable only at its issuer —
+ * the secret that signed it and the record of its having been spent are both
+ * there — so a page cannot read it out of the token itself: the expiry it
+ * carries is the only half of the answer, and a URL already spent looks alive
+ * for the rest of its window.
+ *
+ * A token that is spent, expired, or issued by nobody this instance can reach
+ * refuses the challenge with `auth_invalid` and says no more. The three are one
+ * answer on purpose: telling them apart would tell a caller holding a URL they
+ * guessed at that it was, at some point, a real one. */
+export const AuthChallengeArgs = Type.Object({
+  /** The enrolment URL's token, opaque here as it is everywhere but at its
+   * issuer. Absent is a page that is not answering one — signing in with a
+   * passkey that exists — and nothing is checked before the challenge. */
+  token: Type.Optional(Type.String({ minLength: 1 })),
+});
 export type AuthChallengeArgs = Static<typeof AuthChallengeArgs>;
 
 /** A challenge and who issued it.
@@ -488,17 +509,29 @@ export const AuthResolveArgs = Type.Union(
       code: Type.String({ pattern: "^[0-9]{6}$" }),
     }),
     Type.Object({ kind: Type.Literal("challenge"), challenge: Base64Url }),
+    /** Whether an enrolment URL could still be spent, which is asked before a
+     * person is shown a form and spends nothing: no digits are stated, no
+     * attempt is counted against the URL, and the enrolment stands exactly as
+     * it did. Apart from `claims` for that reason — one consumes, this one
+     * reads — and carrying no code because there is nothing here for a code to
+     * authorize. */
+    Type.Object({ kind: Type.Literal("alive"), token: Type.String({ minLength: 1 }) }),
   ],
   { $id: "AuthResolveArgs" },
 );
 export type AuthResolveArgs = Static<typeof AuthResolveArgs>;
 
 /** What was authorized, for an enrolment; nothing beyond the acknowledgement
- * for a challenge, whose whole answer is that it was unspent and now is not. */
+ * for a challenge, whose whole answer is that it was unspent and now is not.
+ *
+ * An `alive` answer carries nothing either, and for the opposite reason: what
+ * was asked is answered by the call not having been refused, and a URL that
+ * could be spent says nothing about what it would authorize until it is. */
 export const AuthResolveResult = Type.Union(
   [
     Type.Object({ kind: Type.Literal("claims"), claims: EnrollClaims }),
     Type.Object({ kind: Type.Literal("challenge") }),
+    Type.Object({ kind: Type.Literal("alive") }),
   ],
   { $id: "AuthResolveResult" },
 );

@@ -34,10 +34,13 @@ import {
 import { ErrorResponse, MAX_FRAME_BYTES } from "../src/envelope.ts";
 import { ERROR_CODES } from "../src/errors.ts";
 import {
+  AUTH_CHALLENGE_ENROLL_REQUEST,
   AUTH_RECORDS_FAMILY_FRAME,
   AUTH_RECORDS_TOMBSTONE_FRAME,
   AUTH_REGISTER_REQUEST,
   AUTH_RESOLVE_ADD_OWNER_RESPONSE,
+  AUTH_RESOLVE_ALIVE_REQUEST,
+  AUTH_RESOLVE_ALIVE_RESPONSE,
   AUTH_RESOLVE_CHALLENGE_REQUEST,
   AUTH_RESOLVE_CHALLENGE_RESPONSE,
   AUTH_RESOLVE_RESPONSE,
@@ -131,6 +134,17 @@ describe("the fixtures cover the contract", () => {
       "what spending one answers",
       OP_SCHEMAS["auth.resolve"].response,
       AUTH_RESOLVE_CHALLENGE_RESPONSE,
+    ],
+    [
+      "asking whether an enrolment URL is still good",
+      AuthResolveRequest,
+      AUTH_RESOLVE_ALIVE_REQUEST,
+    ],
+    ["what asking that answers", OP_SCHEMAS["auth.resolve"].response, AUTH_RESOLVE_ALIVE_RESPONSE],
+    [
+      "a challenge asked for by a page opened from an enrolment URL",
+      OP_SCHEMAS["auth.challenge"].request,
+      AUTH_CHALLENGE_ENROLL_REQUEST,
     ],
     ["a forwarded send", MessageSendRequest, MESSAGE_SEND_FORWARDED_REQUEST],
     ["a send nobody took", MessageSendResponse, MESSAGE_SEND_HELD_RESPONSE],
@@ -901,6 +915,27 @@ describe("authenticating a person", () => {
   test("a challenge is spent at the instance that issued it", () => {
     expect(challenge.issuer).toBe(INSTANCE);
     expect(AUTH_RESOLVE_CHALLENGE_RESPONSE.kind).toBe("challenge");
+  });
+
+  test("a challenge is asked for with nothing, or with the URL being answered", () => {
+    // The token is what a page opened from an enrolment URL adds, and its
+    // absence is the ordinary sign-in rather than a field left out.
+    const { request_id: _id, op: _op, ...args } = OP_FIXTURES["auth.challenge"].request;
+    expect(args).toEqual({});
+    expect(isValid(OP_SCHEMAS["auth.challenge"].request, AUTH_CHALLENGE_ENROLL_REQUEST)).toBe(true);
+  });
+
+  test("asking whether an enrolment URL is still good states the token and nothing else", () => {
+    // No digits: nothing here is authorized by them, and an attempt counted
+    // against the URL for a question that spends nothing would let a page
+    // exhaust an enrolment by being opened.
+    const { token: _dropped, ...rest } = AUTH_RESOLVE_ALIVE_REQUEST;
+    expect(isValid(AuthResolveRequest, rest)).toBe(false);
+    expect(AUTH_RESOLVE_ALIVE_REQUEST).not.toHaveProperty("code");
+    // And its answer carries nothing: what was asked is answered by the call
+    // not having been refused.
+    const { ok: _ok, request_id: _rid, kind: _kind, ...body } = AUTH_RESOLVE_ALIVE_RESPONSE;
+    expect(body).toEqual({});
   });
 });
 

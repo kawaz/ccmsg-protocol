@@ -156,13 +156,17 @@ export const OP_ATTRIBUTES = {
   // instance is reached answers — behind a load balancer that is not a choice
   // the caller makes — and each asks the issuing instance itself for the parts
   // only it holds.
+  // A challenge asked for with an enrolment URL's token is refused when that
+  // URL could no longer be spent, which is the one thing this op judges — and
+  // it says no more than that, spent, expired and issued by an instance nobody
+  // here can reach being one answer (`AuthChallengeArgs`).
   "auth.challenge": {
     plane: "common",
     roles: ALL_ROLES,
     needs_hello: false,
     locality: "any_instance",
     carrier: "http",
-    errors: [],
+    errors: ["auth_invalid"],
   },
   "auth.register": {
     plane: "common",

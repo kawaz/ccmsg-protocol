@@ -181,6 +181,12 @@ AuthSession = { user: UserId, access: { value, expires_at } }
 
 `auth.enroll` の属性は他の HTTP op と揃える (`plane: "common"`、全 role、`needs_hello: false`、`locality: "any_instance"`、`carrier: "http"`、errors は `auth.register` と同じ)。`auth.resolve` の `register` kind は `claims` kind になり、purpose は返る claims が言う (検査する物 — token・6 桁・試行回数 — が 2 経路で同じなので、resolve を 2 つに割らない)。
 
+**登録 URL の生死は、人に何かを入力させる前に確かめる。** `auth.challenge` は登録 token を任意で受け取り、受けた instance は発行者に `auth.resolve` の `alive` kind で中継して「この URL はまだ使えるか」だけを問う。生きていなければ challenge を配らず `auth_invalid` で断る。page はここで断られた時にフォームを出さない。
+
+- **`claims` kind と分けるのは、あちらが使い切る op だから**。`alive` は 6 桁を運ばず、試行回数も数えず、`jti` も消費しない — page が開かれただけで enrolment が減る形になってしまう。答えも空で、「使えるか」は断られなかったことが答える (使われるまで何を authorize する URL かは言わない)
+- **使用済み・期限切れ・発行元が到達不能の 3 つは 1 つの答えにする**。区別すると、当てずっぽうの URL を持つ呼び手に「それは実在した URL だ」と教えることになる。期限は token の claims からも読めるが、それは答えの半分でしかなく (使用済みの URL は窓が終わるまで生きて見える)、残りの半分は発行者のメモリにしかない
+- **token を名乗らない `auth.challenge` は今までどおり何も検査しない**。既存の passkey で入る page はこの問いを持たない
+
 ### 5. token family
 
 - family はユーザの物で、mesh に複製する。`sub` は `user` になり、`webui` は `origin` になる。他は変わらない (単一世代 + 前世代の猶予 + retired の digest)
@@ -235,6 +241,7 @@ auth.account.read() -> {
 - **`Origin` の不在は不一致**。全てのゲートを通ることが条件で、比べる物が無い呼び手は条件を満たしていない
 - **`auth.signout` だけ所有を見ない**。所有が答えるのは「その人が入ってよいか」で、出ていくのに入る資格は要らない。所有を外された人の cookie が期限まで残り続ける方が、閉じられない扉として悪い
 - **`endpoint` の列は無い**。どの列にも現れないことがこの DR である
+- **`auth.challenge` の行が全部 `—` なのは、照らす相手をまだ持たないため**。ただし登録 token を名乗った時だけ、その URL がまだ使えるかを発行者に問い、駄目なら `auth_invalid` (§4)。ヘッダも所有も見ないことは変わらない
 - どの検査で落ちても答えは `auth_invalid` で、どれが合わなかったかは述べない
 - CORS は op で 2 通り。**`auth.register` と `auth.challenge` は全 origin に開く** — 人を作る ceremony は、その origin の credential がまだ 1 つも無い所から始まるので、照らせる集合が存在しない。守っているのは token と 6 桁と発行者の判定であって CORS ではない。**それ以外 (`auth.enroll` / `auth.assert` / `auth.token.refresh` / `auth.signout`) の許可集合は「その instance が持っている credential record の origin」**。所有で絞らないのは、この集合が「その page を知っているか」を答える物であって「その人が入ってよいか」を答える物ではないから — 後者は所有が答え、両方を CORS に負わせると、複製で credential を知っているのに所有がまだ無い instance (= enroll が成立すべきちょうどその場面) で preflight が落ちる。生きている登録 URL の origin を発行者だけが足す形は、`register` が全 origin に開いたことで要らなくなり、**消える**
 
@@ -350,6 +357,7 @@ Decision の内容は下記の裁定を織り込んだ後の姿で、ここは�
 | 既に所有者である人の `auth.enroll` | **成功、ownership を増やさない** (§4)。契約が決めているので daemon は従うだけ | 無し |
 | 最後の credential を消した時 | 契約は禁じない。消えた credential で始まった family をどうするかは daemon (issue `passkey-list-for-people` の残論点) | §2.5 は「該当 sub の family を全部失効」で sub 前提 |
 | user の tombstone | ユーザを消す op を契約は持たない。key (`user/<user>`) だけが用意されている | 無し |
+| 登録 URL の生死の判定 (`auth.challenge` の token) | 発行者に `auth.resolve` の `alive` で問う。消費も試行回数の加算もしない。駄目なら `auth_invalid` 1 種 (§4) | 無し。発行者側は `jti` の未消費・期限・署名を見るだけ、他 instance は中継 |
 | 6 桁の試行回数の上限 | 発行者だけが数える ([DR-0021](DR-0021-registration-in-two-halves.md)) | §2.10 にあり。現状維持 |
 | ヘッダと ceremony の検査手順 | §9 の表。`Origin` は登録 URL (register / enroll) か credential (assert / refresh) の origin と比べる | §2.5 が endpoint の origin と比べる旧手順。**要更新** |
 | CORS の 2 通り | `register` / `challenge` は全 origin、`enroll` / `assert` / `refresh` はその instance が持つ credential record の origin (§9) | §2.4 が「credential の webui + 生きている登録 URL」。**要更新** |

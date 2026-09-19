@@ -211,6 +211,8 @@ page が HTTP で叩く 6 op — 人の identity を確定させる 5 つ (`auth
 
 コードの検証も発行者だけが行う。受けた instance は `auth.resolve` の `claims` に token と一緒にコードをそのまま転送し、何も判定しない — 試行回数を数えているのが発行者だからで、受け側が自分で判定すると攻撃者が instance をまたいで試行を分散でき、どこでも数えられない。2 つの登録経路で `auth.resolve` を割らないのは、検証する物 (token・6 桁・試行回数) が同じで、どちらだったかは返る claims が言うため。
 
+その URL がそもそも使えるかは、人に何かを入力させる前に問う。登録 URL から開かれた page は `auth.challenge` に token を添え、受けた instance は challenge を配る前に発行者へ問う — `auth.resolve` の `alive` で、6 桁を運ばず、試行回数も数えず、何も消費しない。使用済み・期限切れ・発行元が到達不能の URL はどれも `auth_invalid` だけで断る。区別すると、当てずっぽうの URL を持つ呼び手に「それは実在した URL だ」と教えることになるため。期限は token の claims からも読めるが、それは答えの半分でしかない — 使用済みの URL は窓が終わるまで生きて見え、残りの半分は発行者のメモリにしかない。
+
 登録 URL の claims (`EnrollClaims`) は `purpose` (`create_user` / `add_owner`) と、所有者を足す先の `instance`、人を送る先の `origin`、page が叩く `endpoint` を名乗る。`user` を持つのは `create_user` の時だけ — authenticator が instance の手の届かない所でこの値を保持するので、page 任せにすると 1 人に 2 つの値ができた時に instance からは直せない。`add_owner` では誰が来るかが assert の結果で決まるので、claims は持たない。`display_name` は認証器に見せるアカウント名で、page は credential を作る前にそれを決めねばならず知る手段が URL しか無いので運ぶ。`issued_label` と分けてあるのは、管理者が「誰に渡した URL か」を書いたメモを本人の名前として見せないためで、これは初期値にすぎない — 登録画面がこの値を入れた欄を見せ、人が確定した値が `auth.register.display_name` になる。`instances` はその URL が渡す instance 全部で、URL を作った端末で決まり、着弾した instance が ceremony の成立後に書く — 着弾側が自分で数えると LB の裏では別の問いに答えることになり、成立前に書くと、どの user record も答えない人を名指した granting が残る。
 
 **`EnrollClaims.endpoint` は宛先であって束縛ではない**。page はどこかに POST しなければならず、端末から運ばれる URL が行き先を言う手段は他に無い。受け取った側はこれを何とも照合しない — 自分の endpoint とも、発行者のものとも。HA の住所 (裏に複数 instance が居る FQDN) でもよく、どれに着弾しても登録は成立する: 受けた instance が自分で ceremony を検査し、自分で record を書き、発行者に問うのは発行者のメモリにしか無い物 (token の真正・`jti` の未消費・6 桁と試行回数) だけである。したがって **発行 instance の endpoint が browser から到達できなくてよい**。
@@ -242,7 +244,7 @@ credential record は登録時の authenticator data の BE / BS フラグ (`bac
 - `auth.extend` は WS。生きている接続の期限 (挨拶の応答の `auth_expires_at`) を、切らずに延ばす
 - `auth.account.read` も WS (`roles: ["user"]`、`scope: "role"`)。**ユーザ / passkey (認証器ごと) / 所有 instance** の 3 段を 1 度に答える。答えるのは呼び手自身の分だけで、他人の分を読む形は持たない。公開鍵は返らない。名前を 3 つのどれかにすると他の 2 つが付属物に見えるので、account という名にしてある
 - `auth.ownership.remove` (`instance`) と `auth.credential.remove` (`credential_id`) も WS (同じく `roles: ["user"]`、`scope: "role"`)。持っている物を手放す 2 op で、**名指すのは外す対象だけ**。誰の物かは接続が既に言っているので、ユーザを引数に取れば他人の物を外す形ができてしまう。**今その呼び出しに使っている物 — 繋いでいる instance の所有、今の session が認証に使った credential — は外せず、`auth_in_use` で断る**。呼び手の資格の問題ではない (本人の物である) ので `forbidden` とは別の code にしてあり、別の所有 instance や別の passkey から、あるいは CLI から外せば済む。「今使っているか」の判定は daemon
-- `auth.resolve` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証と challenge の使い切り — を `to_instance = iss` で発行者へ転送する。family の rotate はここに無い (どの所有 instance でも書けるので、転送する物が無い)
+- `auth.resolve` は instance 間 (`roles: ["instance"]`、`locality: owner_instance`)。発行者にしか答えられないもの — 登録 URL の検証、その URL がまだ使えるかの判定、challenge の使い切り — を `to_instance = iss` で発行者へ転送する。family の rotate はここに無い (どの所有 instance でも書けるので、転送する物が無い)
 
 family は退役させた refresh の値を `retired` にダイジェストだけで、その値本来の exp まで残す (値そのものを複製すると生きた秘密を配って回ることになるが、再利用の判定に要るのは「かつてここで発行され、もう有効でない」かどうかだけ)。
 

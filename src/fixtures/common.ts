@@ -202,6 +202,14 @@ export const AUTH_CHALLENGE_REQUEST: Static<typeof AuthChallengeRequest> = {
   op: "auth.challenge",
 };
 
+/** The same op asked for by a page opened from an enrolment URL, which states
+ * the token so a URL that is already spent refuses before a form is shown. */
+export const AUTH_CHALLENGE_ENROLL_REQUEST: Static<typeof AuthChallengeRequest> = {
+  request_id,
+  op: "auth.challenge",
+  token: ENROLL_TOKEN,
+};
+
 export const AUTH_CHALLENGE_RESPONSE: Static<typeof AuthChallengeResponse> = {
   ok: true,
   request_id,
@@ -460,4 +468,20 @@ export const AUTH_RESOLVE_CHALLENGE_RESPONSE = {
   ok: true,
   request_id,
   kind: "challenge",
+} satisfies Static<typeof AuthResolveResponse>;
+
+/** The third: asking the issuer whether an enrolment URL could still be spent,
+ * which states no digits and spends nothing. */
+export const AUTH_RESOLVE_ALIVE_REQUEST = {
+  request_id,
+  op: "auth.resolve",
+  to_instance: instance,
+  kind: "alive",
+  token: ENROLL_TOKEN,
+} satisfies Static<typeof AuthResolveRequest>;
+
+export const AUTH_RESOLVE_ALIVE_RESPONSE = {
+  ok: true,
+  request_id,
+  kind: "alive",
 } satisfies Static<typeof AuthResolveResponse>;
